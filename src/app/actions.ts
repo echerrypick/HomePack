@@ -82,11 +82,28 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
 
-  let landRegistryData = {
-    titleNumber: 'N/A',
-    tenure: 'Data not found',
-    pricePaid: 'Data not found',
-    date: 'N/A',
+  // Start with a complete, default data structure. This is crucial.
+  const propertyData: PropertyData = {
+    address: fullAddress,
+    landRegistry: {
+      titleNumber: 'N/A',
+      tenure: 'Data not found',
+      pricePaid: 'Data not found',
+      date: 'N/A',
+    },
+    epc: {
+      rating: 'B' as const,
+      potentialRating: 'A' as const,
+      validUntil: '2032-06-20',
+      energyUse: 85,
+    },
+    floodRisk: {
+      riverAndSea: 'Low',
+      surfaceWater: 'Very Low',
+    },
+    planningHistory: [
+      { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
+    ],
   };
 
   try {
@@ -116,8 +133,9 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
-          landRegistryData = {
-            titleNumber: 'N/A', // PPD doesn’t provide title numbers
+          // If a match is found, we overwrite the default landRegistry data.
+          propertyData.landRegistry = {
+            titleNumber: 'N/A',
             tenure: latestTransaction.estateType?.label || 'N/A',
             pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'Data not found',
             date: latestTransaction.transactionDate || 'N/A',
@@ -135,26 +153,9 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     console.error('[SERVER] Error fetching Land Registry data:', error.message);
   }
 
-  const completePropertyData: PropertyData = {
-    address: fullAddress,
-    landRegistry: landRegistryData,
-    epc: {
-      rating: 'B' as const,
-      potentialRating: 'A' as const,
-      validUntil: '2032-06-20',
-      energyUse: 85,
-    },
-    floodRisk: {
-      riverAndSea: 'Low',
-      surfaceWater: 'Very Low',
-    },
-    planningHistory: [
-      { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
-    ],
-  };
-
-  console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(completePropertyData, null, 2));
-  return completePropertyData;
+  // Always return the full, valid propertyData object.
+  console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(propertyData, null, 2));
+  return propertyData;
 }
 
 
@@ -167,21 +168,21 @@ export async function getAddressSuggestions(query: string): Promise<Address[]> {
 export async function getPropertyReport(fullAddress: string): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
   console.log(`[SERVER] getPropertyReport called for: ${fullAddress}`);
   
-  // 1. Fetch all property data. This function now correctly returns the full object.
+  // 1. fetchPropertyData now ALWAYS returns a complete, valid object.
   const propertyData = await fetchPropertyData(fullAddress);
   
   console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
 
   try {
-    // 2. Generate AI summary
+    // 2. Generate AI summary with the guaranteed valid data.
     const summaryResult = await generateAiSummary({
       propertyData: JSON.stringify(propertyData, null, 2),
     });
     
     console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
-    // 3. Return the complete, updated data and the summary
+    // 3. Return the complete data and the summary.
     return {
-      propertyData, // This object now correctly contains the matched land registry info
+      propertyData,
       summary: summaryResult.summary,
     };
   } catch (error) {
