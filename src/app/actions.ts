@@ -175,7 +175,7 @@ export async function getPropertyReport(fullAddress: string): Promise<{ property
     
     console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
     return {
-      propertyData, // CORRECTED: Return the propertyData object we've been working with.
+      propertyData,
       summary: summaryResult.summary,
     };
   } catch (error) {
