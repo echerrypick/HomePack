@@ -86,57 +86,53 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 
 
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
-    // In a real app, you'd call various APIs here using the address.
     console.log(`[SERVER] Fetching real data for ${fullAddress}`);
     
-    // --- Land Registry API Call ---
     let landRegistryData = {
         titleNumber: 'N/A',
         tenure: 'N/A',
         pricePaid: 'N/A',
         date: 'N/A',
     };
-    try {
-        // Regex to extract postcode from the end of the address string
-        const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
-        if (postcodeMatch) {
-            const postcode = postcodeMatch[0];
-            const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
-            
-            console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
-            const response = await fetch(ppdUrl);
-            
-            if(response.ok) {
-                const json = await response.json();
-                const results = json.result.items;
 
-                // Find the best match for the address.
-                // The address from mapbox is usually more complete, so we search if the land registry address is at the start of it.
-                const addressUpper = fullAddress.toUpperCase();
-                const latestTransaction = results.find((item: any) => 
-                    addressUpper.startsWith(item.propertyAddress.label.toUpperCase())
-                );
-                
-                if (latestTransaction) {
-                    console.log("[SERVER] Found matching transaction:", latestTransaction);
-                    landRegistryData = {
-                        titleNumber: latestTransaction.transactionId || 'N/A', // Not a real title number, but a unique ID
-                        tenure: latestTransaction.estateType?.label || 'N/A',
-                        pricePaid: `£${latestTransaction.pricePaid.toLocaleString()}`,
-                        date: latestTransaction.transactionDate,
-                    };
-                } else {
-                    console.log("[SERVER] No matching transaction found in Land Registry data for this address.");
-                }
-            } else {
-                console.error(`[SERVER] Land Registry API Error: ${response.status}`);
-            }
-        } else {
-            console.log("[SERVER] Could not extract postcode from address for Land Registry lookup.");
-        }
-    } catch(error) {
-        console.error("[SERVER] Error fetching or parsing Land Registry data:", error);
+  try {
+    const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
+    if (postcodeMatch) {
+      const postcode = postcodeMatch[0];
+      const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
+      
+      console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
+      const response = await fetch(ppdUrl);
+      
+      if(response.ok) {
+          const json = await response.json();
+          const results = json.result.items;
+
+          const addressUpper = fullAddress.toUpperCase();
+          const latestTransaction = results.find((item: any) => 
+              addressUpper.startsWith(item.propertyAddress.label.toUpperCase())
+          );
+          
+          if (latestTransaction) {
+              console.log("[SERVER] Found matching transaction:", latestTransaction);
+              landRegistryData = {
+                  titleNumber: latestTransaction.transactionId || 'N/A', // Not a real title number, but a unique ID
+                  tenure: latestTransaction.estateType?.label || 'N/A',
+                  pricePaid: `£${latestTransaction.pricePaid.toLocaleString()}`,
+                  date: latestTransaction.transactionDate,
+              };
+          } else {
+              console.log("[SERVER] No matching transaction found in Land Registry data for this address.");
+          }
+      } else {
+          console.error(`[SERVER] Land Registry API Error: ${response.status}`);
+      }
+    } else {
+        console.log("[SERVER] Could not extract postcode from address for Land Registry lookup.");
     }
+  } catch(error) {
+      console.error("[SERVER] Error fetching or parsing Land Registry data:", error);
+  }
 
 
     // --- EPC API Call ---
@@ -181,7 +177,7 @@ export async function getAddressSuggestions(query: string): Promise<Address[]> {
   return fetchAddressesFromQuery(query);
 }
 
-export async function getPropertyReport(fullAddress: string): Promise<{ propertyData: PropertyData, summary: string }> {
+export async function getPropertyReport(fullAddress: string): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
   const propertyData = await fetchPropertyData(fullAddress);
 
   try {
@@ -195,15 +191,15 @@ export async function getPropertyReport(fullAddress: string): Promise<{ property
     };
   } catch (error) {
     console.error("AI Summary generation failed:", error);
-    // Return a fallback summary if AI fails
     return {
       propertyData,
-      summary: "AI summary could not be generated at this time. Please review the property data manually."
+      summary: "AI summary could not be generated at this time. Please review the property data manually.",
+      error: "AI summary error"
     }
   }
 }
 
-export async function generateConditionReportAction(imageURIs: string[]): Promise<string> {
+export async function generateConditionReportAction(imageURIs: string[]): Promise<{ report: string, error?: string }> {
   if (!imageURIs || imageURIs.length === 0) {
     throw new Error("No images provided for condition report.");
   }
@@ -212,9 +208,12 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
     const reportResult = await generateAiConditionReport({
       photoDataUris: imageURIs,
     });
-    return reportResult.conditionReport;
+    return { report: reportResult.conditionReport };
   } catch (error) {
     console.error("AI Condition Report generation failed:", error);
-    return "The AI condition report could not be generated. This may be due to an issue with the images or a temporary service problem. Please try again later."
+    return { 
+        report: "The AI condition report could not be generated. This may be due to an issue with the images or a temporary service problem. Please try again later.",
+        error: "AI report error"
+    }
   }
 }

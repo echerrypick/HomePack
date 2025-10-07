@@ -9,10 +9,17 @@ import { getPropertyReport } from '@/app/actions';
 
 type Step = 'address' | 'report';
 
+type ReportResult = {
+  propertyData: PropertyData;
+  summary: string;
+  error?: string;
+};
+
+
 export default function ToolPage() {
   const [step, setStep] = useState<Step>('address');
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const [reportData, setReportData] = useState<{ propertyData: PropertyData, summary: string } | null>(null);
+  const [reportData, setReportData] = useState<ReportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +33,9 @@ export default function ToolPage() {
       console.log('[CLIENT] Received report result from server action:', report);
       setSelectedAddress(address);
       setReportData(report);
+      if (report.error) {
+        setError(report.error);
+      }
     } catch (e: any) {
       console.error("[CLIENT] Error during report generation:", e);
       setError(e.message || "Failed to generate property report. Please try again later.");

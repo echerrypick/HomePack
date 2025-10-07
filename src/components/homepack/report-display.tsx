@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 
 type ReportDisplayProps = {
   address: Address;
-  reportData: { propertyData: PropertyData; summary: string } | null;
+  reportData: { propertyData: PropertyData; summary: string, error?: string } | null;
   isLoading: boolean;
   onReset: () => void;
 };

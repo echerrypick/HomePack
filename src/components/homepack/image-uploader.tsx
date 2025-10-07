@@ -58,8 +58,11 @@ export function ImageUploader({ onReportGenerated, setIsLoading }: ImageUploader
 
     try {
         const dataUris = await Promise.all(files.map(fileToDataUri));
-        const report = await generateConditionReportAction(dataUris);
-        onReportGenerated(report);
+        const result = await generateConditionReportAction(dataUris);
+        onReportGenerated(result.report);
+        if (result.error) {
+           toast({ title: "Report Generation Warning", description: result.report, variant: "destructive" });
+        }
     } catch(e) {
         toast({ title: "Report Generation Failed", description: "Could not generate the condition report.", variant: "destructive" });
     } finally {
