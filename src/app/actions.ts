@@ -100,7 +100,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const response = await fetch(ppdUrl);
       if (response.ok) {
         const json = await response.json();
-        console.log('[SERVER] Raw PPD API Response:', JSON.stringify(json, null, 2)); // Debug full response
         const transactions = json.result?.items || [];
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
         const postcodeUpper = postcode.toUpperCase();
