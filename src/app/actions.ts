@@ -123,7 +123,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const postcode = postcodeMatch[0];
       const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
       
-      const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate`;
+      const ppdUrl = `https://landregistry.data.gov.uk/app/ppd/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
 
       const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
@@ -274,7 +274,7 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 
-  const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate`;
+  const ppdUrl = `https://landregistry.data.gov.uk/app/ppd/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate`;
 
   try {
     const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
@@ -299,18 +299,29 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
             error: `Empty response from Land Registry API with status code: ${response.status}.`
         };
     }
+    
+    let rawData;
+    try {
+        rawData = JSON.parse(responseText);
+    } catch (e: any) {
+        return {
+            fullAddressUsed: fullAddress,
+            postcode: postcode,
+            landRegistryUrl: ppdUrl,
+            landRegistryRawResponse: `Failed to parse API response as JSON. Error: ${e.message}. Raw Response: ${responseText}`,
+            error: 'Could not parse non-JSON response from Land Registry API.'
+        };
+    }
 
     if (!response.ok) {
         return {
             fullAddressUsed: fullAddress,
             postcode: postcode,
             landRegistryUrl: ppdUrl,
-            landRegistryRawResponse: responseText || `API responded with status: ${response.status}`,
+            landRegistryRawResponse: rawData,
             error: `Land Registry API responded with status: ${response.status}`
         };
     }
-
-    const rawData = JSON.parse(responseText);
 
     return {
       fullAddressUsed: fullAddress,
