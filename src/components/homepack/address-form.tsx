@@ -33,7 +33,7 @@ export function AddressForm({ onAddressSelect, isLoading, error }: AddressFormPr
         setSuggestions(results);
       } catch (error) {
         console.error("Failed to fetch address suggestions:", error);
-        setSuggestions([]);
+        setSuggestions([]); // Optionally, you could set an error state here
       } finally {
         setIsFetching(false);
       }
