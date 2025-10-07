@@ -43,7 +43,7 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
   if (!apiKey) {
     throw new Error("Address lookup API key is not configured. Please add OS_PLACES_API_KEY to your .env file.");
   }
-  const url = `https://api.os.uk/search/places/v1/postcode?postcode=${encodeURIComponent(postcode)}&key=${apiKey}`;
+  const url = `https://api.os.uk/search/names/v1/find?key=${apiKey}&query=${encodeURIComponent(postcode)}`;
 
   try {
     const response = await fetch(url);
@@ -69,10 +69,10 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     
     // Map the API response to our Address interface
     return data.results.map((hit: any) => {
-        const dpa = hit.DPA;
+        const dpa = hit.GAZETTEER_ENTRY;
         return {
-            id: dpa.UDPRN.toString(),
-            line1: dpa.ADDRESS.split(',')[0],
+            id: dpa.ID.toString(),
+            line1: dpa.NAME1,
             town: dpa.POST_TOWN,
             postcode: dpa.POSTCODE,
         };
