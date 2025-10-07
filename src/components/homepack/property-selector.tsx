@@ -32,10 +32,7 @@ export function PropertySelector({ addresses, onSelect, onBack }: PropertySelect
             >
               <Home className="h-5 w-5 text-primary" />
               <div>
-                <p className="font-semibold">{address.line1}</p>
-                <p className="text-sm text-muted-foreground">
-                  {address.town}, {address.postcode}
-                </p>
+                <p className="font-semibold">{address.address}</p>
               </div>
             </button>
           ))}

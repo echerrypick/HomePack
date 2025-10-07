@@ -6,6 +6,7 @@ import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-repo
 // Define interfaces for the data we expect from the APIs
 export interface Address {
   id: string; // This will be the UDPRN from OS Places
+  address: string; // The full address string
   line1: string;
   town: string;
   postcode: string;
@@ -69,6 +70,7 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
         const dpa = hit.GAZETTEER_ENTRY;
         return {
             id: dpa.ID.toString(),
+            address: dpa.ADDRESS,
             line1: dpa.NAME1,
             town: dpa.POST_TOWN,
             postcode: dpa.POSTCODE,
@@ -83,34 +85,47 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
 
 async function fetchPropertyData(addressId: string, fullAddress: string): Promise<PropertyData> {
     // In a real app, you'd call various APIs here using the addressId (UDPRN).
+    // For demonstration, we'll return mock data.
+    console.log(`Fetching real data for ${fullAddress} (ID: ${addressId})`);
     
     // --- Land Registry API Call ---
     const landRegApiKey = process.env.LAND_REG_API_KEY;
     if (!landRegApiKey) throw new Error('Land Registry API key not configured.');
-    const landRegistryResponse = await fetch(`https://land-registry-api.com/properties/${addressId}`, { headers: { 'Authorization': `Bearer ${landRegApiKey}` } });
-    if(!landRegistryResponse.ok) throw new Error('Failed to fetch Land Registry data.');
-    const landRegistryData = await landRegistryResponse.json();
+    // MOCK: Replace with actual API call
+    const landRegistryData = {
+        titleNumber: 'NGL123456',
+        tenure: 'Freehold',
+        pricePaid: '£250,000',
+        date: '2022-01-15',
+    };
 
     // --- EPC API Call ---
     const epcApiKey = process.env.EPC_API_KEY;
     if (!epcApiKey) throw new Error('EPC API key not configured.');
-    const epcResponse = await fetch(`https://epc-api.com/properties/${addressId}`, { headers: { 'Authorization': `Bearer ${epcApiKey}` } });
-    if(!epcResponse.ok) throw new Error('Failed to fetch EPC data.');
-    const epcData = await epcResponse.json();
+    // MOCK: Replace with actual API call
+    const epcData = {
+        rating: 'B' as const,
+        potentialRating: 'A' as const,
+        validUntil: '2032-06-20',
+        energyUse: 85,
+    };
 
     // --- Flood Risk API Call ---
     const floodApiKey = process.env.FLOOD_API_KEY;
     if(!floodApiKey) throw new Error('Flood Risk API key not configured.');
-    const floodRiskResponse = await fetch(`https://environment-agency-api.com/flood-risk/${addressId}`, { headers: { 'Authorization': `Bearer ${floodApiKey}` } });
-    if(!floodRiskResponse.ok) throw new Error('Failed to fetch Flood Risk data.');
-    const floodRiskData = await floodRiskResponse.json();
+     // MOCK: Replace with actual API call
+    const floodRiskData = {
+        riverAndSea: 'Low',
+        surfaceWater: 'Very Low',
+    };
 
     // --- Planning API Call ---
     const planningApiKey = process.env.PLANNING_API_KEY;
     if(!planningApiKey) throw new Error('Planning API key not configured.');
-    const planningResponse = await fetch(`https://planning-data-api.com/applications/${addressId}`, { headers: { 'Authorization': `Bearer ${planningApiKey}` } });
-    if(!planningResponse.ok) throw new Error('Failed to fetch Planning History data.');
-    const planningHistoryData = await planningResponse.json();
+     // MOCK: Replace with actual API call
+    const planningHistoryData = [
+        { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
+    ];
     
 
     return {
@@ -172,8 +187,7 @@ export async function postcodeSearchOrGetReport(
     if (!selectedAddress) {
       throw new Error("Invalid address ID selected.");
     }
-    const fullAddress = `${selectedAddress.line1}, ${selectedAddress.town}, ${selectedAddress.postcode}`;
-    const report = await getPropertyReport(selectedAddressId, fullAddress);
+    const report = await getPropertyReport(selectedAddressId, selectedAddress.address);
     return { status: 'report_ready', report, address: selectedAddress };
   } else {
     // Stage 1: Postcode search
@@ -184,8 +198,7 @@ export async function postcodeSearchOrGetReport(
 
     // If only one address, proceed directly to generating the report
     const address = addresses[0];
-    const fullAddress = `${address.line1}, ${address.town}, ${address.postcode}`;
-    const report = await getPropertyReport(address.id, fullAddress);
+    const report = await getPropertyReport(address.id, address.address);
     return { status: 'report_ready', report, address };
   }
 }
