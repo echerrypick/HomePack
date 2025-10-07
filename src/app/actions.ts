@@ -130,6 +130,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         let latestTransaction = null;
         
         // --- Pass 1: Exact Match ---
+        console.log('[SERVER] Starting Pass 1: Exact Match');
         latestTransaction = transactions.find((item: any) => {
             const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
             return itemAddress === addressStart;
@@ -137,7 +138,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
         // --- Pass 2: "Starts With" Fallback ---
         if (!latestTransaction) {
-            console.log('[SERVER] No exact match found. Trying "starts with" logic.');
+            console.log('[SERVER] No exact match found. Starting Pass 2: "Starts With" Match');
             latestTransaction = transactions.find((item: any) => {
                 const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
                 return itemAddress.startsWith(addressStart);
@@ -274,7 +275,6 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
   try {
     const response = await fetch(ppdUrl);
     
-    // Check if the response is ok, if not, handle it as an error but still return the raw text.
     if (!response.ok) {
         const errorText = await response.text();
         return {
@@ -286,7 +286,19 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
         };
     }
     
-    const rawData = await response.json();
+    // We expect JSON, but if the response is empty, .json() will throw an error
+    const responseText = await response.text();
+    if (!responseText) {
+        return {
+            fullAddressUsed: fullAddress,
+            postcode: postcode,
+            landRegistryUrl: ppdUrl,
+            landRegistryRawResponse: "API returned an empty response.",
+            error: "Empty response from Land Registry API."
+        };
+    }
+
+    const rawData = JSON.parse(responseText);
 
     return {
       fullAddressUsed: fullAddress,
@@ -296,7 +308,7 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
 
   } catch (e: any) {
-    // This will catch network errors or if response.json() fails
+    // This will catch network errors or if JSON.parse() fails
     return {
       fullAddressUsed: fullAddress,
       postcode: postcode,
