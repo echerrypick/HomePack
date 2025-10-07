@@ -87,18 +87,52 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     // In a real app, you'd call various APIs here using the address.
-    // For demonstration, we'll return mock data.
-    console.log(`Fetching real data for ${fullAddress}`);
+    console.log(`[SERVER] Fetching real data for ${fullAddress}`);
     
     // --- Land Registry API Call ---
-    const landRegApiKey = process.env.LAND_REG_API_KEY;
-    // MOCK: Replace with actual API call
-    const landRegistryData = {
-        titleNumber: 'NGL123456',
-        tenure: 'Freehold',
-        pricePaid: '£250,000',
-        date: '2022-01-15',
+    let landRegistryData = {
+        titleNumber: 'N/A',
+        tenure: 'N/A',
+        pricePaid: 'N/A',
+        date: 'N/A',
     };
+    try {
+        const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/);
+        if (postcodeMatch) {
+            const postcode = postcodeMatch[0];
+            const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
+            console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
+            const response = await fetch(ppdUrl);
+            if(response.ok) {
+                const json = await response.json();
+                const results = json.result.items;
+
+                // Find the best match for the address
+                const addressStart = fullAddress.split(',')[0].toUpperCase();
+                const latestTransaction = results.find((item: any) => 
+                    item.propertyAddress.label.toUpperCase().startsWith(addressStart)
+                );
+                
+                if (latestTransaction) {
+                    landRegistryData = {
+                        titleNumber: latestTransaction.transactionId || 'N/A', // Not a real title number, but a unique ID
+                        tenure: latestTransaction.estateType.label,
+                        pricePaid: `£${latestTransaction.pricePaid.toLocaleString()}`,
+                        date: latestTransaction.transactionDate,
+                    };
+                } else {
+                    console.log("[SERVER] No matching transaction found in Land Registry data for this address.");
+                }
+            } else {
+                console.error(`[SERVER] Land Registry API Error: ${response.status}`);
+            }
+        } else {
+            console.log("[SERVER] Could not extract postcode from address for Land Registry lookup.");
+        }
+    } catch(error) {
+        console.error("[SERVER] Error fetching or parsing Land Registry data:", error);
+    }
+
 
     // --- EPC API Call ---
     const epcApiKey = process.env.EPC_API_KEY;
