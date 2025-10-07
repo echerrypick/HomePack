@@ -119,7 +119,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           console.log('[SERVER] No matching transaction found for address:', addressStart);
           landRegistryData.tenure = 'No recent sales data found.';
           landRegistryData.pricePaid = 'No recent sales data found.';
-          landRegistryData.date = '';
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
