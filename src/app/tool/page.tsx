@@ -3,48 +3,18 @@
 import { useState } from 'react';
 import { HomePackHeader } from '@/components/homepack/header';
 import { AddressForm } from '@/components/homepack/address-form';
-import { PropertySelector } from '@/components/homepack/property-selector';
 import { ReportDisplay } from '@/components/homepack/report-display';
 import type { Address, PropertyData } from '@/app/actions';
-import { postcodeSearchOrGetReport } from '@/app/actions';
+import { getPropertyReport } from '@/app/actions';
 
-type Step = 'address' | 'select' | 'report';
+type Step = 'address' | 'report';
 
 export default function ToolPage() {
   const [step, setStep] = useState<Step>('address');
-  const [postcode, setPostcode] = useState('');
-  const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [reportData, setReportData] = useState<{ propertyData: PropertyData, summary: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const handleAddressSearch = async (postcode: string) => {
-    setIsLoading(true);
-    setError(null);
-    setPostcode(postcode); // Save postcode for later
-    console.log(`[CLIENT] Starting address search for postcode: ${postcode}`);
-    try {
-      const result = await postcodeSearchOrGetReport({ postcode });
-      console.log('[CLIENT] Received result from server action:', result);
-
-      if (result.status === 'address_selection') {
-        setAddresses(result.addresses);
-        console.log('[CLIENT] addresses state set to:', result.addresses);
-        setStep('select');
-      } else if (result.status === 'report_ready') {
-        setSelectedAddress(result.address);
-        setReportData(result.report);
-        setStep('report');
-      }
-    } catch (e: any) {
-      console.error("[CLIENT] Error during address search:", e);
-      setError(e.message || "Failed to process postcode. Please try again later.");
-      setAddresses([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleAddressSelect = async (address: Address) => {
     setIsLoading(true);
@@ -52,17 +22,12 @@ export default function ToolPage() {
     setStep('report'); // Change step immediately for better UX
     console.log('[CLIENT] Address selected:', address);
     try {
-      const result = await postcodeSearchOrGetReport({ postcode, selectedAddressId: address.id });
-      console.log('[CLIENT] Received report result from server action:', result);
-      if (result.status === 'report_ready') {
-        setSelectedAddress(result.address);
-        setReportData(result.report);
-      } else {
-        // This case should not happen if we provide an address ID
-         throw new Error("An unexpected error occurred while fetching the report.");
-      }
+      const report = await getPropertyReport(address.address);
+      console.log('[CLIENT] Received report result from server action:', report);
+      setSelectedAddress(address);
+      setReportData(report);
     } catch (e: any) {
-      console.error("[CLIENT] Error during address selection:", e);
+      console.error("[CLIENT] Error during report generation:", e);
       setError(e.message || "Failed to generate property report. Please try again later.");
       // Reset to a safe state on failure
       handleReset();
@@ -73,15 +38,13 @@ export default function ToolPage() {
 
   const handleReset = () => {
     setStep('address');
-    setPostcode('');
-    setAddresses([]);
     setSelectedAddress(null);
     setReportData(null);
     setError(null);
     console.log('[CLIENT] State reset.');
   };
   
-  console.log(`[CLIENT] Rendering page. Current step: ${step}, Number of addresses: ${addresses.length}`);
+  console.log(`[CLIENT] Rendering page. Current step: ${step}`);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -89,15 +52,7 @@ export default function ToolPage() {
       <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-5xl mx-auto">
           {step === 'address' && (
-             <AddressForm onSearch={handleAddressSearch} isLoading={isLoading} error={error} />
-          )}
-
-          {step === 'select' && !isLoading && (
-            <PropertySelector
-              addresses={addresses}
-              onSelect={handleAddressSelect}
-              onBack={handleReset}
-            />
+             <AddressForm onAddressSelect={handleAddressSelect} isLoading={isLoading} error={error} />
           )}
           
           {step === 'report' && (

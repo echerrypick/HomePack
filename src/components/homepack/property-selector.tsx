@@ -10,7 +10,6 @@ type PropertySelectorProps = {
 };
 
 export function PropertySelector({ addresses, onSelect, onBack }: PropertySelectorProps) {
-  console.log('[PropertySelector] Rendering with addresses:', addresses);
   return (
     <Card className="shadow-lg animate-fade-in-up">
       <CardHeader>
