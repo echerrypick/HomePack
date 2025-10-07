@@ -82,7 +82,7 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
 
-  // Start with a complete, default data structure. This is crucial.
+  // Start with a complete, default data structure.
   const propertyData: PropertyData = {
     address: fullAddress,
     landRegistry: {
@@ -124,9 +124,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
         const latestTransaction = transactions.find((item: any) => {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          const matchesAddress = itemAddress.includes(addressStart);
-          const matchesPostcode = itemAddress.includes(postcodeUpper);
-          return matchesAddress && matchesPostcode;
+          return itemAddress.includes(addressStart) && itemAddress.includes(postcodeUpper);
         });
 
         if (latestTransaction) {
@@ -134,7 +132,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           // If a match is found, we overwrite the default landRegistry data.
           propertyData.landRegistry = {
             titleNumber: 'N/A',
-            tenure: latestTransaction.estateType?.label || 'N/A',
+            tenure: latestTransaction.estateType?.label || 'Data not found',
             pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'Data not found',
             date: latestTransaction.transactionDate || 'N/A',
           };
@@ -166,28 +164,25 @@ export async function getAddressSuggestions(query: string): Promise<Address[]> {
 export async function getPropertyReport(fullAddress: string): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
   console.log(`[SERVER] getPropertyReport called for: ${fullAddress}`);
   
-  // 1. fetchPropertyData now ALWAYS returns a complete, valid object.
   const propertyData = await fetchPropertyData(fullAddress);
   
   console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
 
   try {
-    // 2. Generate AI summary with the guaranteed valid data.
     const summaryResult = await generateAiSummary({
       propertyData: JSON.stringify(propertyData, null, 2),
     });
     
     console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
-    // 3. Return the complete data and the summary.
     return {
-      propertyData,
+      propertyData, // CORRECTED: Return the propertyData object we've been working with.
       summary: summaryResult.summary,
     };
   } catch (error) {
     console.error("AI Summary generation failed:", error);
     console.log('[SERVER] getPropertyReport is returning FAILURE but still with property data.');
     return {
-      propertyData, // Still return the property data even if AI summary fails
+      propertyData,
       summary: "AI summary could not be generated at this time. Please review the property data manually.",
       error: "AI summary error"
     }
