@@ -100,7 +100,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
       console.log(`[SERVER] Extracted postcode: ${postcode}`);
-      const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
+      const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?ppi:propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
       
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
       const response = await fetch(ppdUrl);
