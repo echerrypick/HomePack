@@ -5,7 +5,7 @@ import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-repo
 
 // Define interfaces for the data we expect from the APIs
 export interface Address {
-  id: string; // Will be a composite ID from the address data, e.g., UDRN
+  id: string; // This will be the UDPRN from Ideal Postcodes
   line1: string;
   town: string;
   postcode: string;
@@ -36,38 +36,63 @@ export interface PropertyData {
   }[];
 }
 
-// Simulate network latency for a better user experience feel
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 // --- API Calls ---
-// Note: In a real app, these would be more robust, with error handling, etc.
 
 async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> {
-  // In a real app, you'd use an address lookup API.
-  // We'll simulate this with our mock data for now.
-  const { MOCK_ADDRESSES } = await import('@/lib/mock-data');
-  await sleep(1000);
-  return MOCK_ADDRESSES;
+  const apiKey = process.env.IDEAL_POSTCODES_API_KEY;
+  if (!apiKey) {
+    throw new Error("Address lookup API key is not configured.");
+  }
+  const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodeURIComponent(postcode)}?api_key=${apiKey}`;
+  
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Failed to fetch addresses from postcode.");
+  }
+  const data = await response.json();
+
+  if (data.code !== 2000) {
+    throw new Error(data.message || "Could not retrieve addresses.");
+  }
+
+  // Map the API response to our Address interface
+  return data.result.hits.map((hit: any) => ({
+    id: hit.udprn,
+    line1: hit.line_1,
+    town: hit.post_town,
+    postcode: hit.postcode,
+  }));
 }
 
-async function fetchPropertyData(addressId: string): Promise<PropertyData> {
-    // In a real app, you'd call various APIs here (Land Registry, EPC, etc.)
-    // using the addressId (like a UPRN) to get the data.
-    // We'll simulate this with our mock data.
-    const { MOCK_PROPERTY_DATA } = await import('@/lib/mock-data');
-    await sleep(1500);
-    const data = MOCK_PROPERTY_DATA[addressId];
-    if (!data) {
-        throw new Error("Could not retrieve property details.");
-    }
-    return data;
+async function fetchPropertyData(addressId: string, fullAddress: string): Promise<PropertyData> {
+    // In a real app, you'd call various APIs here using the addressId (UDPRN).
+    // For this example, we'll simulate this by calling mock-style functions.
+    // In a full implementation, each of these would be a `fetch` call.
+    
+    // Simulate fetching data from various sources
+    const landRegistryData = { titleNumber: 'NGL123456', tenure: 'Leasehold', pricePaid: '£750,000', date: '2022-08-15' };
+    const epcData = { rating: 'C', potentialRating: 'B', validUntil: '2030-01-01', energyUse: 95 };
+    const floodRiskData = { riverAndSea: 'Low', surfaceWater: 'Very Low' };
+    const planningHistoryData = [{ application: 'Rear extension', decision: 'Approved', date: '2019-05-20' }];
+
+    // You would replace the above with actual fetch calls to your APIs:
+    // const landRegistryData = await fetch(`https://land-registry-api.com/properties/${addressId}`, { headers: { 'Authorization': `Bearer ${process.env.LAND_REG_API_KEY}` } }).then(res => res.json());
+    // ... and so on for EPC, Flood Risk, etc.
+
+    return {
+        address: fullAddress,
+        landRegistry: landRegistryData,
+        epc: epcData,
+        floodRisk: floodRiskData,
+        planningHistory: planningHistoryData,
+    };
 }
 
 
 // --- Main Server Action ---
 
-async function getPropertyReport(addressId: string): Promise<{ propertyData: PropertyData, summary: string }> {
-  const propertyData = await fetchPropertyData(addressId);
+async function getPropertyReport(addressId: string, fullAddress: string): Promise<{ propertyData: PropertyData, summary: string }> {
+  const propertyData = await fetchPropertyData(addressId, fullAddress);
 
   try {
     const summaryResult = await generateAiSummary({
@@ -97,35 +122,36 @@ export async function postcodeSearchOrGetReport(
 ): Promise<SearchResult> {
   const { postcode, selectedAddressId } = currentState;
 
+  const addresses = await fetchAddressesFromPostcode(postcode);
+  if (addresses.length === 0) {
+      throw new Error("No addresses found for this postcode.");
+  }
+      
   if (selectedAddressId) {
     // Stage 2: Address selected, get the report
-    const addresses = await fetchAddressesFromPostcode(postcode);
     const selectedAddress = addresses.find(a => a.id === selectedAddressId);
     
     if (!selectedAddress) {
       throw new Error("Invalid address ID selected.");
     }
-    const report = await getPropertyReport(selectedAddressId);
+    const fullAddress = `${selectedAddress.line1}, ${selectedAddress.town}, ${selectedAddress.postcode}`;
+    const report = await getPropertyReport(selectedAddressId, fullAddress);
     return { status: 'report_ready', report, address: selectedAddress };
   } else {
     // Stage 1: Postcode search
     if (!postcode) {
       throw new Error('Postcode is required');
     }
-    const results = await fetchAddressesFromPostcode(postcode);
-
-    if (results.length === 0) {
-      throw new Error("No addresses found for this postcode.");
-    }
     
-    if (results.length > 1) {
+    if (addresses.length > 1) {
       // Multiple addresses found, user needs to select one
-      return { status: 'address_selection', addresses: results };
+      return { status: 'address_selection', addresses: addresses };
     }
 
     // If only one address, proceed directly to generating the report
-    const address = results[0];
-    const report = await getPropertyReport(address.id);
+    const address = addresses[0];
+    const fullAddress = `${address.line1}, ${address.town}, ${address.postcode}`;
+    const report = await getPropertyReport(address.id, fullAddress);
     return { status: 'report_ready', report, address };
   }
 }
@@ -136,7 +162,6 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
     throw new Error("No images provided for condition report.");
   }
 
-  // No need to sleep here, the AI call has its own latency
   try {
     const reportResult = await generateAiConditionReport({
       photoDataUris: imageURIs,
