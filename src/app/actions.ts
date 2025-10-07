@@ -8,34 +8,8 @@ import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-repo
 // Simulate network latency
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-type SearchResult = 
-  | { status: 'address_selection'; addresses: Address[] }
-  | { status: 'report_ready'; report: { propertyData: PropertyData, summary: string }, address: Address };
-
-export async function processPostcode(postcode: string): Promise<SearchResult> {
-    await sleep(1000); // Simulate API call
-    if (!postcode) {
-        throw new Error('Postcode is required');
-    }
-    // In a real app, you'd fetch this from an API.
-    const results = MOCK_ADDRESSES;
-
-    if (results.length === 0) {
-        throw new Error("No addresses found for this postcode.");
-    }
-    
-    if (results.length > 1) {
-        return { status: 'address_selection', addresses: results };
-    }
-
-    // If only one address, proceed to get property data
-    const address = results[0];
-    const report = await getPropertyData(address.id);
-    return { status: 'report_ready', report, address };
-}
-
-
-export async function getPropertyData(addressId: string): Promise<{ propertyData: PropertyData, summary: string }> {
+// Internal function to get property data and generate AI summary
+async function getPropertyReport(addressId: string): Promise<{ propertyData: PropertyData, summary: string }> {
   await sleep(1500); // Simulate API calls
   const propertyData = MOCK_PROPERTY_DATA[addressId];
   if (!propertyData) {
@@ -60,6 +34,49 @@ export async function getPropertyData(addressId: string): Promise<{ propertyData
     }
   }
 }
+
+type SearchResult = 
+  | { status: 'address_selection'; addresses: Address[] }
+  | { status: 'report_ready'; report: { propertyData: PropertyData, summary: string }, address: Address };
+
+export async function postcodeSearchOrGetReport(
+  currentState: { postcode: string, selectedAddressId?: string }
+): Promise<SearchResult> {
+  const { postcode, selectedAddressId } = currentState;
+
+  if (selectedAddressId) {
+    // Stage 2: Address selected, get the report
+    const selectedAddress = MOCK_ADDRESSES.find(a => a.id === selectedAddressId);
+    if (!selectedAddress) {
+      throw new Error("Invalid address ID selected.");
+    }
+    const report = await getPropertyReport(selectedAddressId);
+    return { status: 'report_ready', report, address: selectedAddress };
+  } else {
+    // Stage 1: Postcode search
+    await sleep(1000); // Simulate API call
+    if (!postcode) {
+      throw new Error('Postcode is required');
+    }
+    // In a real app, you'd fetch this from an API based on the postcode.
+    const results = MOCK_ADDRESSES;
+
+    if (results.length === 0) {
+      throw new Error("No addresses found for this postcode.");
+    }
+    
+    if (results.length > 1) {
+      // Multiple addresses found, user needs to select one
+      return { status: 'address_selection', addresses: results };
+    }
+
+    // If only one address, proceed directly to generating the report
+    const address = results[0];
+    const report = await getPropertyReport(address.id);
+    return { status: 'report_ready', report, address };
+  }
+}
+
 
 export async function generateConditionReportAction(imageURIs: string[]): Promise<string> {
   if (!imageURIs || imageURIs.length === 0) {

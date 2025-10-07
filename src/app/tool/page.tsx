@@ -6,12 +6,13 @@ import { AddressForm } from '@/components/homepack/address-form';
 import { PropertySelector } from '@/components/homepack/property-selector';
 import { ReportDisplay } from '@/components/homepack/report-display';
 import type { Address, PropertyData } from '@/lib/mock-data';
-import { processPostcode, getPropertyData } from '@/app/actions';
+import { postcodeSearchOrGetReport } from '@/app/actions';
 
 type Step = 'address' | 'select' | 'report';
 
 export default function ToolPage() {
   const [step, setStep] = useState<Step>('address');
+  const [postcode, setPostcode] = useState('');
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [reportData, setReportData] = useState<{ propertyData: PropertyData, summary: string } | null>(null);
@@ -21,8 +22,9 @@ export default function ToolPage() {
   const handleAddressSearch = async (postcode: string) => {
     setIsLoading(true);
     setError(null);
+    setPostcode(postcode); // Save postcode for later
     try {
-      const result = await processPostcode(postcode);
+      const result = await postcodeSearchOrGetReport({ postcode });
       if (result.status === 'address_selection') {
         setAddresses(result.addresses);
         setStep('select');
@@ -43,12 +45,17 @@ export default function ToolPage() {
     setIsLoading(true);
     setError(null);
     setStep('report'); // Change step immediately for better UX
-    setSelectedAddress(address);
     try {
-      const data = await getPropertyData(address.id);
-      setReportData(data);
-    } catch (e) {
-      setError("Failed to generate property report. Please try again later.");
+      const result = await postcodeSearchOrGetReport({ postcode, selectedAddressId: address.id });
+      if (result.status === 'report_ready') {
+        setSelectedAddress(result.address);
+        setReportData(result.report);
+      } else {
+        // This case should not happen if we provide an address ID
+         throw new Error("An unexpected error occurred while fetching the report.");
+      }
+    } catch (e: any) {
+      setError(e.message || "Failed to generate property report. Please try again later.");
       // Reset to a safe state on failure
       handleReset();
     } finally {
@@ -58,6 +65,7 @@ export default function ToolPage() {
 
   const handleReset = () => {
     setStep('address');
+    setPostcode('');
     setAddresses([]);
     setSelectedAddress(null);
     setReportData(null);
@@ -77,7 +85,7 @@ export default function ToolPage() {
             <PropertySelector
               addresses={addresses}
               onSelect={handleAddressSelect}
-              onBack={() => setStep('address')}
+              onBack={handleReset}
             />
           )}
           

@@ -15,7 +15,7 @@ export function PropertySelector({ addresses, onSelect, onBack }: PropertySelect
       <CardHeader>
         <Button variant="ghost" size="sm" className="absolute top-4 left-4" onClick={onBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          Search Again
         </Button>
         <CardTitle className="text-2xl font-headline pt-10 text-center">Select a Property</CardTitle>
         <CardDescription className="text-center">
