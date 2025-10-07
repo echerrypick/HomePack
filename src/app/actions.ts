@@ -80,9 +80,9 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 }
 
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
-  console.log(`[SERVER] Fetching real data for ${fullAddress}`);
+  console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
 
-  // Start with default/mock data
+  // Create a mutable property object with default values
   let property: PropertyData = {
     address: fullAddress,
     landRegistry: {
@@ -127,26 +127,23 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           const matchesAddress = itemAddress.includes(addressStart);
           const matchesPostcode = itemAddress.includes(postcodeUpper);
           
-          console.log(`[SERVER] DETAILED LOG FOR COMPARISON:`);
-          console.log(`[SERVER] ==> Comparing API Address: "${itemAddress}"`);
-          console.log(`[SERVER] ==> With search term: "${addressStart}"`);
-          console.log(`[SERVER] ==> Address match: ${matchesAddress}, Postcode match: ${matchesPostcode}`);
-
+          console.log(`[SERVER] ==> Comparing API Address: "${itemAddress}" | With search term: "${addressStart}" | Address match: ${matchesAddress}, Postcode match: ${matchesPostcode}`);
           return matchesAddress && matchesPostcode;
         });
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
-          // THIS IS THE CRITICAL FIX: Update the landRegistry part of the property object
+          // THIS IS THE CRITICAL FIX: Directly mutate the landRegistry part of the 'property' object
           property.landRegistry = {
             titleNumber: 'N/A', // PPD doesn’t provide title numbers
             tenure: latestTransaction.estateType?.label || 'N/A',
             pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'No recent sales data found.',
             date: latestTransaction.transactionDate || 'N/A',
           };
+          console.log('[SERVER] Mutated property.landRegistry with matched data:', property.landRegistry);
         } else {
           console.log('[SERVER] No matching transaction found for address:', addressStart);
-          property.landRegistry.pricePaid = 'No recent sales data found.';
+          // property.landRegistry retains its default 'Data not found' values
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
@@ -162,7 +159,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     property.landRegistry.pricePaid = 'Error fetching data.';
   }
 
-  console.log('[SERVER] Returning propertyData with updated land registry:', property.landRegistry);
+  console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(property, null, 2));
   return property; // Return the entire, potentially updated, property object
 }
 
@@ -174,21 +171,28 @@ export async function getAddressSuggestions(query: string): Promise<Address[]> {
 }
 
 export async function getPropertyReport(fullAddress: string): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
-  // fetchPropertyData now returns the complete object with Land Registry data (or defaults)
+  console.log(`[SERVER] getPropertyReport called for: ${fullAddress}`);
+  
+  // 1. Fetch all property data. This function now correctly returns the full object.
   const propertyData = await fetchPropertyData(fullAddress);
+  
+  console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
 
   try {
+    // 2. Generate AI summary
     const summaryResult = await generateAiSummary({
       propertyData: JSON.stringify(propertyData, null, 2),
     });
     
-    // The returned propertyData object now correctly contains the land registry info
+    console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
+    // 3. Return the complete, updated data and the summary
     return {
-      propertyData,
+      propertyData, // This object now correctly contains the matched land registry info
       summary: summaryResult.summary,
     };
   } catch (error) {
     console.error("AI Summary generation failed:", error);
+    console.log('[SERVER] getPropertyReport is returning FAILURE but still with property data.');
     return {
       propertyData, // Still return the property data even if AI summary fails
       summary: "AI summary could not be generated at this time. Please review the property data manually.",
