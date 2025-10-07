@@ -122,7 +122,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
-      const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
       
       const ppdUrl = `https://landregistry.data.gov.uk/app/ppd/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
@@ -132,6 +131,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         const json = await response.json();
         const transactions = json.result?.items || [];
         
+        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
         console.log(`[SERVER] Searching for address matching: "${addressStart}" within postcode: "${postcode}"`);
 
         // Pass 1: Exact Match on the address line
