@@ -25,7 +25,7 @@ export default function DebugPage() {
     setDebugInfo(null);
     setIsSearching(false); // Hide the form and show loading spinner
     try {
-        const result = await getDebugInfo(address.address);
+        const result = await getDebugInfo(address);
         setDebugInfo(result);
     } catch(e: any) {
         setError(e.message || "An unexpected error occurred.");

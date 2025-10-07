@@ -11,6 +11,7 @@ import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-repo
 export type Address = {
   id: string;
   address: string;
+  postcode?: string;
 }
 
 export type PropertyData = {
@@ -67,10 +68,14 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
       return [];
     }
 
-    const mappedAddresses: Address[] = data.features.map((feature: any) => ({
-      id: feature.id,
-      address: feature.place_name,
-    }));
+    const mappedAddresses: Address[] = data.features.map((feature: any) => {
+        const postcodeContext = feature.context?.find((c: any) => c.id.startsWith('postcode.'));
+        return {
+          id: feature.id,
+          address: feature.place_name,
+          postcode: postcodeContext?.text,
+        };
+    });
     
     return mappedAddresses;
 
@@ -119,22 +124,22 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         const json = await response.json();
         const transactions = json.result?.items || [];
         
-        const searchTerm = fullAddress.split(',')[0].trim().toUpperCase();
-        console.log(`[SERVER] Searching for address matching: "${searchTerm}" within postcode: "${postcode}"`);
+        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
+        console.log(`[SERVER] Searching for address matching: "${addressStart}" within postcode: "${postcode}"`);
 
         let latestTransaction = null;
         
         // --- Pass 1: Exact Match ---
         latestTransaction = transactions.find((item: any) => {
             const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-            return itemAddress === searchTerm;
+            return itemAddress === addressStart;
         });
 
         // --- Pass 2: "Starts With" Fallback ---
         if (!latestTransaction) {
             latestTransaction = transactions.find((item: any) => {
                 const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-                return itemAddress.startsWith(searchTerm);
+                return itemAddress.startsWith(addressStart);
             });
         }
 
@@ -147,7 +152,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
             date: latestTransaction.transactionDate || 'N/A',
           };
         } else {
-          console.log('[SERVER] No matching transaction found for address:', searchTerm);
+          console.log('[SERVER] No matching transaction found for address:', addressStart);
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
@@ -239,7 +244,8 @@ export type DebugInfo = {
   error?: string;
 }
 
-export async function getDebugInfo(fullAddress: string): Promise<DebugInfo> {
+export async function getDebugInfo(address: Address): Promise<DebugInfo> {
+  const fullAddress = address.address;
   try {
     if (!fullAddress) {
       return { 
@@ -250,18 +256,17 @@ export async function getDebugInfo(fullAddress: string): Promise<DebugInfo> {
         error: 'No address was provided.' 
       };
     }
-
-    const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
-    if (!postcodeMatch) {
-      return { 
-        fullAddressUsed: fullAddress, 
-        postcode: 'N/A', 
-        landRegistryUrl: '', 
-        landRegistryRawResponse: 'Could not extract postcode from address.',
-        error: 'Could not extract postcode from the full address.'
-      };
+    
+    if (!address.postcode) {
+         return { 
+            fullAddressUsed: fullAddress, 
+            postcode: 'N/A', 
+            landRegistryUrl: '', 
+            landRegistryRawResponse: 'Could not find postcode from Mapbox API response.',
+            error: 'Could not find postcode from Mapbox API response.'
+        };
     }
-    const postcode = postcodeMatch[0];
+    const postcode = address.postcode;
 
     const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
 
@@ -288,7 +293,7 @@ export async function getDebugInfo(fullAddress: string): Promise<DebugInfo> {
   } catch (e: any) {
     return {
       fullAddressUsed: fullAddress,
-      postcode: '',
+      postcode: address.postcode || 'Error',
       landRegistryUrl: '',
       landRegistryRawResponse: e.message,
       error: 'An unexpected error occurred in the debug action.'
