@@ -265,7 +265,10 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 
-  const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
+  const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
+  const paon = addressStart.split(' ')[0];
+
+  const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&propertyAddress.paon=${encodeURIComponent(paon)}&_sort=-transactionDate&_limit=200`;
 
   try {
     const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
