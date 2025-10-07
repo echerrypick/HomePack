@@ -40,64 +40,46 @@ export type PropertyData = {
 // --- API Calls ---
 
 async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
-  const apiKey = process.env.OS_PLACES_API_KEY;
-  if (!apiKey) {
-    console.error('[SERVER] OS_PLACES_API_KEY is not set. Cannot fetch addresses.');
-    throw new Error('Server configuration error: OS Places API key is missing.');
+  const apiKey = process.env.MAPBOX_API_KEY;
+  if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+    console.error('[SERVER] MAPBOX_API_KEY is not set. Cannot fetch addresses.');
+    throw new Error('Server configuration error: Mapbox API key is missing.');
   }
 
   if (!query) return [];
 
-  const url = `https://api.os.uk/search/places/v1/find?query=${encodeURIComponent(query)}&key=${apiKey}`;
-  console.log(`[SERVER] Fetching addresses from: ${url}`);
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+    query
+  )}.json?access_token=${apiKey}&country=gb&types=address,postcode&limit=10`;
+
+  console.log(`[SERVER] Fetching addresses from Mapbox: ${url}`);
 
   try {
     const response = await fetch(url);
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[SERVER] API Error Response: ${errorText}`);
-      throw new Error(`Failed to fetch addresses. The API responded with status: ${response.status}.`);
+      console.error(`[SERVER] Mapbox API Error Response: ${errorText}`);
+      throw new Error(`Failed to fetch addresses from Mapbox. The API responded with status: ${response.status}.`);
     }
 
     const data = await response.json();
-    console.log('[SERVER] Raw API Response:', JSON.stringify(data, null, 2));
+    console.log('[SERVER] Raw Mapbox API Response:', JSON.stringify(data, null, 2));
 
-    if (!data.results) {
-      console.log('[SERVER] No results found in API response.');
+    if (!data.features) {
+      console.log('[SERVER] No features found in Mapbox API response.');
       return [];
     }
 
-    const mappedAddresses = data.results
-      .filter((hit: any) => hit.DPA) // Use DPA for residential addresses
-      .map((hit: any) => {
-        const dpa = hit.DPA;
-        // Construct a full, readable address
-        const address = [
-          dpa.BUILDING_NUMBER,
-          dpa.THOROUGHFARE_NAME,
-          dpa.POST_TOWN,
-          dpa.POSTCODE,
-        ]
-          .filter(Boolean) // Remove any empty parts
-          .join(', ');
-
-        return {
-          id: dpa.UPRN, // Unique Property Reference Number is a great ID
-          address: dpa.ADDRESS || address,
-        };
-      });
-
-    // Deduplicate addresses
-    const uniqueAddresses = Array.from(
-      new Map(mappedAddresses.map((a: Address) => [a.address, a])).values()
-    );
-
-    console.log('[SERVER] Mapped addresses:', JSON.stringify(uniqueAddresses, null, 2));
-    return uniqueAddresses;
+    const mappedAddresses: Address[] = data.features.map((feature: any) => ({
+      id: feature.id,
+      address: feature.place_name,
+    }));
+    
+    console.log('[SERVER] Mapped addresses:', JSON.stringify(mappedAddresses, null, 2));
+    return mappedAddresses;
 
   } catch (error: any) {
     console.error("[SERVER] Error in fetchAddressesFromQuery:", error.message);
-    // It's better to throw the error and let the client-side handle the message display
     throw new Error("There was a problem fetching addresses. Please check your search and try again.");
   }
 }
