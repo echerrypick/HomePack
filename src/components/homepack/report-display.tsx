@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 
 type ReportDisplayProps = {
   address: Address;
-  reportData: { propertyData: PropertyData; summary: string, error?: string } | null;
+  reportData: { propertyData: PropertyData; summary: string; error?: string } | null;
   isLoading: boolean;
   onReset: () => void;
 };
@@ -21,6 +21,9 @@ type ReportDisplayProps = {
 export function ReportDisplay({ address, reportData, isLoading, onReset }: ReportDisplayProps) {
   const [conditionReport, setConditionReport] = useState<string | null>(null);
   const [isConditionReportLoading, setIsConditionReportLoading] = useState(false);
+
+  // Debug log for incoming data
+  console.log('Report Data in UI:', reportData);
 
   if (isLoading) {
     return (
@@ -39,15 +42,14 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
-  // --- ROBUST DATA HANDLING FOR LAST SOLD TEXT ---
-  // This is the critical fix. We check if the date is a valid, non-"N/A" string before formatting.
-  const lastSoldDate = (landRegistry.date && landRegistry.date !== 'N/A')
+  // Enhanced last sold text handling
+  const lastSoldDate = landRegistry.date && landRegistry.date !== 'N/A' && !isNaN(new Date(landRegistry.date).getTime())
     ? new Date(landRegistry.date).toLocaleDateString('en-GB')
     : null;
 
   const lastSoldText = lastSoldDate && landRegistry.pricePaid.includes('£')
     ? `${landRegistry.pricePaid} on ${lastSoldDate}`
-    : landRegistry.pricePaid; // Fallback to whatever pricePaid says (e.g., "Data not found")
+    : landRegistry.pricePaid || 'No sales data available';
 
   return (
     <div className="space-y-8 animate-fade-in-up">
@@ -72,7 +74,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
 
           <DataSection icon={Landmark} title="Land Registry">
             <DataItem label="Title Number" value={landRegistry.titleNumber} />
-            <DataItem label="Tenure" value={landRegistry.tenure} />
+            <DataItem label="Tenure" value={landRegistry.tenure || 'No tenure data available'} />
             <DataItem label="Last Sold" value={lastSoldText} />
           </DataSection>
 
