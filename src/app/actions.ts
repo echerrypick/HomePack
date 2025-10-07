@@ -130,9 +130,12 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           };
         } else {
           console.log('[SERVER] No matching transaction found for address:', addressStart);
+          landRegistryData.pricePaid = 'No recent sales data found.'
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
+        landRegistryData.pricePaid = 'Error fetching data.';
+        landRegistryData.tenure = 'Error fetching data.';
       }
     } else {
       console.log('[SERVER] Could not extract postcode from address:', fullAddress);
