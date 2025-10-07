@@ -45,28 +45,32 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     throw new Error("Address lookup API key is not configured. Please add OS_NAMES_API_KEY to your .env file.");
   }
   const url = `https://api.os.uk/search/names/v1/find?key=${apiKey}&query=${encodeURIComponent(postcode)}`;
+  
+  console.log(`[SERVER] Fetching addresses for postcode: ${postcode} from URL: ${url}`);
 
   try {
     const response = await fetch(url);
+    
+    console.log(`[SERVER] API Response Status: ${response.status}`);
 
-    if (response.status === 404) {
-        throw new Error("Invalid postcode. Please check and try again.");
-    }
     if (response.status === 401) {
         throw new Error("The address lookup API key is invalid. Please check your OS_NAMES_API_KEY in the .env file.");
     }
     if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[SERVER] API Error Response Text:", errorText);
         throw new Error(`Failed to fetch addresses. The API responded with status: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('[SERVER] Raw API data received:', JSON.stringify(data, null, 2));
 
     if (!data.results) {
+      console.log('[SERVER] No results found in API response.');
       return [];
     }
     
-    // Map the API response to our Address interface
-    return data.results
+    const mappedAddresses = data.results
         .filter((hit: any) => hit.GAZETTEER_ENTRY)
         .map((hit: any) => {
             const gazetteerEntry = hit.GAZETTEER_ENTRY;
@@ -78,12 +82,17 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
                 postcode: gazetteerEntry.POSTCODE,
             };
     });
+
+    console.log('[SERVER] Mapped addresses:', JSON.stringify(mappedAddresses, null, 2));
+    return mappedAddresses;
+
   } catch (error: any) {
-    console.error("Error fetching addresses:", error.message);
+    console.error("[SERVER] Error in fetchAddressesFromPostcode:", error.message);
     // Re-throw a more user-friendly error or the specific error from the try block
     throw new Error(error.message || "There was a problem fetching addresses. Please check the postcode and try again.");
   }
 }
+
 
 async function fetchPropertyData(addressId: string, fullAddress: string): Promise<PropertyData> {
     // In a real app, you'd call various APIs here using the addressId (UDPRN).

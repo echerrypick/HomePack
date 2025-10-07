@@ -23,10 +23,14 @@ export default function ToolPage() {
     setIsLoading(true);
     setError(null);
     setPostcode(postcode); // Save postcode for later
+    console.log(`[CLIENT] Starting address search for postcode: ${postcode}`);
     try {
       const result = await postcodeSearchOrGetReport({ postcode });
+      console.log('[CLIENT] Received result from server action:', result);
+
       if (result.status === 'address_selection') {
         setAddresses(result.addresses);
+        console.log('[CLIENT] addresses state set to:', result.addresses);
         setStep('select');
       } else if (result.status === 'report_ready') {
         setSelectedAddress(result.address);
@@ -34,6 +38,7 @@ export default function ToolPage() {
         setStep('report');
       }
     } catch (e: any) {
+      console.error("[CLIENT] Error during address search:", e);
       setError(e.message || "Failed to process postcode. Please try again later.");
       setAddresses([]);
     } finally {
@@ -45,8 +50,10 @@ export default function ToolPage() {
     setIsLoading(true);
     setError(null);
     setStep('report'); // Change step immediately for better UX
+    console.log('[CLIENT] Address selected:', address);
     try {
       const result = await postcodeSearchOrGetReport({ postcode, selectedAddressId: address.id });
+      console.log('[CLIENT] Received report result from server action:', result);
       if (result.status === 'report_ready') {
         setSelectedAddress(result.address);
         setReportData(result.report);
@@ -55,6 +62,7 @@ export default function ToolPage() {
          throw new Error("An unexpected error occurred while fetching the report.");
       }
     } catch (e: any) {
+      console.error("[CLIENT] Error during address selection:", e);
       setError(e.message || "Failed to generate property report. Please try again later.");
       // Reset to a safe state on failure
       handleReset();
@@ -70,8 +78,11 @@ export default function ToolPage() {
     setSelectedAddress(null);
     setReportData(null);
     setError(null);
+    console.log('[CLIENT] State reset.');
   };
   
+  console.log(`[CLIENT] Rendering page. Current step: ${step}, Number of addresses: ${addresses.length}`);
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <HomePackHeader />
