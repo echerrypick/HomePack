@@ -157,7 +157,9 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
             date: latestTransaction.transactionDate || 'N/A',
           };
         } else {
-          console.log('[SERVER] No matching transaction found for address:', addressStart);
+            console.log('[SERVER] No matching transaction found for address:', addressStart);
+            // If we found the address but there are no transactions, we should reflect this.
+            propertyData.landRegistry.pricePaid = 'No recent sales data found';
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
