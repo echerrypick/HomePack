@@ -97,26 +97,31 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         date: 'N/A',
     };
     try {
-        const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/);
+        // Regex to extract postcode from the end of the address string
+        const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
         if (postcodeMatch) {
             const postcode = postcodeMatch[0];
             const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
+            
             console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
             const response = await fetch(ppdUrl);
+            
             if(response.ok) {
                 const json = await response.json();
                 const results = json.result.items;
 
-                // Find the best match for the address
-                const addressStart = fullAddress.split(',')[0].toUpperCase();
+                // Find the best match for the address.
+                // The address from mapbox is usually more complete, so we search if the land registry address is at the start of it.
+                const addressUpper = fullAddress.toUpperCase();
                 const latestTransaction = results.find((item: any) => 
-                    item.propertyAddress.label.toUpperCase().startsWith(addressStart)
+                    addressUpper.startsWith(item.propertyAddress.label.toUpperCase())
                 );
                 
                 if (latestTransaction) {
+                    console.log("[SERVER] Found matching transaction:", latestTransaction);
                     landRegistryData = {
                         titleNumber: latestTransaction.transactionId || 'N/A', // Not a real title number, but a unique ID
-                        tenure: latestTransaction.estateType.label,
+                        tenure: latestTransaction.estateType?.label || 'N/A',
                         pricePaid: `£${latestTransaction.pricePaid.toLocaleString()}`,
                         date: latestTransaction.transactionDate,
                     };
