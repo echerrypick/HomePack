@@ -79,7 +79,6 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
   }
 }
 
-
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   console.log(`[SERVER] Fetching real data for ${fullAddress}`);
 
@@ -129,6 +128,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           };
         } else {
           console.log('[SERVER] No matching transaction found for address:', addressStart);
+          landRegistryData.pricePaid = 'No recent sales data found.';
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);

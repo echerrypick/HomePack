@@ -37,10 +37,11 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   const { propertyData, summary } = reportData;
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
-  const lastSoldDate = propertyData.landRegistry.date 
+  const lastSoldDate = propertyData.landRegistry.date && propertyData.landRegistry.date !== 'N/A'
     ? new Date(propertyData.landRegistry.date).toLocaleDateString()
     : '';
-  const lastSoldText = propertyData.landRegistry.pricePaid !== 'No recent sales data found.' && lastSoldDate
+
+  const lastSoldText = propertyData.landRegistry.pricePaid !== 'Data not found' && lastSoldDate
     ? `${propertyData.landRegistry.pricePaid} on ${lastSoldDate}`
     : propertyData.landRegistry.pricePaid;
 
