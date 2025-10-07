@@ -35,15 +35,17 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   if (!reportData) return null;
 
   const { propertyData, summary } = reportData;
+  const landRegistry = propertyData.landRegistry;
+  
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
-  const lastSoldDate = propertyData.landRegistry.date && propertyData.landRegistry.date !== 'N/A'
-    ? new Date(propertyData.landRegistry.date).toLocaleDateString()
-    : '';
+  const lastSoldDate = landRegistry.date && landRegistry.date !== 'N/A'
+    ? new Date(landRegistry.date).toLocaleDateString()
+    : null;
 
-  const lastSoldText = propertyData.landRegistry.pricePaid !== 'Data not found' && lastSoldDate
-    ? `${propertyData.landRegistry.pricePaid} on ${lastSoldDate}`
-    : propertyData.landRegistry.pricePaid;
+  const lastSoldText = lastSoldDate
+    ? `${landRegistry.pricePaid} on ${lastSoldDate}`
+    : landRegistry.pricePaid;
 
 
   return (
@@ -68,8 +70,8 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           <AiSummary summary={summary} />
 
           <DataSection icon={Landmark} title="Land Registry">
-            <DataItem label="Title Number" value={propertyData.landRegistry.titleNumber} />
-            <DataItem label="Tenure" value={propertyData.landRegistry.tenure} />
+            <DataItem label="Title Number" value={landRegistry.titleNumber} />
+            <DataItem label="Tenure" value={landRegistry.tenure} />
             <DataItem label="Last Sold" value={lastSoldText} />
           </DataSection>
 

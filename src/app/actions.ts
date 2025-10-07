@@ -82,11 +82,28 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   console.log(`[SERVER] Fetching real data for ${fullAddress}`);
 
-  let landRegistryData = {
-    titleNumber: 'N/A',
-    tenure: 'Data not found',
-    pricePaid: 'Data not found',
-    date: 'N/A',
+  // Start with default/mock data
+  let property: PropertyData = {
+    address: fullAddress,
+    landRegistry: {
+      titleNumber: 'N/A',
+      tenure: 'Data not found',
+      pricePaid: 'Data not found',
+      date: 'N/A',
+    },
+    epc: {
+      rating: 'B' as const,
+      potentialRating: 'A' as const,
+      validUntil: '2032-06-20',
+      energyUse: 85,
+    },
+    floodRisk: {
+      riverAndSea: 'Low',
+      surfaceWater: 'Very Low',
+    },
+    planningHistory: [
+      { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
+    ],
   };
 
   try {
@@ -120,7 +137,8 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
-          landRegistryData = {
+          // IMPORTANT: Update the landRegistry part of the property object
+          property.landRegistry = {
             titleNumber: 'N/A', // PPD doesn’t provide title numbers
             tenure: latestTransaction.estateType?.label || 'N/A',
             pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'N/A',
@@ -128,44 +146,23 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           };
         } else {
           console.log('[SERVER] No matching transaction found for address:', addressStart);
-          landRegistryData.pricePaid = 'No recent sales data found.';
+          property.landRegistry.pricePaid = 'No recent sales data found.';
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
+        property.landRegistry.tenure = 'Error fetching data.';
+        property.landRegistry.pricePaid = 'Error fetching data.';
       }
     } else {
       console.log('[SERVER] Could not extract postcode from address:', fullAddress);
     }
   } catch (error: any) {
     console.error('[SERVER] Error fetching Land Registry data:', error.message);
-    landRegistryData.tenure = 'Error fetching data.';
-    landRegistryData.pricePaid = 'Error fetching data.';
+    property.landRegistry.tenure = 'Error fetching data.';
+    property.landRegistry.pricePaid = 'Error fetching data.';
   }
 
-  // MOCK data for other sections
-  const epcData = {
-    rating: 'B' as const,
-    potentialRating: 'A' as const,
-    validUntil: '2032-06-20',
-    energyUse: 85,
-  };
-
-  const floodRiskData = {
-    riverAndSea: 'Low',
-    surfaceWater: 'Very Low',
-  };
-
-  const planningHistoryData = [
-    { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
-  ];
-
-  return {
-    address: fullAddress,
-    landRegistry: landRegistryData,
-    epc: epcData,
-    floodRisk: floodRiskData,
-    planningHistory: planningHistoryData,
-  };
+  return property; // Return the entire, potentially updated, property object
 }
 
 
@@ -176,6 +173,7 @@ export async function getAddressSuggestions(query: string): Promise<Address[]> {
 }
 
 export async function getPropertyReport(fullAddress: string): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
+  // fetchPropertyData now returns the complete object with Land Registry data (or defaults)
   const propertyData = await fetchPropertyData(fullAddress);
 
   try {
@@ -183,6 +181,7 @@ export async function getPropertyReport(fullAddress: string): Promise<{ property
       propertyData: JSON.stringify(propertyData, null, 2),
     });
     
+    // The returned propertyData object now correctly contains the land registry info
     return {
       propertyData,
       summary: summaryResult.summary,
@@ -190,7 +189,7 @@ export async function getPropertyReport(fullAddress: string): Promise<{ property
   } catch (error) {
     console.error("AI Summary generation failed:", error);
     return {
-      propertyData,
+      propertyData, // Still return the property data even if AI summary fails
       summary: "AI summary could not be generated at this time. Please review the property data manually.",
       error: "AI summary error"
     }
