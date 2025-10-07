@@ -82,28 +82,11 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
 
-  // Create a mutable property object with default values
-  let property: PropertyData = {
-    address: fullAddress,
-    landRegistry: {
-      titleNumber: 'N/A',
-      tenure: 'Data not found',
-      pricePaid: 'Data not found',
-      date: 'N/A',
-    },
-    epc: {
-      rating: 'B' as const,
-      potentialRating: 'A' as const,
-      validUntil: '2032-06-20',
-      energyUse: 85,
-    },
-    floodRisk: {
-      riverAndSea: 'Low',
-      surfaceWater: 'Very Low',
-    },
-    planningHistory: [
-      { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
-    ],
+  let landRegistryData = {
+    titleNumber: 'N/A',
+    tenure: 'Data not found',
+    pricePaid: 'Data not found',
+    date: 'N/A',
   };
 
   try {
@@ -127,40 +110,51 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           const matchesAddress = itemAddress.includes(addressStart);
           const matchesPostcode = itemAddress.includes(postcodeUpper);
           
-          console.log(`[SERVER] ==> Comparing API Address: "${itemAddress}" | With search term: "${addressStart}" | Address match: ${matchesAddress}, Postcode match: ${matchesPostcode}`);
+          console.log(`[SERVER] DETAILED LOG FOR COMPARISON:\n[SERVER] ==> Comparing API Address: "${itemAddress}"\n[SERVER] ==> With search term: "${addressStart}"\n[SERVER] ==> Address match: ${matchesAddress}, Postcode match: ${matchesPostcode}`);
           return matchesAddress && matchesPostcode;
         });
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
-          // THIS IS THE CRITICAL FIX: Directly mutate the landRegistry part of the 'property' object
-          property.landRegistry = {
+          landRegistryData = {
             titleNumber: 'N/A', // PPD doesn’t provide title numbers
             tenure: latestTransaction.estateType?.label || 'N/A',
-            pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'No recent sales data found.',
+            pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'Data not found',
             date: latestTransaction.transactionDate || 'N/A',
           };
-          console.log('[SERVER] Mutated property.landRegistry with matched data:', property.landRegistry);
         } else {
           console.log('[SERVER] No matching transaction found for address:', addressStart);
-          // property.landRegistry retains its default 'Data not found' values
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
-        property.landRegistry.tenure = 'Error fetching data.';
-        property.landRegistry.pricePaid = 'Error fetching data.';
       }
     } else {
       console.log('[SERVER] Could not extract postcode from address:', fullAddress);
     }
   } catch (error: any) {
     console.error('[SERVER] Error fetching Land Registry data:', error.message);
-    property.landRegistry.tenure = 'Error fetching data.';
-    property.landRegistry.pricePaid = 'Error fetching data.';
   }
 
-  console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(property, null, 2));
-  return property; // Return the entire, potentially updated, property object
+  const completePropertyData: PropertyData = {
+    address: fullAddress,
+    landRegistry: landRegistryData,
+    epc: {
+      rating: 'B' as const,
+      potentialRating: 'A' as const,
+      validUntil: '2032-06-20',
+      energyUse: 85,
+    },
+    floodRisk: {
+      riverAndSea: 'Low',
+      surfaceWater: 'Very Low',
+    },
+    planningHistory: [
+      { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
+    ],
+  };
+
+  console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(completePropertyData, null, 2));
+  return completePropertyData;
 }
 
 
