@@ -123,8 +123,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const postcode = postcodeMatch[0];
       const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
       
-      // We will fetch all results for the postcode and then filter them in our code.
-      // This is more robust than trying to guess the paon/saon.
       const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
 
@@ -160,7 +158,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           };
         } else {
             console.log('[SERVER] No matching transaction found for address:', addressStart);
-            // If we found the address but there are no transactions, we should reflect this.
             propertyData.landRegistry.pricePaid = 'No recent sales data found';
         }
       } else {
@@ -277,9 +274,6 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 
-  const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
-  const paon = addressStart.split(' ')[0];
-
   const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
 
   try {
@@ -335,5 +329,3 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 }
-
-    
