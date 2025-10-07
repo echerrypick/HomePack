@@ -120,38 +120,16 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         
         const searchAddressUpper = fullAddress.toUpperCase();
         const postcodeUpper = postcode.toUpperCase();
-
-        const searchHouseNumberMatch = searchAddressUpper.match(/^(\d+)/);
-        const searchHouseNumber = searchHouseNumberMatch ? searchHouseNumberMatch[1] : null;
+        
+        // Use the part of the address before the first comma for matching
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
 
-        console.log(`[SERVER] Searching for address containing: "${addressStart}" (House Number: ${searchHouseNumber || 'N/A'}) within postcode: "${postcode}"`);
+        console.log(`[SERVER] Searching for address starting with: "${addressStart}" within postcode: "${postcode}"`);
 
         const latestTransaction = transactions.find((item: any) => {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          if (!itemAddress.includes(postcodeUpper)) return false;
-
-          // Robust matching
-          if (searchHouseNumber) {
-            const itemHouseNumberMatch = itemAddress.match(/^(\d+)/);
-            const itemHouseNumber = itemHouseNumberMatch ? itemHouseNumberMatch[1] : null;
-            
-            // Check if house number matches and if the start of the search address (street name etc) is in the item address
-            const searchStreetPart = addressStart.replace(searchHouseNumber, '').trim();
-            if (itemHouseNumber === searchHouseNumber && itemAddress.includes(searchStreetPart)) {
-                 console.log(`[SERVER] DETAILED LOG (House Number Match): Comparing API Address: "${itemAddress}" with Search: "${searchAddressUpper}" -> MATCH`);
-                 return true;
-            }
-          }
-          
-          // Fallback for addresses without numbers or if above fails
-          if (itemAddress.includes(addressStart)) {
-              console.log(`[SERVER] DETAILED LOG (Substring Match): Comparing API Address: "${itemAddress}" with Search Term: "${addressStart}" -> MATCH`);
-              return true;
-          }
-
-          console.log(`[SERVER] DETAILED LOG: Comparing API Address: "${itemAddress}" with Search Term: "${addressStart}" -> NO MATCH`);
-          return false;
+          // Simple, robust check: Does the API address start with the user's search term?
+          return itemAddress.startsWith(addressStart) && itemAddress.includes(postcodeUpper);
         });
 
         if (latestTransaction) {
