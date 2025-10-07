@@ -86,20 +86,19 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 
 
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
-    console.log(`[SERVER] Fetching real data for ${fullAddress}`);
-    
-    let landRegistryData = {
-        titleNumber: 'N/A',
-        tenure: 'N/A',
-        pricePaid: 'N/A',
-        date: 'N/A',
-    };
+  console.log(`[SERVER] Fetching real data for ${fullAddress}`);
+
+  let landRegistryData = {
+    titleNumber: 'N/A',
+    tenure: 'N/A',
+    pricePaid: 'N/A',
+    date: 'N/A',
+  };
 
   try {
     const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
-      console.log(`[SERVER] Extracted postcode: ${postcode}`);
       const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?ppi:propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
       
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
@@ -111,10 +110,14 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           const results = json.result.items;
 
           const addressUpper = fullAddress.toUpperCase();
-          console.log(`[SERVER] Searching for address starting with: ${addressUpper.split(',')[0]}`);
-          const latestTransaction = results.find((item: any) => 
-              addressUpper.startsWith(item.propertyAddress.label.toUpperCase())
-          );
+          const addressStart = addressUpper.split(',')[0].trim();
+          console.log(`[SERVER] Searching for address starting with: ${addressStart}`);
+
+          const latestTransaction = results.find((item: any) => {
+            const itemAddress = item.propertyAddress.label.toUpperCase() || '';
+            console.log(`[SERVER] Comparing: ${addressStart} with ${itemAddress}`);
+            return itemAddress.includes(addressStart);
+          });
           
           if (latestTransaction) {
               console.log("[SERVER] Found matching transaction:", JSON.stringify(latestTransaction, null, 2));
