@@ -39,6 +39,10 @@ export type PropertyData = {
   }[];
 }
 
+const FETCH_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+};
+
 // --- API Calls ---
 
 async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
@@ -55,7 +59,7 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
   )}.json?access_token=${apiKey}&country=gb&types=address,postcode&limit=10`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: FETCH_HEADERS });
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[SERVER] Mapbox API Error Response: ${errorText}`);
@@ -119,7 +123,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
 
-      const response = await fetch(ppdUrl);
+      const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
       if (response.ok) {
         const json = await response.json();
         const transactions = json.result?.items || [];
@@ -273,21 +277,11 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
   const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
 
   try {
-    const response = await fetch(ppdUrl);
-    
-    if (!response.ok) {
-        const errorText = await response.text();
-        return {
-            fullAddressUsed: fullAddress,
-            postcode: postcode,
-            landRegistryUrl: ppdUrl,
-            landRegistryRawResponse: errorText || `API responded with status: ${response.status}`,
-            error: `Land Registry API responded with status: ${response.status}`
-        };
-    }
+    const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
     
     // We expect JSON, but if the response is empty, .json() will throw an error
     const responseText = await response.text();
+    
     if (!responseText) {
         return {
             fullAddressUsed: fullAddress,
@@ -295,6 +289,16 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
             landRegistryUrl: ppdUrl,
             landRegistryRawResponse: "API returned an empty response.",
             error: "Empty response from Land Registry API."
+        };
+    }
+
+    if (!response.ok) {
+        return {
+            fullAddressUsed: fullAddress,
+            postcode: postcode,
+            landRegistryUrl: ppdUrl,
+            landRegistryRawResponse: responseText || `API responded with status: ${response.status}`,
+            error: `Land Registry API responded with status: ${response.status}`
         };
     }
 
@@ -318,3 +322,5 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 }
+
+    
