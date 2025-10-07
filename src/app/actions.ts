@@ -31,6 +31,7 @@ export type PropertyData = {
   floodRisk: {
     riverAndSea: string;
     surfaceWater: string;
+
   };
   planningHistory: {
     application: string;
@@ -340,5 +341,3 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 }
-
-    
