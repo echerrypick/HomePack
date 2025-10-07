@@ -4,27 +4,32 @@
 import { useState } from 'react';
 import { HomePackHeader } from '@/components/homepack/header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Search } from 'lucide-react';
-import { getDebugInfo, type DebugInfo } from '@/app/actions';
+import { Loader2 } from 'lucide-react';
+import { getDebugInfo, type DebugInfo, type Address } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { AddressForm } from '@/components/homepack/address-form';
 
 export default function DebugPage() {
-  const [query, setQuery] = useState('');
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query) return;
+  const handleAddressSelect = async (address: Address) => {
+    if (!address) return;
 
     setIsLoading(true);
+    setError(null);
     setDebugInfo(null);
-    const result = await getDebugInfo(query);
-    setDebugInfo(result);
-    setIsLoading(false);
+    try {
+        const result = await getDebugInfo(address.address);
+        setDebugInfo(result);
+    } catch(e: any) {
+        setError(e.message || "An unexpected error occurred.");
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -40,23 +45,11 @@ export default function DebugPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSearch} className="flex gap-2">
-                <Input
-                  placeholder="Enter an address..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="flex-grow"
-                  disabled={isLoading}
-                />
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? <Loader2 className="animate-spin" /> : <Search />}
-                  <span className="ml-2 hidden sm:inline">Search</span>
-                </Button>
-              </form>
+                <AddressForm onAddressSelect={handleAddressSelect} isLoading={isLoading} error={error} />
             </CardContent>
           </Card>
 
-          {isLoading && (
+          {isLoading && !debugInfo && (
             <div className="text-center py-10">
               <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
               <p className="mt-2 text-muted-foreground">Fetching debug info...</p>

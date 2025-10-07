@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -238,24 +239,22 @@ export type DebugInfo = {
   error?: string;
 }
 
-export async function getDebugInfo(query: string): Promise<DebugInfo> {
+export async function getDebugInfo(fullAddress: string): Promise<DebugInfo> {
   try {
-    const addresses = await getAddressSuggestions(query);
-    if (!addresses || addresses.length === 0) {
+    if (!fullAddress) {
       return { 
-        fullAddressUsed: 'No address found', 
+        fullAddressUsed: 'No address provided', 
         postcode: '', 
         landRegistryUrl: '', 
-        landRegistryRawResponse: 'No address found for query.',
-        error: 'Could not find a matching address from the geocoding API.' 
+        landRegistryRawResponse: 'No address was provided to debug.',
+        error: 'No address was provided.' 
       };
     }
-    const firstAddress = addresses[0];
 
-    const postcodeMatch = firstAddress.address.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
+    const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
     if (!postcodeMatch) {
       return { 
-        fullAddressUsed: firstAddress.address, 
+        fullAddressUsed: fullAddress, 
         postcode: 'N/A', 
         landRegistryUrl: '', 
         landRegistryRawResponse: 'Could not extract postcode from address.',
@@ -271,7 +270,7 @@ export async function getDebugInfo(query: string): Promise<DebugInfo> {
 
     if (!response.ok) {
        return { 
-        fullAddressUsed: firstAddress.address, 
+        fullAddressUsed: fullAddress, 
         postcode: postcode, 
         landRegistryUrl: ppdUrl, 
         landRegistryRawResponse: rawData,
@@ -280,7 +279,7 @@ export async function getDebugInfo(query: string): Promise<DebugInfo> {
     }
 
     return {
-      fullAddressUsed: firstAddress.address,
+      fullAddressUsed: fullAddress,
       postcode: postcode,
       landRegistryUrl: ppdUrl,
       landRegistryRawResponse: rawData,
@@ -288,7 +287,7 @@ export async function getDebugInfo(query: string): Promise<DebugInfo> {
 
   } catch (e: any) {
     return {
-      fullAddressUsed: 'Error occurred',
+      fullAddressUsed: fullAddress,
       postcode: '',
       landRegistryUrl: '',
       landRegistryRawResponse: e.message,
