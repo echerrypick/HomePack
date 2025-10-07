@@ -124,7 +124,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
       const paon = addressStart.split(' ')[0]; // Primary Addressable Object Name (house number)
 
-      const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&propertyAddress.paon=${encodeURIComponent(paon)}&_sort=-transactionDate&_limit=10`;
+      const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&propertyAddress.paon=${encodeURIComponent(paon)}&_sort=-transactionDate&_limit=200`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
 
       const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
@@ -134,11 +134,19 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         
         console.log(`[SERVER] Searching for address matching: "${addressStart}" within postcode: "${postcode}"`);
 
-        // Use a looser 'includes' check because the API response can have extra details
-        const latestTransaction = transactions.find((item: any) => {
+        // Pass 1: Exact Match
+        let latestTransaction = transactions.find((item: any) => {
             const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-            return itemAddress.includes(addressStart);
+            return itemAddress === addressStart;
         });
+
+        // Pass 2: Fallback to "includes" if no exact match was found
+        if (!latestTransaction) {
+            latestTransaction = transactions.find((item: any) => {
+                const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
+                return itemAddress.includes(addressStart);
+            });
+        }
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
@@ -276,6 +284,15 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     const responseText = await response.text();
     
     if (!responseText) {
+        if (response.status === 200) {
+            return {
+                fullAddressUsed: fullAddress,
+                postcode: postcode,
+                landRegistryUrl: ppdUrl,
+                landRegistryRawResponse: `API returned an empty response with status 200. This usually means the query was successful but no matching records were found in the public dataset (e.g., no sales since 1995, or a non-market sale).`,
+                error: `Empty response from Land Registry API with status code: ${response.status}.`
+            };
+        }
         return {
             fullAddressUsed: fullAddress,
             postcode: postcode,
@@ -314,3 +331,5 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 }
+
+    
