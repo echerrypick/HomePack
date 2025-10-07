@@ -49,7 +49,6 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
   try {
     const response = await fetch(url);
 
-    // The API returns 404 for invalid postcodes and 402 if credits are depleted.
     if (response.status === 404) {
       throw new Error("Invalid postcode. Please check and try again.");
     }
