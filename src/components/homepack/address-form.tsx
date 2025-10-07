@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from '@/components/ui/command';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Search } from 'lucide-react';
@@ -19,27 +19,32 @@ export function AddressForm({ onAddressSelect, isLoading, error }: AddressFormPr
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Address[]>([]);
   const [isFetching, setIsFetching] = useState(false);
+  const debouncedQuery = useDebounce(query, 300);
 
-  const debouncedSearch = useDebounce(async (searchQuery: string) => {
-    if (searchQuery.length < 3) {
-      setSuggestions([]);
-      return;
-    }
-    setIsFetching(true);
-    try {
-      const results = await getAddressSuggestions(searchQuery);
-      setSuggestions(results);
-    } catch (error) {
-      console.error("Failed to fetch address suggestions:", error);
-      setSuggestions([]);
-    } finally {
-      setIsFetching(false);
-    }
-  }, 300);
+  useEffect(() => {
+    const searchAddresses = async () => {
+      if (debouncedQuery.length < 3) {
+        setSuggestions([]);
+        return;
+      }
+      setIsFetching(true);
+      try {
+        const results = await getAddressSuggestions(debouncedQuery);
+        setSuggestions(results);
+      } catch (error) {
+        console.error("Failed to fetch address suggestions:", error);
+        setSuggestions([]);
+      } finally {
+        setIsFetching(false);
+      }
+    };
+
+    searchAddresses();
+  }, [debouncedQuery]);
+
 
   const handleInputChange = (value: string) => {
     setQuery(value);
-    debouncedSearch(value);
   };
   
   const handleSelect = (addressString: string) => {
@@ -79,10 +84,8 @@ export function AddressForm({ onAddressSelect, isLoading, error }: AddressFormPr
               />
             </div>
             <CommandList>
-                {suggestions.length > 0 && (
-                    <CommandEmpty>No results found.</CommandEmpty>
-                )}
-                {suggestions.map((suggestion) => (
+                {suggestions.length > 0 ? (
+                  suggestions.map((suggestion) => (
                     <CommandItem
                     key={suggestion.id}
                     value={suggestion.address}
@@ -90,7 +93,10 @@ export function AddressForm({ onAddressSelect, isLoading, error }: AddressFormPr
                     >
                     {suggestion.address}
                     </CommandItem>
-                ))}
+                  ))
+                ) : (
+                  query.length > 2 && !isFetching && <CommandEmpty>No results found.</CommandEmpty>
+                )}
             </CommandList>
           </Command>
         </div>
