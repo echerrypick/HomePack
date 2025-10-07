@@ -1,20 +1,73 @@
 'use server';
 
-import { MOCK_ADDRESSES, MOCK_PROPERTY_DATA } from '@/lib/mock-data';
-import type { Address, PropertyData } from '@/lib/mock-data';
 import { generateAiSummary } from '@/ai/flows/generate-ai-summary';
 import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-report';
 
-// Simulate network latency
+// Define interfaces for the data we expect from the APIs
+export interface Address {
+  id: string; // Will be a composite ID from the address data, e.g., UDRN
+  line1: string;
+  town: string;
+  postcode: string;
+}
+
+export interface PropertyData {
+  address: string;
+  landRegistry: {
+    titleNumber: string;
+    tenure: string;
+    pricePaid: string;
+    date: string;
+  };
+  epc: {
+    rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+    potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+    validUntil: string;
+    energyUse: number;
+  };
+  floodRisk: {
+    riverAndSea: string;
+    surfaceWater: string;
+  };
+  planningHistory: {
+    application: string;
+    decision: string;
+    date: string;
+  }[];
+}
+
+// Simulate network latency for a better user experience feel
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Internal function to get property data and generate AI summary
+// --- API Calls ---
+// Note: In a real app, these would be more robust, with error handling, etc.
+
+async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> {
+  // In a real app, you'd use an address lookup API.
+  // We'll simulate this with our mock data for now.
+  const { MOCK_ADDRESSES } = await import('@/lib/mock-data');
+  await sleep(1000);
+  return MOCK_ADDRESSES;
+}
+
+async function fetchPropertyData(addressId: string): Promise<PropertyData> {
+    // In a real app, you'd call various APIs here (Land Registry, EPC, etc.)
+    // using the addressId (like a UPRN) to get the data.
+    // We'll simulate this with our mock data.
+    const { MOCK_PROPERTY_DATA } = await import('@/lib/mock-data');
+    await sleep(1500);
+    const data = MOCK_PROPERTY_DATA[addressId];
+    if (!data) {
+        throw new Error("Could not retrieve property details.");
+    }
+    return data;
+}
+
+
+// --- Main Server Action ---
+
 async function getPropertyReport(addressId: string): Promise<{ propertyData: PropertyData, summary: string }> {
-  await sleep(1500); // Simulate API calls
-  const propertyData = MOCK_PROPERTY_DATA[addressId];
-  if (!propertyData) {
-    throw new Error('Property data not found.');
-  }
+  const propertyData = await fetchPropertyData(addressId);
 
   try {
     const summaryResult = await generateAiSummary({
@@ -46,7 +99,9 @@ export async function postcodeSearchOrGetReport(
 
   if (selectedAddressId) {
     // Stage 2: Address selected, get the report
-    const selectedAddress = MOCK_ADDRESSES.find(a => a.id === selectedAddressId);
+    const addresses = await fetchAddressesFromPostcode(postcode);
+    const selectedAddress = addresses.find(a => a.id === selectedAddressId);
+    
     if (!selectedAddress) {
       throw new Error("Invalid address ID selected.");
     }
@@ -54,12 +109,10 @@ export async function postcodeSearchOrGetReport(
     return { status: 'report_ready', report, address: selectedAddress };
   } else {
     // Stage 1: Postcode search
-    await sleep(1000); // Simulate API call
     if (!postcode) {
       throw new Error('Postcode is required');
     }
-    // In a real app, you'd fetch this from an API based on the postcode.
-    const results = MOCK_ADDRESSES;
+    const results = await fetchAddressesFromPostcode(postcode);
 
     if (results.length === 0) {
       throw new Error("No addresses found for this postcode.");
@@ -83,8 +136,7 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
     throw new Error("No images provided for condition report.");
   }
 
-  await sleep(2500); // Simulate AI processing time
-
+  // No need to sleep here, the AI call has its own latency
   try {
     const reportResult = await generateAiConditionReport({
       photoDataUris: imageURIs,

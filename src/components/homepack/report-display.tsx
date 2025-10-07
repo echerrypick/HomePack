@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Address, PropertyData } from '@/lib/mock-data';
+import type { Address, PropertyData } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Download } from 'lucide-react';
 import { AiSummary } from './ai-summary';

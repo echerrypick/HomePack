@@ -5,7 +5,7 @@ import { HomePackHeader } from '@/components/homepack/header';
 import { AddressForm } from '@/components/homepack/address-form';
 import { PropertySelector } from '@/components/homepack/property-selector';
 import { ReportDisplay } from '@/components/homepack/report-display';
-import type { Address, PropertyData } from '@/lib/mock-data';
+import type { Address, PropertyData } from '@/app/actions';
 import { postcodeSearchOrGetReport } from '@/app/actions';
 
 type Step = 'address' | 'select' | 'report';

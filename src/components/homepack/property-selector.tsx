@@ -1,4 +1,4 @@
-import type { Address } from '@/lib/mock-data';
+import type { Address } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Home } from 'lucide-react';
