@@ -118,15 +118,24 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         const json = await response.json();
         const transactions = json.result?.items || [];
         
-        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
+        const searchTerm = fullAddress.split(',')[0].trim().toUpperCase();
+        console.log(`[SERVER] Searching for address matching: "${searchTerm}" within postcode: "${postcode}"`);
 
-        console.log(`[SERVER] Searching for address starting with: "${addressStart}" within postcode: "${postcode}"`);
-
-        const latestTransaction = transactions.find((item: any) => {
-          const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          return itemAddress.startsWith(addressStart);
+        let latestTransaction = null;
+        
+        // --- Pass 1: Exact Match ---
+        latestTransaction = transactions.find((item: any) => {
+            const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
+            return itemAddress === searchTerm;
         });
 
+        // --- Pass 2: "Starts With" Fallback ---
+        if (!latestTransaction) {
+            latestTransaction = transactions.find((item: any) => {
+                const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
+                return itemAddress.startsWith(searchTerm);
+            });
+        }
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
@@ -137,7 +146,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
             date: latestTransaction.transactionDate || 'N/A',
           };
         } else {
-          console.log('[SERVER] No matching transaction found for address:', addressStart);
+          console.log('[SERVER] No matching transaction found for address:', searchTerm);
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
