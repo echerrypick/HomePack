@@ -279,7 +279,6 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
   try {
     const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
     
-    // We expect JSON, but if the response is empty, .json() will throw an error
     const responseText = await response.text();
     
     if (!responseText) {
@@ -287,8 +286,8 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
             fullAddressUsed: fullAddress,
             postcode: postcode,
             landRegistryUrl: ppdUrl,
-            landRegistryRawResponse: "API returned an empty response.",
-            error: "Empty response from Land Registry API."
+            landRegistryRawResponse: `API returned an empty response. Status: ${response.status}`,
+            error: `Empty response from Land Registry API with status code: ${response.status}.`
         };
     }
 
@@ -312,12 +311,11 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
 
   } catch (e: any) {
-    // This will catch network errors or if JSON.parse() fails
     return {
       fullAddressUsed: fullAddress,
       postcode: postcode,
       landRegistryUrl: ppdUrl,
-      landRegistryRawResponse: e.message || 'An error occurred while fetching or parsing the Land Registry data.',
+      landRegistryRawResponse: `An error occurred while fetching or parsing the Land Registry data. This often happens if the API returns a non-JSON response (like HTML). Error: ${e.message}`,
       error: 'An unexpected error occurred in the debug action.'
     };
   }
