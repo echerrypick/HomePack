@@ -126,8 +126,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
           const matchesAddress = itemAddress.includes(addressStart);
           const matchesPostcode = itemAddress.includes(postcodeUpper);
-          
-          console.log(`[SERVER] DETAILED LOG FOR COMPARISON:\n[SERVER] ==> Comparing API Address: "${itemAddress}"\n[SERVER] ==> With search term: "${addressStart}"\n[SERVER] ==> Address match: ${matchesAddress}, Postcode match: ${matchesPostcode}`);
           return matchesAddress && matchesPostcode;
         });
 
