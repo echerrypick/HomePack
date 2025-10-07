@@ -3,8 +3,8 @@
 import { generateAiSummary } from '@/ai/flows/generate-ai-summary';
 import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-report';
 
-// Define interfaces for the data we expect from the APIs
-export interface Address {
+// Define types for the data we expect from the APIs
+export type Address = {
   id: string; // This will be the UDPRN from OS Places
   address: string; // The full address string
   line1: string;
@@ -12,7 +12,7 @@ export interface Address {
   postcode: string;
 }
 
-export interface PropertyData {
+export type PropertyData = {
   address: string;
   landRegistry: {
     titleNumber: string;
@@ -45,28 +45,27 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     throw new Error("Address lookup API key is not configured. Please add OS_NAMES_API_KEY to your .env file.");
   }
   const url = `https://api.os.uk/search/names/v1/find?key=${apiKey}&query=${encodeURIComponent(postcode)}`;
-  
-  console.log(`[SERVER] Fetching addresses for postcode: ${postcode} from URL: ${url}`);
 
   try {
     const response = await fetch(url);
     
-    console.log(`[SERVER] API Response Status: ${response.status}`);
-
     if (response.status === 401) {
         throw new Error("The address lookup API key is invalid. Please check your OS_NAMES_API_KEY in the .env file.");
     }
+    if (response.status === 400) {
+        const errorData = await response.json();
+        if (errorData?.error?.message?.includes("Postcode is not valid")) {
+             throw new Error("Invalid postcode format. Please enter a valid UK postcode.");
+        }
+    }
     if (!response.ok) {
         const errorText = await response.text();
-        console.error("[SERVER] API Error Response Text:", errorText);
-        throw new Error(`Failed to fetch addresses. The API responded with status: ${response.status}`);
+        throw new Error(`Failed to fetch addresses. The API responded with status: ${response.status}. Details: ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('[SERVER] Raw API data received:', JSON.stringify(data, null, 2));
 
     if (!data.results) {
-      console.log('[SERVER] No results found in API response.');
       return [];
     }
     
@@ -75,7 +74,7 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
         .map((hit: any) => {
             const gazetteerEntry = hit.GAZETTEER_ENTRY;
             return {
-                id: gazetteerEntry.ID.toString(),
+                id: gazetteerEntry.ID,
                 address: gazetteerEntry.ADDRESS,
                 line1: gazetteerEntry.NAME1,
                 town: gazetteerEntry.POST_TOWN,
@@ -83,7 +82,6 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
             };
     });
 
-    console.log('[SERVER] Mapped addresses:', JSON.stringify(mappedAddresses, null, 2));
     return mappedAddresses;
 
   } catch (error: any) {
