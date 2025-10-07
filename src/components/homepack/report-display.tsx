@@ -42,7 +42,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   // --- ROBUST DATA HANDLING FOR LAST SOLD TEXT ---
   // This is the critical fix. We check if the date is a valid, non-"N/A" string before formatting.
   const lastSoldDate = (landRegistry.date && landRegistry.date !== 'N/A')
-    ? new Date(landRegistry.date).toLocaleDateString('en-GB') // Use a consistent locale
+    ? new Date(landRegistry.date).toLocaleDateString('en-GB')
     : null;
 
   const lastSoldText = lastSoldDate && landRegistry.pricePaid.includes('£')

@@ -137,11 +137,11 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
-          // IMPORTANT: Update the landRegistry part of the property object
+          // THIS IS THE CRITICAL FIX: Update the landRegistry part of the property object
           property.landRegistry = {
             titleNumber: 'N/A', // PPD doesn’t provide title numbers
             tenure: latestTransaction.estateType?.label || 'N/A',
-            pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'N/A',
+            pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'No recent sales data found.',
             date: latestTransaction.transactionDate || 'N/A',
           };
         } else {
@@ -162,6 +162,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     property.landRegistry.pricePaid = 'Error fetching data.';
   }
 
+  console.log('[SERVER] Returning propertyData with updated land registry:', property.landRegistry);
   return property; // Return the entire, potentially updated, property object
 }
 
