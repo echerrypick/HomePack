@@ -5,7 +5,7 @@ import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-repo
 
 // Define interfaces for the data we expect from the APIs
 export interface Address {
-  id: string; // This will be the UDPRN from Ideal Postcodes
+  id: string; // This will be the UDPRN from OS Places
   line1: string;
   town: string;
   postcode: string;
@@ -39,36 +39,41 @@ export interface PropertyData {
 // --- API Calls ---
 
 async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> {
-  const apiKey = process.env.IDEAL_POSTCODES_API_KEY;
+  const apiKey = process.env.OS_PLACES_API_KEY;
   if (!apiKey) {
-    console.error("Address lookup API key is not configured.");
-    throw new Error("Address lookup API key is not configured. Please add IDEAL_POSTCODES_API_KEY to your .env file.");
+    throw new Error("Address lookup API key is not configured. Please add OS_PLACES_API_KEY to your .env file.");
   }
-  const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodeURIComponent(postcode)}?api_key=${apiKey}`;
-  
+  const url = `https://api.os.uk/search/places/v1/postcode?postcode=${encodeURIComponent(postcode)}&key=${apiKey}`;
+
   try {
     const response = await fetch(url);
 
     if (response.status === 404) {
       throw new Error("Invalid postcode. Please check and try again.");
     }
+    if (response.status === 401) {
+        throw new Error("The address lookup API key is invalid. Please check your OS_PLACES_API_KEY in the .env file.");
+    }
     if (!response.ok) {
-        throw new Error(`Failed to fetch addresses. API responded with status: ${response.status}`);
+        throw new Error(`Failed to fetch addresses. The API responded with status: ${response.status}`);
     }
 
     const data = await response.json();
 
-    if (data.code !== 2000) {
-        throw new Error(data.message || "Could not retrieve addresses.");
+    if (!data.results || data.results.length === 0) {
+      return [];
     }
-
+    
     // Map the API response to our Address interface
-    return data.result.hits.map((hit: any) => ({
-        id: hit.udprn.toString(),
-        line1: hit.line_1,
-        town: hit.post_town,
-        postcode: hit.postcode,
-    }));
+    return data.results.map((hit: any) => {
+        const dpa = hit.DPA;
+        return {
+            id: dpa.UDPRN.toString(),
+            line1: dpa.ADDRESS.split(',')[0],
+            town: dpa.POST_TOWN,
+            postcode: dpa.POSTCODE,
+        };
+    });
   } catch (error: any) {
     console.error("Error fetching addresses:", error.message);
     // Re-throw a more user-friendly error or the specific error from the try block
