@@ -39,9 +39,9 @@ export interface PropertyData {
 // --- API Calls ---
 
 async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> {
-  const apiKey = process.env.OS_PLACES_API_KEY;
-  if (!apiKey) {
-    throw new Error("Address lookup API key is not configured. Please add OS_PLACES_API_KEY to your .env file.");
+  const apiKey = process.env.OS_NAMES_API_KEY;
+  if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+    throw new Error("Address lookup API key is not configured. Please add OS_NAMES_API_KEY to your .env file.");
   }
   const url = `https://api.os.uk/search/names/v1/find?key=${apiKey}&query=${encodeURIComponent(postcode)}`;
 
@@ -49,13 +49,10 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     const response = await fetch(url);
 
     if (response.status === 404) {
-      const errorData = await response.json();
-      if (errorData?.error?.message?.includes("postcode not found")) {
-         throw new Error("Invalid postcode. Please check and try again.");
-      }
+        throw new Error("Invalid postcode. Please check and try again.");
     }
     if (response.status === 401) {
-        throw new Error("The address lookup API key is invalid. Please check your OS_PLACES_API_KEY in the .env file.");
+        throw new Error("The address lookup API key is invalid. Please check your OS_NAMES_API_KEY in the .env file.");
     }
     if (!response.ok) {
         throw new Error(`Failed to fetch addresses. The API responded with status: ${response.status}`);
