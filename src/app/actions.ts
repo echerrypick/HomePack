@@ -81,62 +81,16 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 
 
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
-  console.log(`[SERVER] Fetching real data for ${fullAddress}`);
+  console.log(`[SERVER] Using MOCK data for ${fullAddress}`);
 
-  let landRegistryData = {
-    titleNumber: 'N/A',
-    tenure: 'N/A',
-    pricePaid: 'N/A',
-    date: 'N/A',
+  // Reverting to MOCK data as live integration was failing.
+  const landRegistryData = {
+    titleNumber: 'NGL987654',
+    tenure: 'Freehold',
+    pricePaid: '£250,000',
+    date: '2021-08-15',
   };
 
-  try {
-    const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
-    if (postcodeMatch) {
-      const postcode = postcodeMatch[0];
-      const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
-      console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
-      const response = await fetch(ppdUrl);
-      if (response.ok) {
-        const json = await response.json();
-        const transactions = json.result?.items || [];
-        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
-
-        const latestTransaction = transactions.find((item: any) => {
-          const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          return itemAddress.includes(addressStart);
-        });
-
-        if (latestTransaction) {
-          console.log("[SERVER] Found matching transaction:", JSON.stringify(latestTransaction, null, 2));
-          landRegistryData = {
-            titleNumber: 'N/A', // PPD doesn’t provide title numbers
-            tenure: latestTransaction.estateType?.label || 'N/A',
-            pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'N/A',
-            date: latestTransaction.transactionDate || 'N/A',
-          };
-        } else {
-          console.log('[SERVER] No matching transaction found for address:', addressStart);
-          landRegistryData.tenure = 'No recent sales data found.';
-          landRegistryData.pricePaid = 'No recent sales data found.';
-        }
-      } else {
-        console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
-        landRegistryData.tenure = 'Could not fetch data.';
-        landRegistryData.pricePaid = 'Could not fetch data.';
-      }
-    } else {
-      console.log('[SERVER] Could not extract postcode from address:', fullAddress);
-    }
-  } catch (error) {
-    console.error('[SERVER] Error fetching Land Registry data:', error);
-    landRegistryData.tenure = 'Error processing data.';
-    landRegistryData.pricePaid = 'Error processing data.';
-  }
-  
-  console.log("[SERVER] Final constructed landRegistryData:", JSON.stringify(landRegistryData, null, 2));
-
-  // Mock API calls (replace with real APIs/keys)
   const epcData = {
     rating: 'B' as const,
     potentialRating: 'A' as const,
