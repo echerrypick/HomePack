@@ -100,7 +100,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const response = await fetch(ppdUrl);
       if (response.ok) {
         const json = await response.json();
-        console.log('[SERVER] Raw PPD API Response:', JSON.stringify(json, null, 2));
+        console.log('[SERVER] Raw PPD API Response:', JSON.stringify(json, null, 2)); // Debug full response
         const transactions = json.result?.items || [];
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
         const postcodeUpper = postcode.toUpperCase();
@@ -111,8 +111,12 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
           const matchesAddress = itemAddress.includes(addressStart);
           const matchesPostcode = itemAddress.includes(postcodeUpper);
-          // DETAILED LOGGING FOR COMPARISON
-          console.log(`[SERVER] ==> Comparing search term "${addressStart}" with API address "${itemAddress}". Address Match: ${matchesAddress}, Postcode Match: ${matchesPostcode}`);
+          
+          console.log(`[SERVER] DETAILED LOG FOR COMPARISON:`);
+          console.log(`[SERVER] ==> Comparing API Address: "${itemAddress}"`);
+          console.log(`[SERVER] ==> With search term: "${addressStart}"`);
+          console.log(`[SERVER] ==> Address match: ${matchesAddress}, Postcode match: ${matchesPostcode}`);
+
           return matchesAddress && matchesPostcode;
         });
 
