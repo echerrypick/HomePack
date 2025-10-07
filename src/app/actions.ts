@@ -52,8 +52,6 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
     query
   )}.json?access_token=${apiKey}&country=gb&types=address,postcode&limit=10`;
 
-  console.log(`[SERVER] Fetching addresses from Mapbox: ${url}`);
-
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -63,10 +61,8 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
     }
 
     const data = await response.json();
-    console.log('[SERVER] Raw Mapbox API Response:', JSON.stringify(data, null, 2));
 
     if (!data.features) {
-      console.log('[SERVER] No features found in Mapbox API response.');
       return [];
     }
 
@@ -75,7 +71,6 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
       address: feature.place_name,
     }));
     
-    console.log('[SERVER] Mapped addresses:', JSON.stringify(mappedAddresses, null, 2));
     return mappedAddresses;
 
   } catch (error: any) {
@@ -86,7 +81,7 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 
 
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
-  console.log(`[SERVER] Fetching real data for ${fullAddress}`);
+  console.log(`[SERVER] STEP 1: Starting fetchPropertyData for address: ${fullAddress}`);
 
   let landRegistryData = {
     titleNumber: 'N/A',
@@ -99,28 +94,30 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
+      console.log(`[SERVER] STEP 2: Extracted postcode: ${postcode}`);
       const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?ppi:propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
       
-      console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
+      console.log(`[SERVER] STEP 3: Fetching Land Registry data from: ${ppdUrl}`);
       const response = await fetch(ppdUrl);
       
       if(response.ok) {
+          console.log('[SERVER] STEP 4: Land Registry API call successful.');
           const json = await response.json();
-          console.log('[SERVER] Raw Land Registry Response:', JSON.stringify(json, null, 2));
+          console.log('[SERVER] STEP 5: Raw Land Registry Response:', JSON.stringify(json, null, 2));
           const results = json.result.items;
 
           const addressUpper = fullAddress.toUpperCase();
           const addressStart = addressUpper.split(',')[0].trim();
-          console.log(`[SERVER] Searching for address starting with: ${addressStart}`);
+          console.log(`[SERVER] STEP 6: Searching for address starting with: "${addressStart}"`);
 
           const latestTransaction = results.find((item: any) => {
             const itemAddress = item.propertyAddress.label.toUpperCase() || '';
-            console.log(`[SERVER] Comparing: ${addressStart} with ${itemAddress}`);
+            console.log(`[SERVER] -- Comparing search term "${addressStart}" with API address "${itemAddress}"`);
             return itemAddress.includes(addressStart);
           });
           
           if (latestTransaction) {
-              console.log("[SERVER] Found matching transaction:", JSON.stringify(latestTransaction, null, 2));
+              console.log("[SERVER] STEP 7: Found matching transaction:", JSON.stringify(latestTransaction, null, 2));
               landRegistryData = {
                   titleNumber: latestTransaction.transactionId || 'N/A', // Not a real title number, but a unique ID
                   tenure: latestTransaction.estateType?.label || 'N/A',
@@ -128,19 +125,19 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
                   date: latestTransaction.transactionDate,
               };
           } else {
-              console.log("[SERVER] No matching transaction found in Land Registry data for this address.");
+              console.log("[SERVER] STEP 7: No matching transaction found in Land Registry data for this address.");
           }
       } else {
           console.error(`[SERVER] Land Registry API Error: ${response.status}`);
       }
     } else {
-        console.log("[SERVER] Could not extract postcode from address for Land Registry lookup.");
+        console.log("[SERVER] STEP 2 FAILED: Could not extract postcode from address for Land Registry lookup.");
     }
   } catch(error) {
-      console.error("[SERVER] Error fetching or parsing Land Registry data:", error);
+      console.error("[SERVER] ERROR in Land Registry fetch process:", error);
   }
 
-  console.log("[SERVER] Final constructed landRegistryData:", JSON.stringify(landRegistryData, null, 2));
+  console.log("[SERVER] STEP 8: Final constructed landRegistryData:", JSON.stringify(landRegistryData, null, 2));
 
 
     // --- EPC API Call ---
