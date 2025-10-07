@@ -39,14 +39,15 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
-  const lastSoldDate = landRegistry.date && landRegistry.date !== 'N/A'
-    ? new Date(landRegistry.date).toLocaleDateString()
+  // --- ROBUST DATA HANDLING FOR LAST SOLD TEXT ---
+  // This is the critical fix. We check if the date is a valid, non-"N/A" string before formatting.
+  const lastSoldDate = (landRegistry.date && landRegistry.date !== 'N/A')
+    ? new Date(landRegistry.date).toLocaleDateString('en-GB') // Use a consistent locale
     : null;
 
-  const lastSoldText = lastSoldDate
+  const lastSoldText = lastSoldDate && landRegistry.pricePaid.includes('£')
     ? `${landRegistry.pricePaid} on ${lastSoldDate}`
-    : landRegistry.pricePaid;
-
+    : landRegistry.pricePaid; // Fallback to whatever pricePaid says (e.g., "Data not found")
 
   return (
     <div className="space-y-8 animate-fade-in-up">
