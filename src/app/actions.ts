@@ -110,7 +110,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
-      const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
+      const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
 
       const response = await fetch(ppdUrl);
@@ -127,8 +127,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
         const latestTransaction = transactions.find((item: any) => {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          // Robust check: Does the API address start with the user's search term?
-          // This handles cases like "10 Downing Street" and "10 Downing Street, London...".
           return itemAddress.startsWith(addressStart) && itemAddress.includes(postcodeUpper);
         });
 
@@ -136,7 +134,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
           propertyData.landRegistry = {
-            titleNumber: 'N/A', // This data isn't in the PPD feed
+            titleNumber: 'N/A',
             tenure: latestTransaction.estateType?.label || 'Data not found',
             pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'Data not found',
             date: latestTransaction.transactionDate || 'N/A',
