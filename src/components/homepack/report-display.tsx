@@ -37,6 +37,14 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   const { propertyData, summary } = reportData;
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
+  const lastSoldDate = propertyData.landRegistry.date 
+    ? new Date(propertyData.landRegistry.date).toLocaleDateString()
+    : '';
+  const lastSoldText = propertyData.landRegistry.pricePaid !== 'No recent sales data found.' && lastSoldDate
+    ? `${propertyData.landRegistry.pricePaid} on ${lastSoldDate}`
+    : propertyData.landRegistry.pricePaid;
+
+
   return (
     <div className="space-y-8 animate-fade-in-up">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -61,7 +69,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           <DataSection icon={Landmark} title="Land Registry">
             <DataItem label="Title Number" value={propertyData.landRegistry.titleNumber} />
             <DataItem label="Tenure" value={propertyData.landRegistry.tenure} />
-            <DataItem label="Last Sold" value={`${propertyData.landRegistry.pricePaid} on ${new Date(propertyData.landRegistry.date).toLocaleDateString()}`} />
+            <DataItem label="Last Sold" value={lastSoldText} />
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">

@@ -99,13 +99,11 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const response = await fetch(ppdUrl);
       if (response.ok) {
         const json = await response.json();
-        console.log('[SERVER] Raw PPD API Response:', JSON.stringify(json, null, 2)); // Debug log
         const transactions = json.result?.items || [];
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
 
         const latestTransaction = transactions.find((item: any) => {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          console.log(`[SERVER] Comparing: "${addressStart}" with "${itemAddress}"`);
           return itemAddress.includes(addressStart);
         });
 
@@ -119,15 +117,22 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           };
         } else {
           console.log('[SERVER] No matching transaction found for address:', addressStart);
+          landRegistryData.tenure = 'No recent sales data found.';
+          landRegistryData.pricePaid = 'No recent sales data found.';
+          landRegistryData.date = '';
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
+        landRegistryData.tenure = 'Could not fetch data.';
+        landRegistryData.pricePaid = 'Could not fetch data.';
       }
     } else {
       console.log('[SERVER] Could not extract postcode from address:', fullAddress);
     }
   } catch (error) {
     console.error('[SERVER] Error fetching Land Registry data:', error);
+    landRegistryData.tenure = 'Error processing data.';
+    landRegistryData.pricePaid = 'Error processing data.';
   }
   
   console.log("[SERVER] Final constructed landRegistryData:", JSON.stringify(landRegistryData, null, 2));
