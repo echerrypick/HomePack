@@ -226,3 +226,73 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
     }
   }
 }
+
+
+// --- Debug Action ---
+
+export type DebugInfo = {
+  fullAddressUsed: string;
+  postcode: string;
+  landRegistryUrl: string;
+  landRegistryRawResponse: any;
+  error?: string;
+}
+
+export async function getDebugInfo(query: string): Promise<DebugInfo> {
+  try {
+    const addresses = await getAddressSuggestions(query);
+    if (!addresses || addresses.length === 0) {
+      return { 
+        fullAddressUsed: 'No address found', 
+        postcode: '', 
+        landRegistryUrl: '', 
+        landRegistryRawResponse: 'No address found for query.',
+        error: 'Could not find a matching address from the geocoding API.' 
+      };
+    }
+    const firstAddress = addresses[0];
+
+    const postcodeMatch = firstAddress.address.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
+    if (!postcodeMatch) {
+      return { 
+        fullAddressUsed: firstAddress.address, 
+        postcode: 'N/A', 
+        landRegistryUrl: '', 
+        landRegistryRawResponse: 'Could not extract postcode from address.',
+        error: 'Could not extract postcode from the full address.'
+      };
+    }
+    const postcode = postcodeMatch[0];
+
+    const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
+
+    const response = await fetch(ppdUrl);
+    const rawData = await response.json();
+
+    if (!response.ok) {
+       return { 
+        fullAddressUsed: firstAddress.address, 
+        postcode: postcode, 
+        landRegistryUrl: ppdUrl, 
+        landRegistryRawResponse: rawData,
+        error: `Land Registry API responded with status: ${response.status}`
+      };
+    }
+
+    return {
+      fullAddressUsed: firstAddress.address,
+      postcode: postcode,
+      landRegistryUrl: ppdUrl,
+      landRegistryRawResponse: rawData,
+    };
+
+  } catch (e: any) {
+    return {
+      fullAddressUsed: 'Error occurred',
+      postcode: '',
+      landRegistryUrl: '',
+      landRegistryRawResponse: e.message,
+      error: 'An unexpected error occurred in the debug action.'
+    };
+  }
+}
