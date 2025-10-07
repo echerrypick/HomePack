@@ -121,16 +121,17 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         const searchAddressUpper = fullAddress.toUpperCase();
         const postcodeUpper = postcode.toUpperCase();
         
-        // Use the part of the address before the first comma for matching
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
 
         console.log(`[SERVER] Searching for address starting with: "${addressStart}" within postcode: "${postcode}"`);
 
         const latestTransaction = transactions.find((item: any) => {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          // Simple, robust check: Does the API address start with the user's search term?
+          // Robust check: Does the API address start with the user's search term?
+          // This handles cases like "10 Downing Street" and "10 Downing Street, London...".
           return itemAddress.startsWith(addressStart) && itemAddress.includes(postcodeUpper);
         });
+
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
