@@ -118,16 +118,13 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         const json = await response.json();
         const transactions = json.result?.items || [];
         
-        const searchAddressUpper = fullAddress.toUpperCase();
-        const postcodeUpper = postcode.toUpperCase();
-        
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
 
         console.log(`[SERVER] Searching for address starting with: "${addressStart}" within postcode: "${postcode}"`);
 
         const latestTransaction = transactions.find((item: any) => {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          return itemAddress.startsWith(addressStart) && itemAddress.includes(postcodeUpper);
+          return itemAddress.startsWith(addressStart);
         });
 
 
