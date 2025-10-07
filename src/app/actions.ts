@@ -122,9 +122,10 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
       const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
-      const paon = addressStart.split(' ')[0]; // Primary Addressable Object Name (house number)
-
-      const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&propertyAddress.paon=${encodeURIComponent(paon)}&_sort=-transactionDate&_limit=200`;
+      
+      // We will fetch all results for the postcode and then filter them in our code.
+      // This is more robust than trying to guess the paon/saon.
+      const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
 
       const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
@@ -134,7 +135,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         
         console.log(`[SERVER] Searching for address matching: "${addressStart}" within postcode: "${postcode}"`);
 
-        // Pass 1: Exact Match
+        // Pass 1: Exact Match on the address line
         let latestTransaction = transactions.find((item: any) => {
             const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
             return itemAddress === addressStart;
@@ -142,6 +143,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
         // Pass 2: Fallback to "includes" if no exact match was found
         if (!latestTransaction) {
+            console.log('[SERVER] No exact match found, trying fallback "includes" search.');
             latestTransaction = transactions.find((item: any) => {
                 const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
                 return itemAddress.includes(addressStart);
@@ -151,7 +153,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
           propertyData.landRegistry = {
-            titleNumber: 'N/A',
+            titleNumber: 'N/A', // Title number is not in this dataset
             tenure: latestTransaction.estateType?.label || 'Data not found',
             pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'Data not found',
             date: latestTransaction.transactionDate || 'N/A',
@@ -278,7 +280,7 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
   const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
   const paon = addressStart.split(' ')[0];
 
-  const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&propertyAddress.paon=${encodeURIComponent(paon)}&_sort=-transactionDate&_limit=200`;
+  const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
 
   try {
     const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
