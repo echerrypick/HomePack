@@ -137,6 +137,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
         // --- Pass 2: "Starts With" Fallback ---
         if (!latestTransaction) {
+            console.log('[SERVER] No exact match found. Trying "starts with" logic.');
             latestTransaction = transactions.find((item: any) => {
                 const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
                 return itemAddress.startsWith(addressStart);
@@ -246,42 +247,46 @@ export type DebugInfo = {
 
 export async function getDebugInfo(address: Address): Promise<DebugInfo> {
   const fullAddress = address.address;
+  const postcode = address.postcode;
+
+  if (!fullAddress) {
+    return {
+      fullAddressUsed: 'No address provided',
+      postcode: '',
+      landRegistryUrl: '',
+      landRegistryRawResponse: 'No address was provided to debug.',
+      error: 'No address was provided.'
+    };
+  }
+
+  if (!postcode) {
+    return {
+      fullAddressUsed: fullAddress,
+      postcode: 'N/A',
+      landRegistryUrl: 'Could not be constructed.',
+      landRegistryRawResponse: 'Could not find postcode from Mapbox API response. Therefore, could not query Land Registry.',
+      error: 'Could not find postcode from Mapbox API response.'
+    };
+  }
+
+  const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
+
   try {
-    if (!fullAddress) {
-      return { 
-        fullAddressUsed: 'No address provided', 
-        postcode: '', 
-        landRegistryUrl: '', 
-        landRegistryRawResponse: 'No address was provided to debug.',
-        error: 'No address was provided.' 
-      };
-    }
+    const response = await fetch(ppdUrl);
     
-    if (!address.postcode) {
-         return { 
-            fullAddressUsed: fullAddress, 
-            postcode: 'N/A', 
-            landRegistryUrl: '', 
-            landRegistryRawResponse: 'Could not find postcode from Mapbox API response.',
-            error: 'Could not find postcode from Mapbox API response.'
+    // Check if the response is ok, if not, handle it as an error but still return the raw text.
+    if (!response.ok) {
+        const errorText = await response.text();
+        return {
+            fullAddressUsed: fullAddress,
+            postcode: postcode,
+            landRegistryUrl: ppdUrl,
+            landRegistryRawResponse: errorText || `API responded with status: ${response.status}`,
+            error: `Land Registry API responded with status: ${response.status}`
         };
     }
-    const postcode = address.postcode;
-
-    const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
-
-    const response = await fetch(ppdUrl);
+    
     const rawData = await response.json();
-
-    if (!response.ok) {
-       return { 
-        fullAddressUsed: fullAddress, 
-        postcode: postcode, 
-        landRegistryUrl: ppdUrl, 
-        landRegistryRawResponse: rawData,
-        error: `Land Registry API responded with status: ${response.status}`
-      };
-    }
 
     return {
       fullAddressUsed: fullAddress,
@@ -291,11 +296,12 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
 
   } catch (e: any) {
+    // This will catch network errors or if response.json() fails
     return {
       fullAddressUsed: fullAddress,
-      postcode: address.postcode || 'Error',
-      landRegistryUrl: '',
-      landRegistryRawResponse: e.message,
+      postcode: postcode,
+      landRegistryUrl: ppdUrl,
+      landRegistryRawResponse: e.message || 'An error occurred while fetching or parsing the Land Registry data.',
       error: 'An unexpected error occurred in the debug action.'
     };
   }
