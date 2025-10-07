@@ -1,5 +1,8 @@
 'use server';
 
+import { config } from 'dotenv';
+config();
+
 import { generateAiSummary } from '@/ai/flows/generate-ai-summary';
 import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-report';
 
