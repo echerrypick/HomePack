@@ -81,7 +81,7 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 
 
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
-  console.log(`[SERVER] STEP 1: Starting fetchPropertyData for address: ${fullAddress}`);
+  console.log(`[SERVER] Fetching real data for ${fullAddress}`);
 
   let landRegistryData = {
     titleNumber: 'N/A',
@@ -94,85 +94,68 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
-      console.log(`[SERVER] STEP 2: Extracted postcode: ${postcode}`);
-      const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?ppi:propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
-      
-      console.log(`[SERVER] STEP 3: Fetching Land Registry data from: ${ppdUrl}`);
+      const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
+      console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
       const response = await fetch(ppdUrl);
-      
-      if(response.ok) {
-          console.log('[SERVER] STEP 4: Land Registry API call successful.');
-          const json = await response.json();
-          console.log('[SERVER] STEP 5: Raw Land Registry Response:', JSON.stringify(json, null, 2));
-          const results = json.result.items;
+      if (response.ok) {
+        const json = await response.json();
+        console.log('[SERVER] Raw PPD API Response:', JSON.stringify(json, null, 2)); // Debug log
+        const transactions = json.result?.items || [];
+        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
 
-          const addressUpper = fullAddress.toUpperCase();
-          const addressStart = addressUpper.split(',')[0].trim();
-          console.log(`[SERVER] STEP 6: Searching for address starting with: "${addressStart}"`);
+        const latestTransaction = transactions.find((item: any) => {
+          const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
+          console.log(`[SERVER] Comparing: "${addressStart}" with "${itemAddress}"`);
+          return itemAddress.includes(addressStart);
+        });
 
-          const latestTransaction = results.find((item: any) => {
-            const itemAddress = item.propertyAddress.label.toUpperCase() || '';
-            console.log(`[SERVER] -- Comparing search term "${addressStart}" with API address "${itemAddress}"`);
-            return itemAddress.startsWith(addressStart);
-          });
-          
-          if (latestTransaction) {
-              console.log("[SERVER] STEP 7: Found matching transaction:", JSON.stringify(latestTransaction, null, 2));
-              landRegistryData = {
-                  titleNumber: latestTransaction.transactionId || 'N/A', // Not a real title number, but a unique ID
-                  tenure: latestTransaction.estateType?.label || 'N/A',
-                  pricePaid: `£${latestTransaction.pricePaid.toLocaleString()}`,
-                  date: latestTransaction.transactionDate,
-              };
-          } else {
-              console.log("[SERVER] STEP 7: No matching transaction found in Land Registry data for this address.");
-          }
+        if (latestTransaction) {
+          console.log("[SERVER] Found matching transaction:", JSON.stringify(latestTransaction, null, 2));
+          landRegistryData = {
+            titleNumber: 'N/A', // PPD doesn’t provide title numbers
+            tenure: latestTransaction.estateType?.label || 'N/A',
+            pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'N/A',
+            date: latestTransaction.transactionDate || 'N/A',
+          };
+        } else {
+          console.log('[SERVER] No matching transaction found for address:', addressStart);
+        }
       } else {
-          console.error(`[SERVER] Land Registry API Error: ${response.status}`);
+        console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
       }
     } else {
-        console.log("[SERVER] STEP 2 FAILED: Could not extract postcode from address for Land Registry lookup.");
+      console.log('[SERVER] Could not extract postcode from address:', fullAddress);
     }
-  } catch(error) {
-      console.error("[SERVER] ERROR in Land Registry fetch process:", error);
+  } catch (error) {
+    console.error('[SERVER] Error fetching Land Registry data:', error);
   }
+  
+  console.log("[SERVER] Final constructed landRegistryData:", JSON.stringify(landRegistryData, null, 2));
 
-  console.log("[SERVER] STEP 8: Final constructed landRegistryData:", JSON.stringify(landRegistryData, null, 2));
+  // Mock API calls (replace with real APIs/keys)
+  const epcData = {
+    rating: 'B' as const,
+    potentialRating: 'A' as const,
+    validUntil: '2032-06-20',
+    energyUse: 85,
+  };
 
+  const floodRiskData = {
+    riverAndSea: 'Low',
+    surfaceWater: 'Very Low',
+  };
 
-    // --- EPC API Call ---
-    const epcApiKey = process.env.EPC_API_KEY;
-    // MOCK: Replace with actual API call
-    const epcData = {
-        rating: 'B' as const,
-        potentialRating: 'A' as const,
-        validUntil: '2032-06-20',
-        energyUse: 85,
-    };
+  const planningHistoryData = [
+    { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
+  ];
 
-    // --- Flood Risk API Call ---
-    const floodApiKey = process.env.FLOOD_API_KEY;
-     // MOCK: Replace with actual API call
-    const floodRiskData = {
-        riverAndSea: 'Low',
-        surfaceWater: 'Very Low',
-    };
-
-    // --- Planning API Call ---
-    const planningApiKey = process.env.PLANNING_API_KEY;
-     // MOCK: Replace with actual API call
-    const planningHistoryData = [
-        { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
-    ];
-    
-
-    return {
-        address: fullAddress,
-        landRegistry: landRegistryData,
-        epc: epcData,
-        floodRisk: floodRiskData,
-        planningHistory: planningHistoryData,
-    };
+  return {
+    address: fullAddress,
+    landRegistry: landRegistryData,
+    epc: epcData,
+    floodRisk: floodRiskData,
+    planningHistory: planningHistoryData,
+  };
 }
 
 
