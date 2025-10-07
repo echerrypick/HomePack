@@ -107,7 +107,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   };
 
   try {
-    const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/);
+    const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
       const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
@@ -117,21 +117,47 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       if (response.ok) {
         const json = await response.json();
         const transactions = json.result?.items || [];
-        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
+        
+        const searchAddressUpper = fullAddress.toUpperCase();
         const postcodeUpper = postcode.toUpperCase();
 
-        console.log(`[SERVER] Searching for address containing: "${addressStart}" within postcode: "${postcode}"`);
+        const searchHouseNumberMatch = searchAddressUpper.match(/^(\d+)/);
+        const searchHouseNumber = searchHouseNumberMatch ? searchHouseNumberMatch[1] : null;
+        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
+
+        console.log(`[SERVER] Searching for address containing: "${addressStart}" (House Number: ${searchHouseNumber || 'N/A'}) within postcode: "${postcode}"`);
 
         const latestTransaction = transactions.find((item: any) => {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          return itemAddress.includes(addressStart) && itemAddress.includes(postcodeUpper);
+          if (!itemAddress.includes(postcodeUpper)) return false;
+
+          // Robust matching
+          if (searchHouseNumber) {
+            const itemHouseNumberMatch = itemAddress.match(/^(\d+)/);
+            const itemHouseNumber = itemHouseNumberMatch ? itemHouseNumberMatch[1] : null;
+            
+            // Check if house number matches and if the start of the search address (street name etc) is in the item address
+            const searchStreetPart = addressStart.replace(searchHouseNumber, '').trim();
+            if (itemHouseNumber === searchHouseNumber && itemAddress.includes(searchStreetPart)) {
+                 console.log(`[SERVER] DETAILED LOG (House Number Match): Comparing API Address: "${itemAddress}" with Search: "${searchAddressUpper}" -> MATCH`);
+                 return true;
+            }
+          }
+          
+          // Fallback for addresses without numbers or if above fails
+          if (itemAddress.includes(addressStart)) {
+              console.log(`[SERVER] DETAILED LOG (Substring Match): Comparing API Address: "${itemAddress}" with Search Term: "${addressStart}" -> MATCH`);
+              return true;
+          }
+
+          console.log(`[SERVER] DETAILED LOG: Comparing API Address: "${itemAddress}" with Search Term: "${addressStart}" -> NO MATCH`);
+          return false;
         });
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
-          // If a match is found, we overwrite the default landRegistry data.
           propertyData.landRegistry = {
-            titleNumber: 'N/A',
+            titleNumber: 'N/A', // This data isn't in the PPD feed
             tenure: latestTransaction.estateType?.label || 'Data not found',
             pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'Data not found',
             date: latestTransaction.transactionDate || 'N/A',
@@ -149,7 +175,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     console.error('[SERVER] Error fetching Land Registry data:', error.message);
   }
 
-  // Always return the full, valid propertyData object.
   console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(propertyData, null, 2));
   return propertyData;
 }
@@ -175,7 +200,7 @@ export async function getPropertyReport(fullAddress: string): Promise<{ property
     
     console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
     return {
-      propertyData,
+      propertyData: propertyData,
       summary: summaryResult.summary,
     };
   } catch (error) {
