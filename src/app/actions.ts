@@ -121,7 +121,10 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
-      const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=200`;
+      const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
+      const paon = addressStart.split(' ')[0]; // Primary Addressable Object Name (house number)
+
+      const ppdUrl = `https://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&propertyAddress.paon=${encodeURIComponent(paon)}&_sort=-transactionDate&_limit=10`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
 
       const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
@@ -129,26 +132,13 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         const json = await response.json();
         const transactions = json.result?.items || [];
         
-        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
         console.log(`[SERVER] Searching for address matching: "${addressStart}" within postcode: "${postcode}"`);
 
-        let latestTransaction = null;
-        
-        // --- Pass 1: Exact Match ---
-        console.log('[SERVER] Starting Pass 1: Exact Match');
-        latestTransaction = transactions.find((item: any) => {
+        // Use a looser 'includes' check because the API response can have extra details
+        const latestTransaction = transactions.find((item: any) => {
             const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-            return itemAddress === addressStart;
+            return itemAddress.includes(addressStart);
         });
-
-        // --- Pass 2: "Starts With" Fallback ---
-        if (!latestTransaction) {
-            console.log('[SERVER] No exact match found. Starting Pass 2: "Starts With" Match');
-            latestTransaction = transactions.find((item: any) => {
-                const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-                return itemAddress.startsWith(addressStart);
-            });
-        }
 
         if (latestTransaction) {
           console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
