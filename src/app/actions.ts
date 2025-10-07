@@ -99,6 +99,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2})$/i);
     if (postcodeMatch) {
       const postcode = postcodeMatch[0];
+      console.log(`[SERVER] Extracted postcode: ${postcode}`);
       const ppdUrl = `http://landregistry.data.gov.uk/data/ppi/transaction-record.json?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
       
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
@@ -106,15 +107,17 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       
       if(response.ok) {
           const json = await response.json();
+          console.log('[SERVER] Raw Land Registry Response:', JSON.stringify(json, null, 2));
           const results = json.result.items;
 
           const addressUpper = fullAddress.toUpperCase();
+          console.log(`[SERVER] Searching for address starting with: ${addressUpper.split(',')[0]}`);
           const latestTransaction = results.find((item: any) => 
               addressUpper.startsWith(item.propertyAddress.label.toUpperCase())
           );
           
           if (latestTransaction) {
-              console.log("[SERVER] Found matching transaction:", latestTransaction);
+              console.log("[SERVER] Found matching transaction:", JSON.stringify(latestTransaction, null, 2));
               landRegistryData = {
                   titleNumber: latestTransaction.transactionId || 'N/A', // Not a real title number, but a unique ID
                   tenure: latestTransaction.estateType?.label || 'N/A',
@@ -133,6 +136,8 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   } catch(error) {
       console.error("[SERVER] Error fetching or parsing Land Registry data:", error);
   }
+
+  console.log("[SERVER] Final constructed landRegistryData:", JSON.stringify(landRegistryData, null, 2));
 
 
     // --- EPC API Call ---
