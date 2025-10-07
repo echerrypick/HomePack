@@ -96,20 +96,23 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const postcode = postcodeMatch[0];
       const ppdUrl = `http://landregistry.data.gov.uk/app/ppi/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate&_limit=50`;
       console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
-      
-      const response = await fetch(ppdUrl);
 
+      const response = await fetch(ppdUrl);
       if (response.ok) {
         const json = await response.json();
+        console.log('[SERVER] Raw PPD API Response:', JSON.stringify(json, null, 2)); // Debug full response
         const transactions = json.result?.items || [];
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
+        const postcodeUpper = postcode.toUpperCase();
 
-        console.log(`[SERVER] Searching for address starting with: "${addressStart}"`);
+        console.log(`[SERVER] Searching for address containing: "${addressStart}" within postcode: "${postcode}"`);
 
         const latestTransaction = transactions.find((item: any) => {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-          console.log(`[SERVER] Comparing API Address: "${itemAddress}" with search term: "${addressStart}"`);
-          return itemAddress.startsWith(addressStart);
+          const matchesAddress = itemAddress.includes(addressStart);
+          const matchesPostcode = itemAddress.includes(postcodeUpper);
+          console.log(`[SERVER] Comparing: "${itemAddress}" - Address match: ${matchesAddress}, Postcode match: ${matchesPostcode}`);
+          return matchesAddress && matchesPostcode;
         });
 
         if (latestTransaction) {
@@ -122,8 +125,6 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           };
         } else {
           console.log('[SERVER] No matching transaction found for address:', addressStart);
-          landRegistryData.tenure = 'No recent sales data found.';
-          landRegistryData.pricePaid = 'No recent sales data found.';
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
