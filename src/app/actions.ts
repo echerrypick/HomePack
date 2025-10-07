@@ -49,7 +49,10 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     const response = await fetch(url);
 
     if (response.status === 404) {
-      throw new Error("Invalid postcode. Please check and try again.");
+      const errorData = await response.json();
+      if (errorData?.error?.message?.includes("postcode not found")) {
+         throw new Error("Invalid postcode. Please check and try again.");
+      }
     }
     if (response.status === 401) {
         throw new Error("The address lookup API key is invalid. Please check your OS_PLACES_API_KEY in the .env file.");
