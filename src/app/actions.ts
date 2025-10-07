@@ -41,43 +41,69 @@ export interface PropertyData {
 async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> {
   const apiKey = process.env.IDEAL_POSTCODES_API_KEY;
   if (!apiKey) {
-    throw new Error("Address lookup API key is not configured.");
+    // In a real app, you'd want to handle this more gracefully.
+    // For this example, we'll throw an error if the key is missing.
+    console.error("Address lookup API key is not configured.");
+    throw new Error("Address lookup API key is not configured. Please add IDEAL_POSTCODES_API_KEY to your .env file.");
   }
   const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodeURIComponent(postcode)}?api_key=${apiKey}`;
   
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error("Failed to fetch addresses from postcode.");
-  }
-  const data = await response.json();
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "An unknown error occurred." }));
+        throw new Error(errorData.message || `Failed to fetch addresses. Status: ${response.status}`);
+    }
+    const data = await response.json();
 
-  if (data.code !== 2000) {
-    throw new Error(data.message || "Could not retrieve addresses.");
-  }
+    if (data.code !== 2000) {
+        throw new Error(data.message || "Could not retrieve addresses.");
+    }
 
-  // Map the API response to our Address interface
-  return data.result.hits.map((hit: any) => ({
-    id: hit.udprn,
-    line1: hit.line_1,
-    town: hit.post_town,
-    postcode: hit.postcode,
-  }));
+    // Map the API response to our Address interface
+    return data.result.hits.map((hit: any) => ({
+        id: hit.udprn.toString(),
+        line1: hit.line_1,
+        town: hit.post_town,
+        postcode: hit.postcode,
+    }));
+  } catch (error: any) {
+    console.error("Error fetching addresses:", error.message);
+    throw new Error("There was a problem fetching addresses. Please check the postcode and try again.");
+  }
 }
 
 async function fetchPropertyData(addressId: string, fullAddress: string): Promise<PropertyData> {
     // In a real app, you'd call various APIs here using the addressId (UDPRN).
-    // For this example, we'll simulate this by calling mock-style functions.
-    // In a full implementation, each of these would be a `fetch` call.
     
-    // Simulate fetching data from various sources
-    const landRegistryData = { titleNumber: 'NGL123456', tenure: 'Leasehold', pricePaid: '£750,000', date: '2022-08-15' };
-    const epcData = { rating: 'C', potentialRating: 'B', validUntil: '2030-01-01', energyUse: 95 };
-    const floodRiskData = { riverAndSea: 'Low', surfaceWater: 'Very Low' };
-    const planningHistoryData = [{ application: 'Rear extension', decision: 'Approved', date: '2019-05-20' }];
+    // --- Land Registry API Call ---
+    const landRegApiKey = process.env.LAND_REG_API_KEY;
+    if (!landRegApiKey) throw new Error('Land Registry API key not configured.');
+    const landRegistryResponse = await fetch(`https://land-registry-api.com/properties/${addressId}`, { headers: { 'Authorization': `Bearer ${landRegApiKey}` } });
+    if(!landRegistryResponse.ok) throw new Error('Failed to fetch Land Registry data.');
+    const landRegistryData = await landRegistryResponse.json();
 
-    // You would replace the above with actual fetch calls to your APIs:
-    // const landRegistryData = await fetch(`https://land-registry-api.com/properties/${addressId}`, { headers: { 'Authorization': `Bearer ${process.env.LAND_REG_API_KEY}` } }).then(res => res.json());
-    // ... and so on for EPC, Flood Risk, etc.
+    // --- EPC API Call ---
+    const epcApiKey = process.env.EPC_API_KEY;
+    if (!epcApiKey) throw new Error('EPC API key not configured.');
+    const epcResponse = await fetch(`https://epc-api.com/properties/${addressId}`, { headers: { 'Authorization': `Bearer ${epcApiKey}` } });
+    if(!epcResponse.ok) throw new Error('Failed to fetch EPC data.');
+    const epcData = await epcResponse.json();
+
+    // --- Flood Risk API Call ---
+    const floodApiKey = process.env.FLOOD_API_KEY;
+    if(!floodApiKey) throw new Error('Flood Risk API key not configured.');
+    const floodRiskResponse = await fetch(`https://environment-agency-api.com/flood-risk/${addressId}`, { headers: { 'Authorization': `Bearer ${floodApiKey}` } });
+    if(!floodRiskResponse.ok) throw new Error('Failed to fetch Flood Risk data.');
+    const floodRiskData = await floodRiskResponse.json();
+
+    // --- Planning API Call ---
+    const planningApiKey = process.env.PLANNING_API_KEY;
+    if(!planningApiKey) throw new Error('Planning API key not configured.');
+    const planningResponse = await fetch(`https://planning-data-api.com/applications/${addressId}`, { headers: { 'Authorization': `Bearer ${planningApiKey}` } });
+    if(!planningResponse.ok) throw new Error('Failed to fetch Planning History data.');
+    const planningHistoryData = await planningResponse.json();
+    
 
     return {
         address: fullAddress,
@@ -122,6 +148,10 @@ export async function postcodeSearchOrGetReport(
 ): Promise<SearchResult> {
   const { postcode, selectedAddressId } = currentState;
 
+  if (!postcode) {
+    throw new Error('Postcode is required');
+  }
+
   const addresses = await fetchAddressesFromPostcode(postcode);
   if (addresses.length === 0) {
       throw new Error("No addresses found for this postcode.");
@@ -139,10 +169,6 @@ export async function postcodeSearchOrGetReport(
     return { status: 'report_ready', report, address: selectedAddress };
   } else {
     // Stage 1: Postcode search
-    if (!postcode) {
-      throw new Error('Postcode is required');
-    }
-    
     if (addresses.length > 1) {
       // Multiple addresses found, user needs to select one
       return { status: 'address_selection', addresses: addresses };
