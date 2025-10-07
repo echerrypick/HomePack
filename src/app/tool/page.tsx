@@ -6,8 +6,7 @@ import { AddressForm } from '@/components/homepack/address-form';
 import { PropertySelector } from '@/components/homepack/property-selector';
 import { ReportDisplay } from '@/components/homepack/report-display';
 import type { Address, PropertyData } from '@/lib/mock-data';
-import { searchAddress, getPropertyData } from '@/app/actions';
-import { Card, CardContent } from '@/components/ui/card';
+import { processPostcode, getPropertyData } from '@/app/actions';
 
 type Step = 'address' | 'select' | 'report';
 
@@ -23,19 +22,18 @@ export default function ToolPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await searchAddress(postcode);
-      if (result.length === 0) {
-        setError("No addresses found for this postcode. Please try again.");
-        setAddresses([]);
-      } else if (result.length === 1) {
-        // Automatically select if only one address is found
-        await handleAddressSelect(result[0]);
-      } else {
-        setAddresses(result);
+      const result = await processPostcode(postcode);
+      if (result.status === 'address_selection') {
+        setAddresses(result.addresses);
         setStep('select');
+      } else if (result.status === 'report_ready') {
+        setSelectedAddress(result.address);
+        setReportData(result.report);
+        setStep('report');
       }
-    } catch (e) {
-      setError("Failed to fetch addresses. Please try again later.");
+    } catch (e: any) {
+      setError(e.message || "Failed to process postcode. Please try again later.");
+      setAddresses([]);
     } finally {
       setIsLoading(false);
     }

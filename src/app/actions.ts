@@ -8,15 +8,32 @@ import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-repo
 // Simulate network latency
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function searchAddress(postcode: string): Promise<Address[]> {
-  await sleep(1000); // Simulate API call
-  if (!postcode) {
-    throw new Error('Postcode is required');
-  }
-  // In a real app, you'd fetch this from an API. Here we just return mock data.
-  // A simple filter to simulate a postcode search
-  return MOCK_ADDRESSES;
+type SearchResult = 
+  | { status: 'address_selection'; addresses: Address[] }
+  | { status: 'report_ready'; report: { propertyData: PropertyData, summary: string }, address: Address };
+
+export async function processPostcode(postcode: string): Promise<SearchResult> {
+    await sleep(1000); // Simulate API call
+    if (!postcode) {
+        throw new Error('Postcode is required');
+    }
+    // In a real app, you'd fetch this from an API.
+    const results = MOCK_ADDRESSES;
+
+    if (results.length === 0) {
+        throw new Error("No addresses found for this postcode.");
+    }
+    
+    if (results.length > 1) {
+        return { status: 'address_selection', addresses: results };
+    }
+
+    // If only one address, proceed to get property data
+    const address = results[0];
+    const report = await getPropertyData(address.id);
+    return { status: 'report_ready', report, address };
 }
+
 
 export async function getPropertyData(addressId: string): Promise<{ propertyData: PropertyData, summary: string }> {
   await sleep(1500); // Simulate API calls
