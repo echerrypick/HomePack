@@ -41,8 +41,6 @@ export interface PropertyData {
 async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> {
   const apiKey = process.env.IDEAL_POSTCODES_API_KEY;
   if (!apiKey) {
-    // In a real app, you'd want to handle this more gracefully.
-    // For this example, we'll throw an error if the key is missing.
     console.error("Address lookup API key is not configured.");
     throw new Error("Address lookup API key is not configured. Please add IDEAL_POSTCODES_API_KEY to your .env file.");
   }
@@ -50,10 +48,15 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
   
   try {
     const response = await fetch(url);
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "An unknown error occurred." }));
-        throw new Error(errorData.message || `Failed to fetch addresses. Status: ${response.status}`);
+
+    // The API returns 404 for invalid postcodes and 402 if credits are depleted.
+    if (response.status === 404) {
+      throw new Error("Invalid postcode. Please check and try again.");
     }
+    if (!response.ok) {
+        throw new Error(`Failed to fetch addresses. API responded with status: ${response.status}`);
+    }
+
     const data = await response.json();
 
     if (data.code !== 2000) {
@@ -69,7 +72,8 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     }));
   } catch (error: any) {
     console.error("Error fetching addresses:", error.message);
-    throw new Error("There was a problem fetching addresses. Please check the postcode and try again.");
+    // Re-throw a more user-friendly error or the specific error from the try block
+    throw new Error(error.message || "There was a problem fetching addresses. Please check the postcode and try again.");
   }
 }
 
