@@ -100,7 +100,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
       const response = await fetch(ppdUrl);
       if (response.ok) {
         const json = await response.json();
-        console.log('[SERVER] Raw PPD API Response:', JSON.stringify(json, null, 2)); // Debug full response
+        console.log('[SERVER] Raw PPD API Response:', JSON.stringify(json, null, 2));
         const transactions = json.result?.items || [];
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
         const postcodeUpper = postcode.toUpperCase();
@@ -111,7 +111,8 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
           const matchesAddress = itemAddress.includes(addressStart);
           const matchesPostcode = itemAddress.includes(postcodeUpper);
-          console.log(`[SERVER] Comparing: "${itemAddress}" - Address match: ${matchesAddress}, Postcode match: ${matchesPostcode}`);
+          // DETAILED LOGGING FOR COMPARISON
+          console.log(`[SERVER] ==> Comparing search term "${addressStart}" with API address "${itemAddress}". Address Match: ${matchesAddress}, Postcode Match: ${matchesPostcode}`);
           return matchesAddress && matchesPostcode;
         });
 
@@ -196,6 +197,17 @@ export async function getPropertyReport(fullAddress: string): Promise<{ property
 export async function generateConditionReportAction(imageURIs: string[]): Promise<{ report: string, error?: string }> {
   if (!imageURIs || imageURIs.length === 0) {
     throw new Error("No images provided for condition report.");
+  }
+
+  // Basic URI validation
+  for (const uri of imageURIs) {
+    if (!uri.startsWith('data:image/')) {
+      console.error(`[SERVER] Invalid image URI format: ${uri}`);
+      return { 
+        report: "An invalid image format was provided. Please upload valid image files.",
+        error: "Invalid image format"
+      }
+    }
   }
 
   try {
