@@ -29,6 +29,12 @@ function Header() {
             >
               Contact
             </Link>
+            <Link
+              href="/debug"
+              className="font-medium text-primary-foreground/80 hover:text-primary-foreground"
+            >
+              Debug
+            </Link>
           </nav>
           <div className="flex items-center">
             <Button asChild variant="default" className="hidden md:block bg-accent hover:bg-accent/90 text-accent-foreground">
