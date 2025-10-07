@@ -30,7 +30,7 @@ export function PropertySelector({ addresses, onSelect, onBack }: PropertySelect
               onClick={() => onSelect(address)}
               className="w-full text-left p-4 border rounded-lg hover:bg-accent/50 hover:border-accent transition-all flex items-center gap-4 focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <Home className="h-5 w-5 text-primary" />
+              <Home className="h-5 w-5 text-primary flex-shrink-0" />
               <div>
                 <p className="font-semibold">{address.address}</p>
               </div>
