@@ -67,13 +67,13 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     
     // Map the API response to our Address interface
     return data.results.map((hit: any) => {
-        const dpa = hit.GAZETTEER_ENTRY;
+        const gazetteerEntry = hit.GAZETTEER_ENTRY;
         return {
-            id: dpa.ID.toString(),
-            address: dpa.ADDRESS,
-            line1: dpa.NAME1,
-            town: dpa.POST_TOWN,
-            postcode: dpa.POSTCODE,
+            id: gazetteerEntry.ID.toString(),
+            address: gazetteerEntry.ADDRESS,
+            line1: gazetteerEntry.NAME1,
+            town: gazetteerEntry.POST_TOWN,
+            postcode: gazetteerEntry.POSTCODE,
         };
     });
   } catch (error: any) {
