@@ -77,17 +77,28 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
         .filter((hit: any) => hit.GAZETTEER_ENTRY)
         .map((hit: any) => {
             const gazetteerEntry = hit.GAZETTEER_ENTRY;
+            // Fallback to building the address if the full ADDRESS field isn't present
+            const fullAddress = gazetteerEntry.ADDRESS 
+                || [gazetteerEntry.NAME1, gazetteerEntry.STREET_DESCRIPTION, gazetteerEntry.POST_TOWN, gazetteerEntry.POSTCODE]
+                   .filter(Boolean) // Remove any empty/null parts
+                   .join(', ');
+
             return {
                 id: gazetteerEntry.ID,
-                address: gazetteerEntry.ADDRESS,
+                address: fullAddress,
                 line1: gazetteerEntry.NAME1,
                 town: gazetteerEntry.POST_TOWN,
                 postcode: gazetteerEntry.POSTCODE,
             };
     });
 
-    console.log('[SERVER] Mapped addresses:', JSON.stringify(mappedAddresses, null, 2));
-    return mappedAddresses;
+    // Deduplicate addresses
+    const uniqueAddresses = Array.from(
+      new Map(mappedAddresses.map((a: Address) => [a.address, a])).values()
+    );
+
+    console.log('[SERVER] Mapped addresses:', JSON.stringify(uniqueAddresses, null, 2));
+    return uniqueAddresses;
 
   } catch (error: any) {
     console.error("[SERVER] Error in fetchAddressesFromPostcode:", error.message);
