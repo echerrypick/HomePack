@@ -61,20 +61,22 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
 
     const data = await response.json();
 
-    if (!data.results || data.results.length === 0) {
+    if (!data.results) {
       return [];
     }
     
     // Map the API response to our Address interface
-    return data.results.map((hit: any) => {
-        const gazetteerEntry = hit.GAZETTEER_ENTRY;
-        return {
-            id: gazetteerEntry.ID.toString(),
-            address: gazetteerEntry.ADDRESS,
-            line1: gazetteerEntry.NAME1,
-            town: gazetteerEntry.POST_TOWN,
-            postcode: gazetteerEntry.POSTCODE,
-        };
+    return data.results
+        .filter((hit: any) => hit.GAZETTEER_ENTRY)
+        .map((hit: any) => {
+            const gazetteerEntry = hit.GAZETTEER_ENTRY;
+            return {
+                id: gazetteerEntry.ID.toString(),
+                address: gazetteerEntry.ADDRESS,
+                line1: gazetteerEntry.NAME1,
+                town: gazetteerEntry.POST_TOWN,
+                postcode: gazetteerEntry.POSTCODE,
+            };
     });
   } catch (error: any) {
     console.error("Error fetching addresses:", error.message);
