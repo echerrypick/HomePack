@@ -45,6 +45,7 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     throw new Error("Address lookup API key is not configured. Please add OS_NAMES_API_KEY to your .env file.");
   }
   const url = `https://api.os.uk/search/names/v1/find?key=${apiKey}&query=${encodeURIComponent(postcode)}`;
+  console.log(`[SERVER] Fetching addresses from: ${url}`);
 
   try {
     const response = await fetch(url);
@@ -64,8 +65,11 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
     }
 
     const data = await response.json();
+    console.log('[SERVER] Raw API Response:', JSON.stringify(data, null, 2));
+
 
     if (!data.results) {
+      console.log('[SERVER] No results found in API response.');
       return [];
     }
     
@@ -82,11 +86,11 @@ async function fetchAddressesFromPostcode(postcode: string): Promise<Address[]> 
             };
     });
 
+    console.log('[SERVER] Mapped addresses:', JSON.stringify(mappedAddresses, null, 2));
     return mappedAddresses;
 
   } catch (error: any) {
     console.error("[SERVER] Error in fetchAddressesFromPostcode:", error.message);
-    // Re-throw a more user-friendly error or the specific error from the try block
     throw new Error(error.message || "There was a problem fetching addresses. Please check the postcode and try again.");
   }
 }
