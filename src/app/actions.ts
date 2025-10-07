@@ -113,7 +113,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
           const latestTransaction = results.find((item: any) => {
             const itemAddress = item.propertyAddress.label.toUpperCase() || '';
             console.log(`[SERVER] -- Comparing search term "${addressStart}" with API address "${itemAddress}"`);
-            return itemAddress.includes(addressStart);
+            return itemAddress.startsWith(addressStart);
           });
           
           if (latestTransaction) {
