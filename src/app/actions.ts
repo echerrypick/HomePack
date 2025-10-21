@@ -99,10 +99,12 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   }
 
   // --- SPARQL query template with multiple Regex ---
-  const makeQuery = (includeBuilding: boolean) => {
-    let filterClause = `regex(?addressString, "${streetName}", "i") && regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")`;
-    if (includeBuilding && buildingIdentifier) {
-      filterClause = `regex(?addressString, "${buildingIdentifier}", "i") && ${filterClause}`;
+  const makeQuery = () => {
+    let filterClause = `regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")`;
+    if (buildingIdentifier) {
+      // Match the number at the start of the address string, followed by a space.
+      // This is more reliable as street name matching is brittle.
+      filterClause += ` && regex(?addressString, "^${buildingIdentifier}\\\\s", "i")`;
     }
 
     return `
@@ -129,16 +131,8 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     `;
   }
   
-  // --- 1st Attempt: Try with building identifier ---
-  logs.push('[ATTEMPT 1] Querying with building identifier.');
-  let results = await sendQuery(makeQuery(true));
-
-  // --- 2nd Attempt (Fallback): If no results, try without building identifier ---
-  if (results.length === 0) {
-    logs.push('[ATTEMPT 2] No results with building identifier, falling back to street and postcode only.');
-    results = await sendQuery(makeQuery(false));
-  }
-
+  logs.push('[ATTEMPT] Querying with building identifier and postcode.');
+  let results = await sendQuery(makeQuery());
 
   // --- Format result ---
   const formattedResults = results.map((r: any) => ({
@@ -269,7 +263,8 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
               lrppi:propertyAddress ?addrURI ;
               lrppi:estateType ?estateTypeURI .
       ?estateTypeURI rdfs:label ?estateType .
-      ?addrURI lrcommon:address ?addressString .
+      ?addrURI lrcommon:address ?addressString ;
+              lrcommon:postcode ?postcodeValue .
   `;
   
   const ordering = `
@@ -279,13 +274,16 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   `;
 
   // Query 1: Postcode only
-  const query1 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode ?postcodeValue . FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")) ${ordering}`;
+  let filter1 = `FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i"))`;
+  const query1 = `${prefixes} ${baseSelect} ${filter1} ${ordering}`;
 
   // Query 2: Postcode + Street (Regex)
-  const query2 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode ?postcodeValue . FILTER(regex(?addressString, "${streetName}", "i") && regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")) ${ordering}`;
+  let filter2 = `FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i") && regex(?addressString, "${streetName}", "i"))`;
+  const query2 = `${prefixes} ${baseSelect} ${filter2} ${ordering}`;
   
-  // Query 3: Postcode + Street + Building ID (Regex)
-  const query3 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode ?postcodeValue . FILTER(regex(?addressString, "${buildingIdentifier}", "i") && regex(?addressString, "${streetName}", "i") && regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")) ${ordering}`;
+  // Query 3: Postcode + Building ID at start of string (Regex)
+  let filter3 = `FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i") && regex(?addressString, "^${buildingIdentifier}\\\\s", "i"))`;
+  const query3 = `${prefixes} ${baseSelect} ${filter3} ${ordering}`;
 
   async function sendQuery(sparqlQuery: string) {
     try {
@@ -313,5 +311,3 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
-
-    

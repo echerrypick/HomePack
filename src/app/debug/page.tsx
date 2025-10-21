@@ -30,21 +30,24 @@ type StepByStepDebugInfo = {
   result3: StepResult;
 }
 
-function DebugStepView({ step, title, debugInfo }: { step: number; title: string; debugInfo: DebugInfo }) {
+function DebugStepView({ step, title, description, debugInfo }: { step: number; title: string; description: string; debugInfo: DebugInfo }) {
   const hasResults = debugInfo.response?.results?.bindings?.length > 0;
   
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            {hasResults ? (
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            ) : (
-              <XCircle className="h-5 w-5 text-destructive" />
-            )}
-            Step {step}: {title}
-          </CardTitle>
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              {hasResults ? (
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              ) : (
+                <XCircle className="h-5 w-5 text-destructive" />
+              )}
+              Step {step}: {title}
+            </CardTitle>
+            <CardDescription className="pt-1 pl-7">{description}</CardDescription>
+          </div>
           <span className={`text-sm font-semibold ${hasResults ? 'text-green-600' : 'text-destructive'}`}>
             {hasResults ? `${debugInfo.response.results.bindings.length} results found` : (debugInfo.error || 'No results')}
           </span>
@@ -152,9 +155,24 @@ export default function DebugPage() {
                         </Alert>
                     )}
                   <div className="space-y-4">
-                    <DebugStepView step={1} title="Postcode Only" debugInfo={debugInfo.result1} />
-                    <DebugStepView step={2} title="Postcode + Street" debugInfo={debugInfo.result2} />
-                    <DebugStepView step={3} title="Postcode + Street + Building ID" debugInfo={debugInfo.result3} />
+                    <DebugStepView 
+                      step={1} 
+                      title="Postcode Only" 
+                      description="Tests if any data exists for the postcode."
+                      debugInfo={debugInfo.result1} 
+                    />
+                    <DebugStepView 
+                      step={2} 
+                      title="Postcode + Street Name"
+                      description="Tests matching the street name within the address."
+                      debugInfo={debugInfo.result2} 
+                    />
+                    <DebugStepView 
+                      step={3} 
+                      title="Postcode + Building ID" 
+                      description="Tests matching the building number at the start of the address."
+                      debugInfo={debugInfo.result3} 
+                    />
                   </div>
                 </div>
               )}
@@ -165,5 +183,3 @@ export default function DebugPage() {
     </div>
   );
 }
-
-    
