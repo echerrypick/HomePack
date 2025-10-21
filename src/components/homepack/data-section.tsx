@@ -1,5 +1,12 @@
 import type { LucideProps } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { HelpCircle } from 'lucide-react';
 
 type DataSectionProps = {
   icon: React.ComponentType<LucideProps>;
@@ -17,7 +24,9 @@ export function DataSection({ icon: Icon, title, children }: DataSectionProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {children}
+        <TooltipProvider>
+            {children}
+        </TooltipProvider>
       </CardContent>
     </Card>
   );
@@ -26,11 +35,24 @@ export function DataSection({ icon: Icon, title, children }: DataSectionProps) {
 type DataItemProps = {
     label: string;
     value: string | number;
+    tooltip?: string;
 }
-export function DataItem({ label, value }: DataItemProps) {
+export function DataItem({ label, value, tooltip }: DataItemProps) {
     return (
         <div className="flex justify-between items-center text-sm even:bg-muted/50 p-2 rounded-md -mx-2">
-            <p className="text-muted-foreground">{label}</p>
+            <div className="flex items-center gap-1.5">
+                <p className="text-muted-foreground">{label}</p>
+                {tooltip && (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/70 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-xs">
+                            <p>{tooltip}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                )}
+            </div>
             <p className="font-medium text-right">{value}</p>
         </div>
     )

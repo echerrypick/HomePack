@@ -12,6 +12,7 @@ import { DataSection, DataItem } from './data-section';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
+import { epcTooltips } from '@/lib/epc-tooltips';
 
 type ReportDisplayProps = {
   address: Address;
@@ -79,62 +80,62 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
                 </AccordionTrigger>
                 <AccordionContent className="space-y-2 pt-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                        <DataItem label="Address Line 1" value={dataOrNA(epcData.address1)} />
-                        <DataItem label="Address Line 2" value={dataOrNA(epcData.address2)} />
-                        <DataItem label="Address Line 3" value={dataOrNA(epcData.address3)} />
-                        <DataItem label="Town" value={dataOrNA(epcData.posttown)} />
-                        <DataItem label="Postcode" value={dataOrNA(epcData.postcode)} />
-                        <DataItem label="County" value={dataOrNA(epcData.county)} />
+                        <DataItem label="Address Line 1" value={dataOrNA(epcData.address1)} tooltip={epcTooltips.address1} />
+                        <DataItem label="Address Line 2" value={dataOrNA(epcData.address2)} tooltip={epcTooltips.address2} />
+                        <DataItem label="Address Line 3" value={dataOrNA(epcData.address3)} tooltip={epcTooltips.address3} />
+                        <DataItem label="Town" value={dataOrNA(epcData.posttown)} tooltip={epcTooltips.posttown} />
+                        <DataItem label="Postcode" value={dataOrNA(epcData.postcode)} tooltip={epcTooltips.postcode} />
+                        <DataItem label="County" value={dataOrNA(epcData.county)} tooltip={epcTooltips.county} />
                         <Separator className="md:col-span-2" />
-                        <DataItem label="Lodgement Date" value={epcData.lodgementDate ? new Date(epcData.lodgementDate).toLocaleDateString() : 'N/A'} />
-                        <DataItem label="Inspection Date" value={epcData.inspectionDate ? new Date(epcData.inspectionDate).toLocaleDateString() : 'N/A'} />
+                        <DataItem label="Lodgement Date" value={epcData.lodgementDate ? new Date(epcData.lodgementDate).toLocaleDateString() : 'N/A'} tooltip={epcTooltips.lodgementDate}/>
+                        <DataItem label="Inspection Date" value={epcData.inspectionDate ? new Date(epcData.inspectionDate).toLocaleDateString() : 'N/A'} tooltip={epcTooltips.inspectionDate} />
                         <Separator className="md:col-span-2" />
-                        <DataItem label="Current Rating" value={dataOrNA(epcData.rating)} />
-                        <DataItem label="Potential Rating" value={dataOrNA(epcData.potentialRating)} />
-                        <DataItem label="Current Efficiency" value={dataOrNA(epcData.currentEnergyEfficiency)} />
-                        <DataItem label="Potential Efficiency" value={dataOrNA(epcData.potentialEnergyEfficiency)} />
+                        <DataItem label="Current Rating" value={dataOrNA(epcData.rating)} tooltip={epcTooltips.rating} />
+                        <DataItem label="Potential Rating" value={dataOrNA(epcData.potentialRating)} tooltip={epcTooltips.potentialRating} />
+                        <DataItem label="Current Efficiency" value={dataOrNA(epcData.currentEnergyEfficiency)} tooltip={epcTooltips.currentEnergyEfficiency} />
+                        <DataItem label="Potential Efficiency" value={dataOrNA(epcData.potentialEnergyEfficiency)} tooltip={epcTooltips.potentialEnergyEfficiency} />
                          <Separator className="md:col-span-2" />
-                        <DataItem label="Property Type" value={dataOrNA(epcData.propertyType)} />
-                        <DataItem label="Built Form" value={dataOrNA(epcData.builtForm)} />
-                        <DataItem label="Construction Age" value={dataOrNA(epcData.constructionAgeBand)} />
-                        <DataItem label="Tenure" value={dataOrNA(epcData.tenure)} />
-                        <DataItem label="UPRN" value={dataOrNA(epcData.uprn)} />
-                        <DataItem label="Building Reference" value={dataOrNA(epcData.buildingReferenceNumber)} />
-                        <DataItem label="Local Authority" value={dataOrNA(epcData.localAuthorityLabel)} />
-                        <DataItem label="Constituency" value={dataOrNA(epcData.constituencyLabel)} />
+                        <DataItem label="Property Type" value={dataOrNA(epcData.propertyType)} tooltip={epcTooltips.propertyType} />
+                        <DataItem label="Built Form" value={dataOrNA(epcData.builtForm)} tooltip={epcTooltips.builtForm} />
+                        <DataItem label="Construction Age" value={dataOrNA(epcData.constructionAgeBand)} tooltip={epcTooltips.constructionAgeBand} />
+                        <DataItem label="Tenure" value={dataOrNA(epcData.tenure)} tooltip={epcTooltips.tenure} />
+                        <DataItem label="UPRN" value={dataOrNA(epcData.uprn)} tooltip={epcTooltips.uprn} />
+                        <DataItem label="Building Reference" value={dataOrNA(epcData.buildingReferenceNumber)} tooltip={epcTooltips.buildingReferenceNumber} />
+                        <DataItem label="Local Authority" value={dataOrNA(epcData.localAuthorityLabel)} tooltip={epcTooltips.localAuthorityLabel} />
+                        <DataItem label="Constituency" value={dataOrNA(epcData.constituencyLabel)} tooltip={epcTooltips.constituencyLabel} />
                         <Separator className="md:col-span-2" />
-                        <DataItem label="Total Floor Area" value={`${dataOrNA(epcData.totalFloorArea)} m²`} />
-                        <DataItem label="Habitable Rooms" value={dataOrNA(epcData.numberHabitableRooms)} />
-                        <DataItem label="Heated Rooms" value={dataOrNA(epcData.numberHeatedRooms)} />
-                        <DataItem label="Transaction Type" value={dataOrNA(epcData.transactionType)} />
+                        <DataItem label="Total Floor Area" value={`${dataOrNA(epcData.totalFloorArea)} m²`} tooltip={epcTooltips.totalFloorArea} />
+                        <DataItem label="Habitable Rooms" value={dataOrNA(epcData.numberHabitableRooms)} tooltip={epcTooltips.numberHabitableRooms} />
+                        <DataItem label="Heated Rooms" value={dataOrNA(epcData.numberHeatedRooms)} tooltip={epcTooltips.numberHeatedRooms} />
+                        <DataItem label="Transaction Type" value={dataOrNA(epcData.transactionType)} tooltip={epcTooltips.transactionType} />
                         <Separator className="md:col-span-2" />
-                        <DataItem label="Main Heat Source" value={dataOrNA(epcData.mainHeatDescription)} />
-                        <DataItem label="Main Heat Controls" value={dataOrNA(epcData.mainheatcontDescription)} />
-                        <DataItem label="Main Fuel" value={dataOrNA(epcData.mainFuel)} />
-                        <DataItem label="Secondary Heat" value={dataOrNA(epcData.secondheatDescription)} />
-                        <DataItem label="Hot Water" value={dataOrNA(epcData.hotwaterDescription)} />
+                        <DataItem label="Main Heat Source" value={dataOrNA(epcData.mainHeatDescription)} tooltip={epcTooltips.mainHeatDescription} />
+                        <DataItem label="Main Heat Controls" value={dataOrNA(epcData.mainheatcontDescription)} tooltip={epcTooltips.mainheatcontDescription} />
+                        <DataItem label="Main Fuel" value={dataOrNA(epcData.mainFuel)} tooltip={epcTooltips.mainFuel} />
+                        <DataItem label="Secondary Heat" value={dataOrNA(epcData.secondheatDescription)} tooltip={epcTooltips.secondheatDescription} />
+                        <DataItem label="Hot Water" value={dataOrNA(epcData.hotwaterDescription)} tooltip={epcTooltips.hotwaterDescription} />
                         <Separator className="md:col-span-2" />
-                        <DataItem label="Walls" value={dataOrNA(epcData.wallsDescription)} />
-                        <DataItem label="Walls Energy Eff." value={dataOrNA(epcData.wallsEnergyEff)} />
-                        <DataItem label="Roof" value={dataOrNA(epcData.roofDescription)} />
-                        <DataItem label="Roof Energy Eff." value={dataOrNA(epcData.roofEnergyEff)} />
-                        <DataItem label="Floor" value={dataOrNA(epcData.floorDescription)} />
-                        <DataItem label="Windows" value={dataOrNA(epcData.windowsDescription)} />
-                        <DataItem label="Windows Energy Eff." value={dataOrNA(epcData.windowsEnergyEff)} />
-                        <DataItem label="Lighting" value={dataOrNA(epcData.lightingDescription)} />
-                        <DataItem label="Lighting Energy Eff." value={dataOrNA(epcData.lightingEnergyEff)} />
+                        <DataItem label="Walls" value={dataOrNA(epcData.wallsDescription)} tooltip={epcTooltips.wallsDescription} />
+                        <DataItem label="Walls Energy Eff." value={dataOrNA(epcData.wallsEnergyEff)} tooltip={epcTooltips.wallsEnergyEff} />
+                        <DataItem label="Roof" value={dataOrNA(epcData.roofDescription)} tooltip={epcTooltips.roofDescription} />
+                        <DataItem label="Roof Energy Eff." value={dataOrNA(epcData.roofEnergyEff)} tooltip={epcTooltips.roofEnergyEff} />
+                        <DataItem label="Floor" value={dataOrNA(epcData.floorDescription)} tooltip={epcTooltips.floorDescription} />
+                        <DataItem label="Windows" value={dataOrNA(epcData.windowsDescription)} tooltip={epcTooltips.windowsDescription} />
+                        <DataItem label="Windows Energy Eff." value={dataOrNA(epcData.windowsEnergyEff)} tooltip={epcTooltips.windowsEnergyEff} />
+                        <DataItem label="Lighting" value={dataOrNA(epcData.lightingDescription)} tooltip={epcTooltips.lightingDescription} />
+                        <DataItem label="Lighting Energy Eff." value={dataOrNA(epcData.lightingEnergyEff)} tooltip={epcTooltips.lightingEnergyEff} />
                         <Separator className="md:col-span-2" />
-                        <DataItem label="CO₂ Emissions (Current)" value={`${dataOrNA(epcData.co2EmissionsCurrent)} tonnes/year`} />
-                        <DataItem label="CO₂ Emissions (Potential)" value={`${dataOrNA(epcData.co2EmissionsPotential)} tonnes/year`} />
-                        <DataItem label="Energy Consumption (Current)" value={`${dataOrNA(epcData.energyConsumptionCurrent)} kWh/m² per year`} />
-                        <DataItem label="Energy Consumption (Potential)" value={`${dataOrNA(epcData.energyConsumptionPotential)} kWh/m² per year`} />
+                        <DataItem label="CO₂ Emissions (Current)" value={`${dataOrNA(epcData.co2EmissionsCurrent)} tonnes/year`} tooltip={epcTooltips.co2EmissionsCurrent} />
+                        <DataItem label="CO₂ Emissions (Potential)" value={`${dataOrNA(epcData.co2EmissionsPotential)} tonnes/year`} tooltip={epcTooltips.co2EmissionsPotential} />
+                        <DataItem label="Energy Consumption (Current)" value={`${dataOrNA(epcData.energyConsumptionCurrent)} kWh/m² per year`} tooltip={epcTooltips.energyConsumptionCurrent} />
+                        <DataItem label="Energy Consumption (Potential)" value={`${dataOrNA(epcData.energyConsumptionPotential)} kWh/m² per year`} tooltip={epcTooltips.energyConsumptionPotential} />
                         <Separator className="md:col-span-2" />
-                        <DataItem label="Heating Cost (Current)" value={`£${dataOrNA(epcData.heatingCostCurrent)} / year`} />
-                        <DataItem label="Heating Cost (Potential)" value={`£${dataOrNA(epcData.heatingCostPotential)} / year`} />
-                        <DataItem label="Hot Water Cost (Current)" value={`£${dataOrNA(epcData.hotWaterCostCurrent)} / year`} />
-                        <DataItem label="Hot Water Cost (Potential)" value={`£${dataOrNA(epcData.hotWaterCostPotential)} / year`} />
-                        <DataItem label="Lighting Cost (Current)" value={`£${dataOrNA(epcData.lightingCostCurrent)} / year`} />
-                        <DataItem label="Lighting Cost (Potential)" value={`£${dataOrNA(epcData.lightingCostPotential)} / year`} />
+                        <DataItem label="Heating Cost (Current)" value={`£${dataOrNA(epcData.heatingCostCurrent)} / year`} tooltip={epcTooltips.heatingCostCurrent} />
+                        <DataItem label="Heating Cost (Potential)" value={`£${dataOrNA(epcData.heatingCostPotential)} / year`} tooltip={epcTooltips.heatingCostPotential} />
+                        <DataItem label="Hot Water Cost (Current)" value={`£${dataOrNA(epcData.hotWaterCostCurrent)} / year`} tooltip={epcTooltips.hotWaterCostCurrent} />
+                        <DataItem label="Hot Water Cost (Potential)" value={`£${dataOrNA(epcData.hotWaterCostPotential)} / year`} tooltip={epcTooltips.hotWaterCostPotential} />
+                        <DataItem label="Lighting Cost (Current)" value={`£${dataOrNA(epcData.lightingCostCurrent)} / year`} tooltip={epcTooltips.lightingCostCurrent} />
+                        <DataItem label="Lighting Cost (Potential)" value={`£${dataOrNA(epcData.lightingCostPotential)} / year`} tooltip={epcTooltips.lightingCostPotential} />
                     </div>
                 </AccordionContent>
               </AccordionItem>
