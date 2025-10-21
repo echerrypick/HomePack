@@ -52,11 +52,14 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
     const headers: HeadersInit = {
         "Accept": "application/json",
     };
-    if (process.env.EPC_API_KEY) {
-        headers["Authorization"] = `Bearer ${process.env.EPC_API_KEY}`;
-        logs.push("[EPC] Using API Key for authentication.");
+
+    if (process.env.EPC_API_EMAIL && process.env.EPC_API_KEY) {
+        const credentials = `${process.env.EPC_API_EMAIL}:${process.env.EPC_API_KEY}`;
+        const encodedCredentials = Buffer.from(credentials).toString('base64');
+        headers["Authorization"] = `Basic ${encodedCredentials}`;
+        logs.push("[EPC] Using Basic authentication with email and API Key.");
     } else {
-        logs.push("[EPC] No API Key found, making unauthenticated request.");
+        logs.push("[EPC] No API credentials found, making unauthenticated request.");
     }
 
     try {
@@ -64,6 +67,8 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
 
         if (!res.ok) {
             logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
+            const errorText = await res.text();
+            logs.push(`[EPC ERROR] Response: ${errorText}`);
             return { data: null, logs };
         }
 
@@ -100,11 +105,10 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
 
-  // --- Normalise input ---
-  const postcode = address.postcode.trim().toUpperCase();
+  const postcode = address.postcode.trim();
   const streetInput = address.street.trim();
   
-  let paon = ''; // Primary Addressable Object Name (building number/name)
+  let paon = ''; 
   let street = '';
 
   const paonMatch = streetInput.match(/^(\d+[a-zA-Z]?(-\d+[a-zA-Z]?)?)\s+/);
@@ -112,7 +116,6 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     paon = paonMatch[1];
     street = streetInput.substring(paonMatch[0].length).trim();
   } else {
-    // Fallback for non-numeric names like 'The Cottage' or street-only searches
     const streetParts = streetInput.split(' ');
     if (streetParts.length > 1 && isNaN(parseInt(streetParts[0]))) {
         paon = streetParts[0];
@@ -222,7 +225,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   logs.push(...epcLogs);
 
   const propertyData: PropertyData = {
-    address: `${address.street}, ${address.town}, ${address.postcode}`,
+    address: formattedResults.length > 0 ? formattedResults[0].addressString : `${address.street}, ${address.town}, ${address.postcode}`,
     landRegistry: formattedResults,
     epc: epcData,
     floodRisk: {
@@ -307,7 +310,7 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
 
 export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
-  const postcode = address.postcode.trim().toUpperCase();
+  const postcode = address.postcode.trim();
   const streetInput = address.street.trim();
 
   let paon = '';
@@ -422,4 +425,5 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
+
 
