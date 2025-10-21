@@ -22,15 +22,38 @@ export type LandRegistryResult = {
 }
 
 export type EpcData = {
+  address1: string;
+  address2: string;
+  address3: string;
+  posttown: string;
+  county: string;
+  lodgementDate: string;
+  inspectionDate: string;
   rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
   potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-  validUntil: string;
-  energyUse: number;
-  totalFloorArea: string;
-  builtForm: string;
-  lodgementDate: string;
-  lmkKey: string;
   propertyType: string;
+  tenure: string;
+  uprn: string;
+  buildingReferenceNumber: string;
+  constructionAgeBand: string;
+  localAuthorityLabel: string;
+  totalFloorArea: string;
+  mainheatcontDescription: string;
+  reportType: string;
+  energyTariff: string;
+  mechanicalVentilation: string;
+  co2EmissCurrPerFloorArea: string;
+  mainsGasFlag: string;
+  constituencyLabel: string;
+  mainFuel: string;
+  lightingDescription: string;
+  multiGlazeProportion: string;
+  mainHeatingControls: string;
+  secondheatDescription: string;
+  transactionType: string;
+  lowEnergyLighting: string;
+  hotwaterDescription: string;
+  builtForm: string;
   currentEnergyEfficiency: string;
   potentialEnergyEfficiency: string;
   mainHeatDescription: string;
@@ -39,6 +62,22 @@ export type EpcData = {
   windowsDescription: string;
   co2EmissionsCurrent: string;
   co2EmissionsPotential: string;
+  heatingCostCurrent: string;
+  heatingCostPotential: string;
+  hotWaterCostCurrent: string;
+  hotWaterCostPotential: string;
+  lightingCostCurrent: string;
+  lightingCostPotential: string;
+  energyConsumptionCurrent: string;
+  energyConsumptionPotential: string;
+  floorDescription: string;
+  roofEnergyEff: string;
+  windowsEnergyEff: string;
+  wallsEnergyEff: string;
+  hotWaterEnergyEff: string;
+  lightingEnergyEff: string;
+  numberHabitableRooms: string;
+  numberHeatedRooms: string;
 } | null;
 
 export type PropertyData = {
@@ -89,15 +128,38 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
         if (data.rows && data.rows.length > 0) {
             const latestEpc = data.rows[0]; // API returns most recent first
             const formattedEpc: EpcData = {
+                address1: latestEpc['address1'],
+                address2: latestEpc['address2'],
+                address3: latestEpc['address3'],
+                posttown: latestEpc['posttown'],
+                county: latestEpc['county'],
+                lodgementDate: latestEpc['lodgement-date'],
+                inspectionDate: latestEpc['inspection-date'],
                 rating: latestEpc['current-energy-rating'],
                 potentialRating: latestEpc['potential-energy-rating'],
-                validUntil: latestEpc['valid-until'],
-                energyUse: latestEpc['energy-consumption-current'],
-                totalFloorArea: latestEpc['total-floor-area'],
-                builtForm: latestEpc['built-form'],
-                lodgementDate: latestEpc['lodgement-date'],
-                lmkKey: latestEpc['lmk-key'],
                 propertyType: latestEpc['property-type'],
+                tenure: latestEpc['tenure'],
+                uprn: latestEpc['uprn'],
+                buildingReferenceNumber: latestEpc['building-reference-number'],
+                constructionAgeBand: latestEpc['construction-age-band'],
+                localAuthorityLabel: latestEpc['local-authority-label'],
+                totalFloorArea: latestEpc['total-floor-area'],
+                mainheatcontDescription: latestEpc['mainheatcont-description'],
+                reportType: latestEpc['report-type'],
+                energyTariff: latestEpc['energy-tariff'],
+                mechanicalVentilation: latestEpc['mechanical-ventilation'],
+                co2EmissCurrPerFloorArea: latestEpc['co2-emiss-curr-per-floor-area'],
+                mainsGasFlag: latestEpc['mains-gas-flag'],
+                constituencyLabel: latestEpc['constituency-label'],
+                mainFuel: latestEpc['main-fuel'],
+                lightingDescription: latestEpc['lighting-description'],
+                multiGlazeProportion: latestEpc['multi-glaze-proportion'],
+                mainHeatingControls: latestEpc['main-heating-controls'],
+                secondheatDescription: latestEpc['secondheat-description'],
+                transactionType: latestEpc['transaction-type'],
+                lowEnergyLighting: latestEpc['low-energy-lighting'],
+                hotwaterDescription: latestEpc['hotwater-description'],
+                builtForm: latestEpc['built-form'],
                 currentEnergyEfficiency: latestEpc['current-energy-efficiency'],
                 potentialEnergyEfficiency: latestEpc['potential-energy-efficiency'],
                 mainHeatDescription: latestEpc['mainheat-description'],
@@ -106,6 +168,22 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
                 windowsDescription: latestEpc['windows-description'],
                 co2EmissionsCurrent: latestEpc['co2-emissions-current'],
                 co2EmissionsPotential: latestEpc['co2-emissions-potential'],
+                heatingCostCurrent: latestEpc['heating-cost-current'],
+                heatingCostPotential: latestEpc['heating-cost-potential'],
+                hotWaterCostCurrent: latestEpc['hot-water-cost-current'],
+                hotWaterCostPotential: latestEpc['hot-water-cost-potential'],
+                lightingCostCurrent: latestEpc['lighting-cost-current'],
+                lightingCostPotential: latestEpc['lighting-cost-potential'],
+                energyConsumptionCurrent: latestEpc['energy-consumption-current'],
+                energyConsumptionPotential: latestEpc['energy-consumption-potential'],
+                floorDescription: latestEpc['floor-description'],
+                roofEnergyEff: latestEpc['roof-energy-eff'],
+                windowsEnergyEff: latestEpc['windows-energy-eff'],
+                wallsEnergyEff: latestEpc['walls-energy-eff'],
+                hotWaterEnergyEff: latestEpc['hot-water-energy-eff'],
+                lightingEnergyEff: latestEpc['lighting-energy-eff'],
+                numberHabitableRooms: latestEpc['number-habitable-rooms'],
+                numberHeatedRooms: latestEpc['number-heated-rooms'],
             };
             logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
             return { data: formattedEpc, logs };
@@ -431,5 +509,6 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
+
 
 

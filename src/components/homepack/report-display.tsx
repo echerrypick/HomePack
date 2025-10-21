@@ -54,6 +54,10 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
 
     const epcValue = (7 - (epcData.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
+    const dataOrNA = (value: string | number | undefined | null) => {
+        return value !== null && value !== undefined && value !== '' ? String(value) : 'N/A';
+    }
+
     return (
         <>
             <div className="space-y-2">
@@ -74,24 +78,64 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
                     <span className="text-sm text-primary hover:underline">View EPC Details</span>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-2 pt-2">
-                   <DataItem label="Valid Until" value={new Date(epcData.validUntil).toLocaleDateString()} />
-                   <DataItem label="Lodgement Date" value={new Date(epcData.lodgementDate).toLocaleDateString()} />
-                   <Separator />
-                   <DataItem label="Energy Efficiency" value={`${epcData.currentEnergyEfficiency}/100`} />
-                   <DataItem label="Potential Efficiency" value={`${epcData.potentialEnergyEfficiency}/100`} />
-                   <Separator />
-                   <DataItem label="CO₂ Emissions (Current)" value={`${epcData.co2EmissionsCurrent} tonnes/year`} />
-                   <DataItem label="CO₂ Emissions (Potential)" value={`${epcData.co2EmissionsPotential} tonnes/year`} />
-                   <Separator />
-                   <DataItem label="Property Type" value={`${epcData.propertyType}, ${epcData.builtForm}`} />
-                   <DataItem label="Total Floor Area" value={`${epcData.totalFloorArea} m²`} />
-                   <Separator />
-                   <DataItem label="Main Heating" value={epcData.mainHeatDescription} />
-                   <DataItem label="Walls" value={epcData.wallsDescription} />
-                   <DataItem label="Roof" value={epcData.roofDescription} />
-                   <DataItem label="Windows" value={epcData.windowsDescription} />
-                   <Separator />
-                   <DataItem label="Certificate LMK Key" value={epcData.lmkKey} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                        <DataItem label="Address Line 1" value={dataOrNA(epcData.address1)} />
+                        <DataItem label="Address Line 2" value={dataOrNA(epcData.address2)} />
+                        <DataItem label="Address Line 3" value={dataOrNA(epcData.address3)} />
+                        <DataItem label="Town" value={dataOrNA(epcData.posttown)} />
+                        <DataItem label="Postcode" value={dataOrNA(epcData.postcode)} />
+                        <DataItem label="County" value={dataOrNA(epcData.county)} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Lodgement Date" value={epcData.lodgementDate ? new Date(epcData.lodgementDate).toLocaleDateString() : 'N/A'} />
+                        <DataItem label="Inspection Date" value={epcData.inspectionDate ? new Date(epcData.inspectionDate).toLocaleDateString() : 'N/A'} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Current Rating" value={dataOrNA(epcData.rating)} />
+                        <DataItem label="Potential Rating" value={dataOrNA(epcData.potentialRating)} />
+                        <DataItem label="Current Efficiency" value={dataOrNA(epcData.currentEnergyEfficiency)} />
+                        <DataItem label="Potential Efficiency" value={dataOrNA(epcData.potentialEnergyEfficiency)} />
+                         <Separator className="md:col-span-2" />
+                        <DataItem label="Property Type" value={dataOrNA(epcData.propertyType)} />
+                        <DataItem label="Built Form" value={dataOrNA(epcData.builtForm)} />
+                        <DataItem label="Construction Age" value={dataOrNA(epcData.constructionAgeBand)} />
+                        <DataItem label="Tenure" value={dataOrNA(epcData.tenure)} />
+                        <DataItem label="UPRN" value={dataOrNA(epcData.uprn)} />
+                        <DataItem label="Building Reference" value={dataOrNA(epcData.buildingReferenceNumber)} />
+                        <DataItem label="Local Authority" value={dataOrNA(epcData.localAuthorityLabel)} />
+                        <DataItem label="Constituency" value={dataOrNA(epcData.constituencyLabel)} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Total Floor Area" value={`${dataOrNA(epcData.totalFloorArea)} m²`} />
+                        <DataItem label="Habitable Rooms" value={dataOrNA(epcData.numberHabitableRooms)} />
+                        <DataItem label="Heated Rooms" value={dataOrNA(epcData.numberHeatedRooms)} />
+                        <DataItem label="Transaction Type" value={dataOrNA(epcData.transactionType)} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Main Heat Source" value={dataOrNA(epcData.mainHeatDescription)} />
+                        <DataItem label="Main Heat Controls" value={dataOrNA(epcData.mainheatcontDescription)} />
+                        <DataItem label="Main Fuel" value={dataOrNA(epcData.mainFuel)} />
+                        <DataItem label="Secondary Heat" value={dataOrNA(epcData.secondheatDescription)} />
+                        <DataItem label="Hot Water" value={dataOrNA(epcData.hotwaterDescription)} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Walls" value={dataOrNA(epcData.wallsDescription)} />
+                        <DataItem label="Walls Energy Eff." value={dataOrNA(epcData.wallsEnergyEff)} />
+                        <DataItem label="Roof" value={dataOrNA(epcData.roofDescription)} />
+                        <DataItem label="Roof Energy Eff." value={dataOrNA(epcData.roofEnergyEff)} />
+                        <DataItem label="Floor" value={dataOrNA(epcData.floorDescription)} />
+                        <DataItem label="Windows" value={dataOrNA(epcData.windowsDescription)} />
+                        <DataItem label="Windows Energy Eff." value={dataOrNA(epcData.windowsEnergyEff)} />
+                        <DataItem label="Lighting" value={dataOrNA(epcData.lightingDescription)} />
+                        <DataItem label="Lighting Energy Eff." value={dataOrNA(epcData.lightingEnergyEff)} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="CO₂ Emissions (Current)" value={`${dataOrNA(epcData.co2EmissionsCurrent)} tonnes/year`} />
+                        <DataItem label="CO₂ Emissions (Potential)" value={`${dataOrNA(epcData.co2EmissionsPotential)} tonnes/year`} />
+                        <DataItem label="Energy Consumption (Current)" value={`${dataOrNA(epcData.energyConsumptionCurrent)} kWh/m² per year`} />
+                        <DataItem label="Energy Consumption (Potential)" value={`${dataOrNA(epcData.energyConsumptionPotential)} kWh/m² per year`} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Heating Cost (Current)" value={`£${dataOrNA(epcData.heatingCostCurrent)} / year`} />
+                        <DataItem label="Heating Cost (Potential)" value={`£${dataOrNA(epcData.heatingCostPotential)} / year`} />
+                        <DataItem label="Hot Water Cost (Current)" value={`£${dataOrNA(epcData.hotWaterCostCurrent)} / year`} />
+                        <DataItem label="Hot Water Cost (Potential)" value={`£${dataOrNA(epcData.hotWaterCostPotential)} / year`} />
+                        <DataItem label="Lighting Cost (Current)" value={`£${dataOrNA(epcData.lightingCostCurrent)} / year`} />
+                        <DataItem label="Lighting Cost (Potential)" value={`£${dataOrNA(epcData.lightingCostPotential)} / year`} />
+                    </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -157,10 +201,11 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           <DataSection icon={Landmark} title="Land Registry">
             {primaryTransaction ? (
                 <>
-                  <DataItem label="Title Number" value={"N/A"} />
+                  <DataItem label="Last Sold Price" value={`£${parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}`} />
+                  <DataItem label="Last Sold Date" value={new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')} />
                   <DataItem label="Tenure" value={primaryTransaction.estateType} />
                   <Separator className="my-4" />
-                  <h3 className="text-md font-semibold text-foreground mb-2">Sales History</h3>
+                  <h3 className="text-md font-semibold text-foreground mb-2">Full Sales History</h3>
                   <div className="space-y-3">
                     {landRegistry.map((transaction, index) => (
                       <div key={index} className="p-2 rounded-md even:bg-muted/50">
