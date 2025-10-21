@@ -111,7 +111,7 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
     pricePaid: r.pricePaid?.value,
     transactionDate: r.transactionDate?.value,
     estateType: r.estateType?.value,
-addressString: r.addressString?.value,
+    addressString: r.addressString?.value,
   }));
 
   const propertyData: PropertyData = {
@@ -200,98 +200,99 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
 
 // --- Debug Action ---
 
-export type DebugInfo = {
-  fullAddressUsed: string;
-  postcode: string | null;
-  sparqlQuery: string;
-  landRegistryRawResponse: any;
+export type DebugStep = {
+  title: string;
+  query: string;
+  response: any;
   error?: string;
-}
+};
 
-export async function getDebugInfo(address: Address): Promise<DebugInfo> {
-  const fullAddress = `${address.street}, ${address.town}, ${address.postcode}`;
-  const { street, postcode } = address;
+export type StepByStepDebugInfo = DebugStep[];
 
-  if (!street || !postcode) {
-    return {
-      fullAddressUsed: fullAddress || 'No address provided',
-      postcode: postcode || 'N/A',
-      sparqlQuery: 'Could not be constructed.',
-      landRegistryRawResponse: 'Street or Postcode was missing.',
-      error: 'Street or Postcode was missing.'
-    };
-  }
-  
-  const streetName = street.replace(/[0-9]/g, '').replace(/flat/i, '').trim();
+export async function getStepByStepDebugInfo(address: Address): Promise<StepByStepDebugInfo> {
+  const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
+  const postcode = address.postcode.trim().toUpperCase();
+  const streetName = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
+  const houseNumber = address.street.split(" ")[0];
 
-  const sparqlQuery = `
-    PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
-    PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+  const queries = {
+    step1: `
+      PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
+      PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      SELECT ?addressString ?pricePaid ?transactionDate
+      WHERE {
+        ?transx a lrppi:TransactionRecord ;
+                lrppi:pricePaid ?pricePaid ;
+                lrppi:transactionDate ?transactionDate ;
+                lrppi:propertyAddress ?addrURI .
+        ?addrURI lrcommon:postcode "${postcode}" ;
+                 lrcommon:address ?addressString .
+      } ORDER BY DESC(?transactionDate) LIMIT 3`,
+    step2: `
+      PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
+      PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      SELECT ?addressString ?pricePaid ?transactionDate
+      WHERE {
+        ?transx a lrppi:TransactionRecord ;
+                lrppi:pricePaid ?pricePaid ;
+                lrppi:transactionDate ?transactionDate ;
+                lrppi:propertyAddress ?addrURI .
+        ?addrURI lrcommon:postcode "${postcode}" ;
+                 lrcommon:street "${streetName}" ;
+                 lrcommon:address ?addressString .
+      } ORDER BY DESC(?transactionDate) LIMIT 3`,
+    step3: `
+      PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
+      PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      SELECT ?addressString ?pricePaid ?transactionDate
+      WHERE {
+        ?transx a lrppi:TransactionRecord ;
+                lrppi:pricePaid ?pricePaid ;
+                lrppi:transactionDate ?transactionDate ;
+                lrppi:propertyAddress ?addrURI .
+        ?addrURI lrcommon:postcode "${postcode}" ;
+                 lrcommon:street "${streetName}" ;
+                 lrcommon:address ?addressString .
+        FILTER regex(str(?addressString), "${houseNumber}", "i")
+      } ORDER BY DESC(?transactionDate) LIMIT 3`,
+  };
 
-    SELECT ?addressString ?pricePaid ?transactionDate ?estateType
-    WHERE {
-      ?transx a lrppi:TransactionRecord ;
-            lrppi:pricePaid ?pricePaid ;
-            lrppi:transactionDate ?transactionDate ;
-            lrppi:propertyAddress ?addrURI ;
-            lrppi:estateType ?estateTypeURI.
+  const debugInfo: StepByStepDebugInfo = [];
 
-      ?addrURI lrcommon:postcode "${postcode}" ;
-               lrcommon:street "${streetName}" ;
-               lrcommon:address ?addressString .
-      
-      FILTER regex(str(?addressString), "${street.split(" ")[0]}", "i")
-      
-      ?estateTypeURI rdfs:label ?estateType .
-    }
-    ORDER BY DESC(?transactionDate)
-    LIMIT 10
-  `;
-
-  try {
-    const response = await fetch("https://landregistry.data.gov.uk/landregistry/query", {
+  async function runQuery(title: string, query: string) {
+    const step: DebugStep = { title, query, response: null };
+    try {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/sparql-results+json'
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/sparql-results+json'
         },
-        body: new URLSearchParams({ query: sparqlQuery })
-    });
-    
-    const responseText = await response.text();
-    let rawData: any = `Status: ${response.status}. Response Body: ${responseText}`;
-
-    try {
-        rawData = JSON.parse(responseText);
-    } catch (e) {
-        console.log("Response was not JSON, showing raw text.");
+        body: `query=${encodeURIComponent(query)}`
+      });
+      const responseText = await response.text();
+      try {
+        step.response = JSON.parse(responseText);
+      } catch (e) {
+        step.response = `Status: ${response.status}. Response Body: ${responseText}`;
+        step.error = "Response was not valid JSON.";
+      }
+      if (!response.ok) {
+        step.error = `API responded with status: ${response.status}`;
+      }
+    } catch (e: any) {
+      step.response = `Fetch failed: ${e.message}`;
+      step.error = 'An unexpected error occurred during fetch.';
     }
-
-    if (!response.ok) {
-        return {
-            fullAddressUsed: fullAddress,
-            postcode: postcode,
-            sparqlQuery: sparqlQuery,
-            landRegistryRawResponse: rawData,
-            error: `Land Registry API responded with status: ${response.status}`
-        };
-    }
-
-    return {
-      fullAddressUsed: fullAddress,
-      postcode: postcode,
-      sparqlQuery: sparqlQuery,
-      landRegistryRawResponse: rawData,
-    };
-
-  } catch (e: any) {
-    return {
-      fullAddressUsed: fullAddress,
-      postcode: postcode,
-      sparqlQuery: sparqlQuery,
-      landRegistryRawResponse: `An error occurred while fetching the Land Registry data. Error: ${e.message}`,
-      error: 'An unexpected error occurred in the debug action.'
-    };
+    debugInfo.push(step);
   }
+
+  await runQuery("Step 1: Postcode Only", queries.step1);
+  await runQuery("Step 2: Postcode + Street", queries.step2);
+  await runQuery("Step 3: Full Query (Postcode + Street + House Number)", queries.step3);
+  
+  return debugInfo;
 }
