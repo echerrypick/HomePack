@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -42,14 +43,15 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
-  // Enhanced last sold text handling
+  // Display logic for last sold data
   const lastSoldDate = landRegistry.date && landRegistry.date !== 'N/A' && !isNaN(new Date(landRegistry.date).getTime())
     ? new Date(landRegistry.date).toLocaleDateString('en-GB')
     : null;
-
-  const lastSoldText = lastSoldDate && landRegistry.pricePaid.includes('£')
+    
+  const lastSoldText = landRegistry.pricePaid.startsWith('£') && lastSoldDate
     ? `${landRegistry.pricePaid} on ${lastSoldDate}`
-    : landRegistry.pricePaid || 'No sales data available';
+    : landRegistry.pricePaid; // This will now show the price, or the error message.
+
 
   return (
     <div className="space-y-8 animate-fade-in-up">

@@ -166,13 +166,14 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
             propertyData.landRegistry.pricePaid = 'No recent sales data found';
         }
     } else {
-        console.error(`[SERVER] Land Registry SPARQL Error: ${response.status} - ${await response.text()}`);
-        propertyData.landRegistry.pricePaid = 'Could not fetch sales data';
+        const errorText = await response.text();
+        console.error(`[SERVER] Land Registry SPARQL Error: ${response.status} - ${errorText}`);
+        propertyData.landRegistry.pricePaid = `Error: ${response.status} - ${errorText}`;
     }
 
   } catch (error: any) {
     console.error('[SERVER] Error fetching Land Registry data via SPARQL:', error.message);
-    propertyData.landRegistry.pricePaid = 'Error fetching sales data';
+    propertyData.landRegistry.pricePaid = `Error fetching sales data: ${error.message}`;
   }
 
   console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(propertyData, null, 2));
@@ -282,9 +283,8 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
             lrppi:transactionDate ?transactionDate ;
             lrppi:propertyAddress ?addr ;
             lrppi:estateType ?estateType.
-      ?addr lrcommon:postcode "${postcode}" ;
-            lrcommon:address ?address .
-      FILTER(CONTAINS(UCASE(STR(?address)), "${firstLine}"))
+      ?addr lrcommon:postcode "${postcode}" .
+      FILTER(CONTAINS(UCASE(STR(?addr)), "${firstLine}"))
     }
     ORDER BY DESC(?transactionDate)
     LIMIT 10
