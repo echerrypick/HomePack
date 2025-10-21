@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Address, PropertyData, LandRegistryResult } from '@/app/actions';
+import type { Address, PropertyData, LandRegistryResult, EpcData } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, BookCopy } from 'lucide-react';
 import { AiSummary } from './ai-summary';
@@ -28,8 +28,8 @@ function DebugLogDisplay({ logs }: { logs: string[] }) {
             <AccordionItem value="debug-log">
                 <AccordionTrigger>
                     <div className="flex items-center gap-2 text-sm">
-                        <BookCopy className="h-4 w-4" />
-                        <span>Show Fetch Log</span>
+                        {/* <BookCopy className="h-4 w-4" />
+                        <span>Show Fetch Log</span> */}
                     </div>
                 </AccordionTrigger>
                 <AccordionContent>
@@ -40,6 +40,32 @@ function DebugLogDisplay({ logs }: { logs: string[] }) {
             </AccordionItem>
         </Accordion>
     )
+}
+
+function EpcDisplay({ epcData }: { epcData: EpcData }) {
+    if (!epcData) {
+        return <DataItem label="EPC Details" value="Not available" />;
+    }
+
+    const epcValue = (7 - (epcData.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
+
+    return (
+        <>
+            <div className="space-y-2">
+                <div className="flex justify-between font-medium">
+                    <span>Current Rating: {epcData.rating}</span>
+                    <span>Potential: {epcData.potentialRating}</span>
+                </div>
+                <Progress value={epcValue} className="h-4" />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>G (Worst)</span>
+                    <span>A (Best)</span>
+                </div>
+            </div>
+            <DataItem label="Valid Until" value={new Date(epcData.validUntil).toLocaleDateString()} />
+            <DataItem label="Estimated Energy Use" value={`${epcData.energyUse} kWh/m²/yr`} />
+        </>
+    );
 }
 
 export function ReportDisplay({ address, reportData, isLoading, onReset }: ReportDisplayProps) {
@@ -62,9 +88,8 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   if (!reportData) return null;
 
   const { propertyData, summary, logs } = reportData;
-  const { landRegistry } = propertyData;
+  const { landRegistry, epc } = propertyData;
   
-  const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
   const getPrimaryTransaction = (results: LandRegistryResult[]) => {
      if (!results || results.length === 0) return null;
@@ -121,22 +146,11 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
                   <DataItem label="Last Sold" value={"No recent sales data found"} />
                 </>
             )}
+            <DebugLogDisplay logs={logs} />
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">
-              <div className="space-y-2">
-                <div className="flex justify-between font-medium">
-                    <span>Current Rating: {propertyData.epc.rating}</span>
-                    <span>Potential: {propertyData.epc.potentialRating}</span>
-                </div>
-                <Progress value={epcValue} className="h-4" />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>G (Worst)</span>
-                    <span>A (Best)</span>
-                </div>
-              </div>
-            <DataItem label="Valid Until" value={new Date(propertyData.epc.validUntil).toLocaleDateString()} />
-            <DataItem label="Estimated Energy Use" value={`${propertyData.epc.energyUse} kWh/m²/yr`} />
+              <EpcDisplay epcData={epc} />
           </DataSection>
           
           <DataSection icon={Waves} title="Flood Risk">

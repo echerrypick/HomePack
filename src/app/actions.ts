@@ -21,15 +21,17 @@ export type LandRegistryResult = {
   addressString: string;
 }
 
+export type EpcData = {
+  rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  validUntil: string;
+  energyUse: number;
+} | null;
+
 export type PropertyData = {
   address: string;
   landRegistry: LandRegistryResult[];
-  epc: {
-    rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-    potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-    validUntil: string;
-    energyUse: number;
-  };
+  epc: EpcData;
   floodRisk: {
     riverAndSea: string;
     surfaceWater: string;
@@ -39,6 +41,47 @@ export type PropertyData = {
     decision: string;
     date: string;
   }[];
+}
+
+async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: string[]}> {
+    const logs: string[] = [];
+    const endpoint = "https://epc.opendatacommunities.org/api/v1/domestic/search";
+    const url = `${endpoint}?postcode=${encodeURIComponent(address.postcode)}&address=${encodeURIComponent(address.street)}&size=1`;
+    // logs.push(`[EPC] Fetching from: ${url}`);
+
+    try {
+        const res = await fetch(url, {
+            headers: { Accept: "application/json" },
+        });
+
+        if (!res.ok) {
+            // logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
+            return { data: null, logs };
+        }
+
+        const data = await res.json();
+        // logs.push(`[EPC RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
+
+        if (data.rows && data.rows.length > 0) {
+            const latestEpc = data.rows[0]; // API returns most recent first
+            const formattedEpc: EpcData = {
+                rating: latestEpc['current-energy-rating'],
+                potentialRating: latestEpc['potential-energy-rating'],
+                validUntil: latestEpc['valid-until'],
+                energyUse: latestEpc['energy-consumption-current'],
+            };
+            // logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
+            return { data: formattedEpc, logs };
+        } else {
+            // logs.push("[EPC] No EPC certificate found for this address.");
+            return { data: null, logs };
+        }
+
+    } catch (err: any) {
+        // logs.push(`[EPC FATAL] Fetch error: ${err.message}`);
+        console.error("❌ EPC fetch error:", err);
+        return { data: null, logs };
+    }
 }
 
 
@@ -56,15 +99,14 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   let paon = ''; // Primary Addressable Object Name (building number/name)
   let street = '';
 
-  // Improved logic to split building identifier from street name
-  const paonMatch = streetInput.match(/^(\d+[a-zA-Z]?(-\d+[a-zA-Z]?)?)/); // Matches "10", "10a", "10-12", "10a-12b"
+  const paonMatch = streetInput.match(/^(\d+[a-zA-Z]?(-\d+[a-zA-Z]?)?)\s+/);
   if (paonMatch) {
     paon = paonMatch[1];
     street = streetInput.substring(paonMatch[0].length).trim();
   } else {
-    // Fallback for non-numeric names like 'The Cottage'
+    // Fallback for non-numeric names like 'The Cottage' or street-only searches
     const streetParts = streetInput.split(' ');
-    if (streetParts.length > 1) {
+    if (streetParts.length > 1 && isNaN(parseInt(streetParts[0]))) {
         paon = streetParts[0];
         street = streetParts.slice(1).join(' ');
     } else {
@@ -107,7 +149,6 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   }
 
   const makeQuery = () => {
-    // Use the final, correct query structure
     return `
       PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
       PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
@@ -143,11 +184,10 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   }
   
   // logs.push('[ATTEMPT] Querying with component regex filters.');
-  let results = await sendQuery(makeQuery());
+  const landRegistryResults = await sendQuery(makeQuery());
 
   // --- Format result ---
-  const formattedResults = results.map((r: any) => {
-    // Reconstruct the address string for display
+  const formattedResults = landRegistryResults.map((r: any) => {
     const addressParts = [
         r.paon?.value,
         r.street?.value,
@@ -169,15 +209,14 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 
   // logs.push(`[FORMAT] Formatted ${formattedResults.length} results.`);
 
+  // --- Fetch EPC Data ---
+  const { data: epcData, logs: epcLogs } = await fetchEpcData(address);
+  logs.push(...epcLogs);
+
   const propertyData: PropertyData = {
     address: `${address.street}, ${address.town}, ${address.postcode}`,
     landRegistry: formattedResults,
-    epc: {
-      rating: 'B' as const,
-      potentialRating: 'A' as const,
-      validUntil: '2032-06-20',
-      energyUse: 85,
-    },
+    epc: epcData,
     floodRisk: {
       riverAndSea: 'Low',
       surfaceWater: 'Very Low',
@@ -265,13 +304,13 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   let paon = '';
   let street = '';
-  const paonMatch = streetInput.match(/^(\d+[a-zA-Z]?(-\d+[a-zA-Z]?)?)/);
+  const paonMatch = streetInput.match(/^(\d+[a-zA-Z]?(-\d+[a-zA-Z]?)?)\s+/);
   if (paonMatch) {
     paon = paonMatch[1];
     street = streetInput.substring(paonMatch[0].length).trim();
   } else {
     const streetParts = streetInput.split(' ');
-    if (streetParts.length > 1) {
+    if (streetParts.length > 1 && isNaN(parseInt(streetParts[0]))) {
       paon = streetParts[0];
       street = streetParts.slice(1).join(' ');
     } else {
