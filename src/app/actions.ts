@@ -43,7 +43,7 @@ export type PropertyData = {
 
 
 // --- API Calls ---
-async function fetchPropertyData(address: Address): Promise<PropertyData> {
+export async function fetchPropertyData(address: Address): Promise<PropertyData> {
   console.log(`[SERVER] fetchPropertyData called for: ${address.street}, ${address.town}, ${address.postcode}`);
   
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
@@ -134,6 +134,7 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
   console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(propertyData, null, 2));
   return propertyData;
 }
+
 
 
 // --- Main Server Actions ---

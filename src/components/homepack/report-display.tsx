@@ -39,7 +39,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   if (!reportData) return null;
 
   const { propertyData, summary } = reportData;
-  const landRegistry = propertyData.landRegistry;
+  const { landRegistry } = propertyData;
   
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
@@ -76,7 +76,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           <AiSummary summary={summary} />
 
           <DataSection icon={Landmark} title="Land Registry">
-            {landRegistry && landRegistry.length > 0 && primaryTransaction ? (
+            {primaryTransaction ? (
                 <>
                   <DataItem label="Last Sold Price" value={`£${parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}`} />
                   <DataItem label="Last Sold Date" value={new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')} />
