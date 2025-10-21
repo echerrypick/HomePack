@@ -52,9 +52,23 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   const postcode = address.postcode.trim().toUpperCase();
   logs.push(`[NORMALIZE] Postcode for query: "${postcode}"`);
   
-  // Use the street name as provided, but just the non-numeric part for broader matching.
-  const street = address.street.replace(/\d+/g, "").trim();
-  logs.push(`[NORMALIZE] Street Name for query: "${street}"`);
+  // Separate building number/name and street name
+  const streetInput = address.street.trim();
+  const firstWord = streetInput.split(' ')[0];
+  let buildingIdentifier = '';
+  let streetName = '';
+
+  // Very basic split - assumes the first word is the number/name if it contains digits or is a common name. A more robust solution would be better.
+  if (/\d/.test(firstWord) || ['flat', 'apartment', 'the', 'cottage', 'house'].includes(firstWord.toLowerCase())) {
+      buildingIdentifier = firstWord;
+      streetName = streetInput.substring(firstWord.length).trim();
+  } else {
+      streetName = streetInput;
+  }
+
+  logs.push(`[NORMALIZE] Building Identifier for query: "${buildingIdentifier}"`);
+  logs.push(`[NORMALIZE] Street Name for query: "${streetName}"`);
+
 
   // Helper to safely send SPARQL queries
   async function sendQuery(sparqlQuery: string) {
@@ -84,7 +98,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     }
   }
 
-  // --- SPARQL query template with Regex ---
+  // --- SPARQL query template with multiple Regex ---
   const makeQuery = () => `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
     PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
@@ -99,7 +113,11 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
               lrppi:estateType ?estateTypeURI .
       ?addrURI lrcommon:address ?addressString ;
               lrcommon:postcode ?postcodeValue .
-      FILTER (regex(?addressString, "${street}", "i") && regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i"))
+      FILTER (
+        ${buildingIdentifier ? `regex(?addressString, "${buildingIdentifier}", "i") &&` : ''}
+        regex(?addressString, "${streetName}", "i") && 
+        regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")
+      )
       ?estateTypeURI rdfs:label ?estateType .
     }
     ORDER BY DESC(?transactionDate)
@@ -212,7 +230,18 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const postcode = address.postcode.trim().toUpperCase();
   
   const streetNameWithNumber = address.street.trim();
-  const streetNameOnly = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
+  
+  // Separate building number/name and street name
+  const firstWord = streetNameWithNumber.split(' ')[0];
+  let buildingIdentifier = '';
+  let streetName = '';
+  if (/\d/.test(firstWord) || ['flat', 'apartment', 'the', 'cottage', 'house'].includes(firstWord.toLowerCase())) {
+      buildingIdentifier = firstWord;
+      streetName = streetNameWithNumber.substring(firstWord.length).trim();
+  } else {
+      streetName = streetNameWithNumber;
+  }
+
 
   const prefixes = `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
@@ -239,13 +268,13 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   `;
 
   // Query 1: Postcode only
-  const query1 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" . ${ordering}`;
+  const query1 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode ?postcodeValue . FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")) ${ordering}`;
 
-  // Query 2: Postcode + Street without number
-  const query2 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetNameOnly}" . ${ordering}`;
+  // Query 2: Postcode + Street (Regex)
+  const query2 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode ?postcodeValue . FILTER(regex(?addressString, "${streetName}", "i") && regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")) ${ordering}`;
   
-  // Query 3: Postcode + Street with number
-  const query3 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetNameWithNumber}" . ${ordering}`;
+  // Query 3: Postcode + Street + Building ID (Regex)
+  const query3 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode ?postcodeValue . FILTER(regex(?addressString, "${buildingIdentifier}", "i") && regex(?addressString, "${streetName}", "i") && regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")) ${ordering}`;
 
   async function sendQuery(sparqlQuery: string) {
     try {
