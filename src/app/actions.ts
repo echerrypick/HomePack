@@ -44,8 +44,7 @@ export type PropertyData = {
 
 // --- API Calls ---
 async function fetchPropertyData(address: Address): Promise<PropertyData> {
-  const fullAddress = `${address.street}, ${address.town}, ${address.postcode}`;
-  console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
+  console.log(`[SERVER] fetchPropertyData called for: ${address.street}, ${address.town}, ${address.postcode}`);
   
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
 
@@ -115,7 +114,7 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
   }));
 
   const propertyData: PropertyData = {
-    address: fullAddress,
+    address: `${address.street}, ${address.town}, ${address.postcode}`,
     landRegistry: formattedResults,
     epc: {
       rating: 'B' as const,
@@ -198,18 +197,21 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
 }
 
 
-// --- Debug Action ---
+// --- Step-by-Step Debug Action ---
 
-export async function getDebugInfo(address: Address): Promise<any> {
+export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
   const postcode = address.postcode.trim().toUpperCase();
-  const streetName = address.street.replace(/\d+/g, "").replace(/\bflat\b/i, "").trim();
+  const streetName = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
+  const houseNumber = address.street.split(" ")[0].trim();
 
-  const query = `
+  const prefixes = `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
     PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
+  `;
+  
+  const baseSelect = `
     SELECT ?pricePaid ?transactionDate ?estateType ?addressString
     WHERE {
       ?transx a lrppi:TransactionRecord ;
@@ -217,35 +219,48 @@ export async function getDebugInfo(address: Address): Promise<any> {
               lrppi:transactionDate ?transactionDate ;
               lrppi:propertyAddress ?addrURI ;
               lrppi:estateType ?estateTypeURI .
-      ?addrURI lrcommon:postcode "${postcode}" ;
-               lrcommon:street "${streetName}" ;
-               lrcommon:address ?addressString .
-      FILTER regex(?addressString, "${address.street.split(" ")[0]}", "i")
       ?estateTypeURI rdfs:label ?estateType .
+      ?addrURI lrcommon:address ?addressString .
+  `;
+  
+  const ordering = `
     }
     ORDER BY DESC(?transactionDate)
     LIMIT 10
   `;
 
-  try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/sparql-results+json",
-      },
-      body: `query=${encodeURIComponent(query)}`,
-    });
+  // Query 1: Postcode only
+  const query1 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" . ${ordering}`;
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Land Registry request failed: ${res.status} - ${errorText}`);
+  // Query 2: Postcode + Street
+  const query2 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetName}" . ${ordering}`;
+  
+  // Query 3: Postcode + Street + House Number Filter
+  const query3 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetName}" . FILTER regex(?addressString, "${houseNumber}", "i") ${ordering}`;
+
+  async function sendQuery(sparqlQuery: string) {
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/sparql-results+json" },
+        body: `query=${encodeURIComponent(sparqlQuery)}`,
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        return { query: sparqlQuery, error: `Request failed: ${res.status} - ${errorText}` };
+      }
+      const data = await res.json();
+      return { query: sparqlQuery, response: data };
+    } catch (err: any) {
+      return { query: sparqlQuery, error: err.message };
     }
-    
-    const data = await res.json();
-    return { query, response: data };
-  } catch (err: any) {
-    console.error("❌ SPARQL fetch error:", err);
-    return { query, error: err.message };
   }
+
+  const [result1, result2, result3] = await Promise.all([
+    sendQuery(query1),
+    sendQuery(query2),
+    sendQuery(query3)
+  ]);
+
+  return { result1, result2, result3 };
 }

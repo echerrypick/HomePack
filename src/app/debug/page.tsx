@@ -6,19 +6,31 @@ import { HomePackHeader } from '@/components/homepack/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
-import { getDebugInfo, type Address } from '@/app/actions';
+import { getStepByStepDebugInfo, type Address } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { AddressForm } from '@/components/homepack/address-form';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 type DebugInfo = {
-    query: string;
-    response?: any;
-    error?: string;
+  query: string;
+  response?: any;
+  error?: string;
 }
 
-function DebugView({ debugInfo }: { debugInfo: DebugInfo }) {
+type StepResult = {
+  query: string;
+  response?: any;
+  error?: string;
+}
+
+type StepByStepDebugInfo = {
+  result1: StepResult;
+  result2: StepResult;
+  result3: StepResult;
+}
+
+function DebugStepView({ step, title, debugInfo }: { step: number; title: string; debugInfo: DebugInfo }) {
   const hasResults = debugInfo.response?.results?.bindings?.length > 0;
   const hasError = !!debugInfo.error || debugInfo.response?.results?.bindings?.length === 0;
 
@@ -32,7 +44,7 @@ function DebugView({ debugInfo }: { debugInfo: DebugInfo }) {
             ) : (
               <XCircle className="h-5 w-5 text-destructive" />
             )}
-            SPARQL Query Result
+            Step {step}: {title}
           </CardTitle>
           <span className={`text-sm font-semibold ${hasResults ? 'text-green-600' : 'text-destructive'}`}>
             {hasResults ? `${debugInfo.response.results.bindings.length} results found` : (debugInfo.error || 'No results')}
@@ -64,7 +76,7 @@ function DebugView({ debugInfo }: { debugInfo: DebugInfo }) {
 }
 
 export default function DebugPage() {
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const [debugInfo, setDebugInfo] = useState<StepByStepDebugInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(true);
@@ -77,7 +89,7 @@ export default function DebugPage() {
     setDebugInfo(null);
     setIsSearching(false);
     try {
-        const result = await getDebugInfo(address);
+        const result = await getStepByStepDebugInfo(address);
         setDebugInfo(result);
     } catch(e: any) {
         setError(e.message || "An unexpected error occurred.");
@@ -100,9 +112,9 @@ export default function DebugPage() {
           {isSearching ? (
             <Card>
               <CardHeader>
-                <CardTitle>Land Registry SPARQL Debugger</CardTitle>
+                <CardTitle>Land Registry SPARQL Step-by-Step Debugger</CardTitle>
                 <CardDescription>
-                  Enter an address to see the exact SPARQL query and the raw API response.
+                  Enter an address to see the results of a 3-step SPARQL query to find the exact point of failure.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -112,7 +124,7 @@ export default function DebugPage() {
           ) : isLoading ? (
             <div className="text-center py-20">
               <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-              <p className="mt-4 text-lg text-muted-foreground">Running debug query...</p>
+              <p className="mt-4 text-lg text-muted-foreground">Running debug queries...</p>
             </div>
           ) : (
             <>
@@ -133,7 +145,11 @@ export default function DebugPage() {
                         <AlertDescription>{error}</AlertDescription>
                         </Alert>
                     )}
-                  <DebugView debugInfo={debugInfo} />
+                  <div className="space-y-4">
+                    <DebugStepView step={1} title="Postcode Only" debugInfo={debugInfo.result1} />
+                    <DebugStepView step={2} title="Postcode + Street" debugInfo={debugInfo.result2} />
+                    <DebugStepView step={3} title="Full Query (with House Number)" debugInfo={debugInfo.result3} />
+                  </div>
                 </div>
               )}
             </>
