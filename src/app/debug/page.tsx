@@ -164,13 +164,13 @@ export default function DebugPage() {
                     <DebugStepView 
                       step={2} 
                       title="Postcode + Street Name"
-                      description="Tests matching the street name within the address."
+                      description="Tests matching the street name within the full address string."
                       debugInfo={debugInfo.result2} 
                     />
                     <DebugStepView 
                       step={3} 
-                      title="Postcode + Building ID" 
-                      description="Tests matching the building number at the start of the address."
+                      title="Postcode + Building ID + Street" 
+                      description="Tests matching against specific database fields (paon, street, postcode)."
                       debugInfo={debugInfo.result3} 
                     />
                   </div>
