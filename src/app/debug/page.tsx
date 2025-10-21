@@ -137,7 +137,7 @@ export default function DebugPage() {
                             <h2 className="text-2xl font-bold">Debug Information</h2>
                             {submittedAddress && (
                                <p className="text-muted-foreground">
-                                Showing results for: {submittedAddress.street}, {submittedAddress.town}, {submittedAddress.postcode}
+                                Showing results for: {submittedAddress.street}, {submittedAddress.town}, {submittedactedAddress.postcode}
                                </p>
                             )}
                         </div>
@@ -153,8 +153,8 @@ export default function DebugPage() {
                     )}
                   <div className="space-y-4">
                     <DebugStepView step={1} title="Postcode Only" debugInfo={debugInfo.result1} />
-                    <DebugStepView step={2} title="Postcode + Street" debugInfo={debugInfo.result2} />
-                    <DebugStepView step={3} title="Full Query (with House Number)" debugInfo={debugInfo.result3} />
+                    <DebugStepView step={2} title="Postcode + Street (No Number)" debugInfo={debugInfo.result2} />
+                    <DebugStepView step={3} title="Postcode + Street (With Number)" debugInfo={debugInfo.result3} />
                   </div>
                 </div>
               )}

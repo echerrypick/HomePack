@@ -52,7 +52,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   const postcode = address.postcode.trim().toUpperCase();
   logs.push(`[NORMALIZE] Postcode: "${postcode}"`);
   
-  const streetName = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
+  const streetName = address.street.trim();
   logs.push(`[NORMALIZE] Street Name for query: "${streetName}"`);
 
   // Helper to safely send SPARQL queries
@@ -84,7 +84,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   }
 
   // --- Base SPARQL query template ---
-  const makeQuery = (includeHouse: boolean) => `
+  const makeQuery = (useFullStreet: boolean) => `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
     PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -97,22 +97,21 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
               lrppi:propertyAddress ?addrURI ;
               lrppi:estateType ?estateTypeURI .
       ?addrURI lrcommon:postcode "${postcode}" ;
-               lrcommon:street "${streetName}" ;
+               lrcommon:street "${useFullStreet ? streetName : streetName.replace(/\d/g, "").trim()}" ;
                lrcommon:address ?addressString .
-      ${includeHouse ? `FILTER regex(?addressString, "${address.street.split(" ")[0]}", "i")` : ""}
       ?estateTypeURI rdfs:label ?estateType .
     }
     ORDER BY DESC(?transactionDate)
     LIMIT 10
   `;
 
-  // --- 1️⃣ Attempt: exact address with house number ---
-  logs.push('[ATTEMPT 1] Querying with house number filter.');
+  // --- 1️⃣ Attempt: exact address with house number in street ---
+  logs.push('[ATTEMPT 1] Querying with full street name (including number).');
   let results = await sendQuery(makeQuery(true));
 
   // --- 2️⃣ Fallback: same street, no house number ---
   if (results.length === 0) {
-    logs.push('[ATTEMPT 2] No results in first attempt. Retrying without house number filter.');
+    logs.push('[ATTEMPT 2] No results in first attempt. Retrying with street name only (no number).');
     results = await sendQuery(makeQuery(false));
   }
 
@@ -218,8 +217,8 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
   const postcode = address.postcode.trim().toUpperCase();
   
-  const streetName = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
-  const houseNumberFilter = `FILTER regex(?addressString, "${address.street.split(" ")[0]}", "i")`;
+  const streetNameWithNumber = address.street.trim();
+  const streetNameOnly = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
 
   const prefixes = `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
@@ -248,11 +247,11 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   // Query 1: Postcode only
   const query1 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" . ${ordering}`;
 
-  // Query 2: Postcode + Street
-  const query2 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetName}" . ${ordering}`;
+  // Query 2: Postcode + Street without number
+  const query2 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetNameOnly}" . ${ordering}`;
   
-  // Query 3: Postcode + Street + House Number Filter
-  const query3 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetName}" . ${houseNumberFilter} ${ordering}`;
+  // Query 3: Postcode + Street with number
+  const query3 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetNameWithNumber}" . ${ordering}`;
 
   async function sendQuery(sparqlQuery: string) {
     try {
