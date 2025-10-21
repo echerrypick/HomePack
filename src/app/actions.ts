@@ -30,6 +30,15 @@ export type EpcData = {
   builtForm: string;
   lodgementDate: string;
   lmkKey: string;
+  propertyType: string;
+  currentEnergyEfficiency: string;
+  potentialEnergyEfficiency: string;
+  mainHeatDescription: string;
+  wallsDescription: string;
+  roofDescription: string;
+  windowsDescription: string;
+  co2EmissionsCurrent: string;
+  co2EmissionsPotential: string;
 } | null;
 
 export type PropertyData = {
@@ -88,6 +97,15 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
                 builtForm: latestEpc['built-form'],
                 lodgementDate: latestEpc['lodgement-date'],
                 lmkKey: latestEpc['lmk-key'],
+                propertyType: latestEpc['property-type'],
+                currentEnergyEfficiency: latestEpc['current-energy-efficiency'],
+                potentialEnergyEfficiency: latestEpc['potential-energy-efficiency'],
+                mainHeatDescription: latestEpc['mainheat-description'],
+                wallsDescription: latestEpc['walls-description'],
+                roofDescription: latestEpc['roof-description'],
+                windowsDescription: latestEpc['windows-description'],
+                co2EmissionsCurrent: latestEpc['co2-emissions-current'],
+                co2EmissionsPotential: latestEpc['co2-emissions-potential'],
             };
             logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
             return { data: formattedEpc, logs };
@@ -413,4 +431,5 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
+
 

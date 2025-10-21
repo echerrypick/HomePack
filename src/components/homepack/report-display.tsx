@@ -75,10 +75,22 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
                 </AccordionTrigger>
                 <AccordionContent className="space-y-2 pt-2">
                    <DataItem label="Valid Until" value={new Date(epcData.validUntil).toLocaleDateString()} />
-                   <DataItem label="Estimated Energy Use" value={`${epcData.energyUse} kWh/m²/yr`} />
+                   <DataItem label="Lodgement Date" value={new Date(epcData.lodgementDate).toLocaleDateString()} />
+                   <Separator />
+                   <DataItem label="Energy Efficiency" value={`${epcData.currentEnergyEfficiency}/100`} />
+                   <DataItem label="Potential Efficiency" value={`${epcData.potentialEnergyEfficiency}/100`} />
+                   <Separator />
+                   <DataItem label="CO₂ Emissions (Current)" value={`${epcData.co2EmissionsCurrent} tonnes/year`} />
+                   <DataItem label="CO₂ Emissions (Potential)" value={`${epcData.co2EmissionsPotential} tonnes/year`} />
+                   <Separator />
+                   <DataItem label="Property Type" value={`${epcData.propertyType}, ${epcData.builtForm}`} />
                    <DataItem label="Total Floor Area" value={`${epcData.totalFloorArea} m²`} />
-                   <DataItem label="Property Type" value={epcData.builtForm} />
-                   <DataItem label="Certificate Lodged" value={new Date(epcData.lodgementDate).toLocaleDateString()} />
+                   <Separator />
+                   <DataItem label="Main Heating" value={epcData.mainHeatDescription} />
+                   <DataItem label="Walls" value={epcData.wallsDescription} />
+                   <DataItem label="Roof" value={epcData.roofDescription} />
+                   <DataItem label="Windows" value={epcData.windowsDescription} />
+                   <Separator />
                    <DataItem label="Certificate LMK Key" value={epcData.lmkKey} />
                 </AccordionContent>
               </AccordionItem>
@@ -167,7 +179,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
                   <DataItem label="Last Sold" value={"No recent sales data found"} />
                 </>
             )}
-            {/* <DebugLogDisplay logs={logs} /> */}
+            
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">
