@@ -67,8 +67,23 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
                     <span>A (Best)</span>
                 </div>
             </div>
-            <DataItem label="Valid Until" value={new Date(epcData.validUntil).toLocaleDateString()} />
-            <DataItem label="Estimated Energy Use" value={`${epcData.energyUse} kWh/m²/yr`} />
+            
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="epc-details">
+                <AccordionTrigger>
+                    <span className="text-sm text-primary hover:underline">View EPC Details</span>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-2 pt-2">
+                   <DataItem label="Valid Until" value={new Date(epcData.validUntil).toLocaleDateString()} />
+                   <DataItem label="Estimated Energy Use" value={`${epcData.energyUse} kWh/m²/yr`} />
+                   <DataItem label="Total Floor Area" value={`${epcData.totalFloorArea} m²`} />
+                   <DataItem label="Property Type" value={epcData.builtForm} />
+                   <DataItem label="Certificate Lodged" value={new Date(epcData.lodgementDate).toLocaleDateString()} />
+                   <DataItem label="Certificate LMK Key" value={epcData.lmkKey} />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+            
             <DebugLogDisplay logs={logs} />
         </>
     );
@@ -79,7 +94,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   const [isConditionReportLoading, setIsConditionReportLoading] = useState(false);
 
   // Debug log for incoming data
-  console.log('[CLIENT] Report Data in UI:', reportData);
+  // console.log('[CLIENT] Report Data in UI:', reportData);
 
   if (isLoading) {
     return (

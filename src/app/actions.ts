@@ -26,6 +26,10 @@ export type EpcData = {
   potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
   validUntil: string;
   energyUse: number;
+  totalFloorArea: string;
+  builtForm: string;
+  lodgementDate: string;
+  lmkKey: string;
 } | null;
 
 export type PropertyData = {
@@ -80,6 +84,10 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
                 potentialRating: latestEpc['potential-energy-rating'],
                 validUntil: latestEpc['valid-until'],
                 energyUse: latestEpc['energy-consumption-current'],
+                totalFloorArea: latestEpc['total-floor-area'],
+                builtForm: latestEpc['built-form'],
+                lodgementDate: latestEpc['lodgement-date'],
+                lmkKey: latestEpc['lmk-key'],
             };
             logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
             return { data: formattedEpc, logs };
@@ -114,20 +122,8 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     paon = paonMatch[1];
     street = streetInput.substring(paonMatch[0].length).trim();
   } else {
-    const streetParts = streetInput.split(' ');
-    if (streetParts.length > 1 && isNaN(parseInt(streetParts[0]))) {
-        paon = streetParts[0];
-        street = streetParts.slice(1).join(' ');
-    } else {
-        street = streetInput;
-    }
+      street = streetInput;
   }
-
-
-  // logs.push(`[NORMALIZE] Postcode for query: "${postcode}"`);
-  // logs.push(`[NORMALIZE] PAON for query: "${paon}"`);
-  // logs.push(`[NORMALIZE] Street for query: "${street}"`);
-
 
   // Helper to safely send SPARQL queries
   async function sendQuery(sparqlQuery: string) {
@@ -244,18 +240,18 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 // --- Main Server Actions ---
 
 export async function getPropertyReport(address: Address): Promise<{ propertyData: PropertyData, summary: string, logs: string[], error?: string }> {
-  console.log(`[SERVER] getPropertyReport called for: ${address.street}, ${address.postcode}`);
+  // console.log(`[SERVER] getPropertyReport called for: ${address.street}, ${address.postcode}`);
   
   const { data: propertyData, logs } = await fetchPropertyData(address);
   
-  console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
+  // console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
 
   try {
     const summaryResult = await generateAiSummary({
       propertyData: JSON.stringify(propertyData, null, 2),
     });
     
-    console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
+    // console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
     return {
       propertyData: propertyData,
       summary: summaryResult.summary,
@@ -263,7 +259,7 @@ export async function getPropertyReport(address: Address): Promise<{ propertyDat
     };
   } catch (error) {
     console.error("AI Summary generation failed:", error);
-    console.log('[SERVER] getPropertyReport is returning FAILURE but still with property data.');
+    // console.log('[SERVER] getPropertyReport is returning FAILURE but still with property data.');
     return {
       propertyData,
       summary: "AI summary could not be generated at this time. Please review the property data manually.",
@@ -281,7 +277,7 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
   // Basic URI validation
   for (const uri of imageURIs) {
     if (!uri.startsWith('data:image/')) {
-      console.error(`[SERVER] Invalid image URI format: ${uri}`);
+      // console.error(`[SERVER] Invalid image URI format: ${uri}`);
       return { 
         report: "An invalid image format was provided. Please upload valid image files.",
         error: "Invalid image format"
@@ -318,13 +314,7 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
     paon = paonMatch[1];
     street = streetInput.substring(paonMatch[0].length).trim();
   } else {
-    const streetParts = streetInput.split(' ');
-    if (streetParts.length > 1 && isNaN(parseInt(streetParts[0]))) {
-      paon = streetParts[0];
-      street = streetParts.slice(1).join(' ');
-    } else {
       street = streetInput;
-    }
   }
   
   const query1 = `
@@ -423,6 +413,4 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
-
-
 
