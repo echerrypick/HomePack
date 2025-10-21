@@ -78,27 +78,17 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           <DataSection icon={Landmark} title="Land Registry">
             {primaryTransaction ? (
                 <>
+                  <DataItem label="Title Number" value={"N/A"} />
+                  <DataItem label="Tenure" value={primaryTransaction.estateType} />
                   <DataItem label="Last Sold Price" value={`£${parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}`} />
                   <DataItem label="Last Sold Date" value={new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')} />
-                  <DataItem label="Tenure" value={primaryTransaction.estateType} />
-                  <DataItem label="Matched Address" value={primaryTransaction.addressString} />
-                  
-                  {landRegistry.length > 1 && (
-                      <div className="pt-4">
-                          <p className="text-sm font-semibold mb-2 text-muted-foreground">Other recent sales on this street:</p>
-                          <ul className="space-y-2 text-xs">
-                          {landRegistry.filter(r => r !== primaryTransaction).slice(0,3).map((item, index) => (
-                              <li key={index} className="flex justify-between p-2 rounded-md bg-muted/50">
-                                  <span>{item.addressString}</span>
-                                  <span className="font-mono">{`£${parseInt(item.pricePaid, 10).toLocaleString()}`}</span>
-                              </li>
-                          ))}
-                          </ul>
-                      </div>
-                  )}
                 </>
             ) : (
-                <p className="text-muted-foreground text-sm">No recent sales data found for this property or street.</p>
+                <>
+                  <DataItem label="Title Number" value={"N/A"} />
+                  <DataItem label="Tenure" value={"Data not found"} />
+                  <DataItem label="Last Sold" value={"No recent sales data found"} />
+                </>
             )}
           </DataSection>
 
