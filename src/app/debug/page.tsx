@@ -6,15 +6,21 @@ import { HomePackHeader } from '@/components/homepack/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
-import { getStepByStepDebugInfo, type StepByStepDebugInfo, type DebugStep, type Address } from '@/app/actions';
+import { getDebugInfo, type Address } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { AddressForm } from '@/components/homepack/address-form';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
-function DebugStepView({ step }: { step: DebugStep }) {
-  const hasResults = step.response?.results?.bindings?.length > 0;
-  const hasError = !!step.error || step.response?.results?.bindings?.length === 0;
+type DebugInfo = {
+    query: string;
+    response?: any;
+    error?: string;
+}
+
+function DebugView({ debugInfo }: { debugInfo: DebugInfo }) {
+  const hasResults = debugInfo.response?.results?.bindings?.length > 0;
+  const hasError = !!debugInfo.error || debugInfo.response?.results?.bindings?.length === 0;
 
   return (
     <Card>
@@ -26,10 +32,10 @@ function DebugStepView({ step }: { step: DebugStep }) {
             ) : (
               <XCircle className="h-5 w-5 text-destructive" />
             )}
-            {step.title}
+            SPARQL Query Result
           </CardTitle>
           <span className={`text-sm font-semibold ${hasResults ? 'text-green-600' : 'text-destructive'}`}>
-            {hasResults ? `${step.response.results.bindings.length} results found` : (step.error || 'No results')}
+            {hasResults ? `${debugInfo.response.results.bindings.length} results found` : (debugInfo.error || 'No results')}
           </span>
         </div>
       </CardHeader>
@@ -39,7 +45,7 @@ function DebugStepView({ step }: { step: DebugStep }) {
             <AccordionTrigger>View SPARQL Query</AccordionTrigger>
             <AccordionContent>
               <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
-                {step.query}
+                {debugInfo.query}
               </pre>
             </AccordionContent>
           </AccordionItem>
@@ -47,7 +53,7 @@ function DebugStepView({ step }: { step: DebugStep }) {
             <AccordionTrigger>View Raw API Response</AccordionTrigger>
             <AccordionContent>
               <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
-                {JSON.stringify(step.response, null, 2)}
+                {JSON.stringify(debugInfo.response || { error: debugInfo.error }, null, 2)}
               </pre>
             </AccordionContent>
           </AccordionItem>
@@ -58,7 +64,7 @@ function DebugStepView({ step }: { step: DebugStep }) {
 }
 
 export default function DebugPage() {
-  const [debugInfo, setDebugInfo] = useState<StepByStepDebugInfo | null>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(true);
@@ -71,7 +77,7 @@ export default function DebugPage() {
     setDebugInfo(null);
     setIsSearching(false);
     try {
-        const result = await getStepByStepDebugInfo(address);
+        const result = await getDebugInfo(address);
         setDebugInfo(result);
     } catch(e: any) {
         setError(e.message || "An unexpected error occurred.");
@@ -94,9 +100,9 @@ export default function DebugPage() {
           {isSearching ? (
             <Card>
               <CardHeader>
-                <CardTitle>Land Registry Step-by-Step Debug</CardTitle>
+                <CardTitle>Land Registry SPARQL Debugger</CardTitle>
                 <CardDescription>
-                  Enter an address to see the results of the SPARQL query at each stage of filtering.
+                  Enter an address to see the exact SPARQL query and the raw API response.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -106,7 +112,7 @@ export default function DebugPage() {
           ) : isLoading ? (
             <div className="text-center py-20">
               <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-              <p className="mt-4 text-lg text-muted-foreground">Running debug steps...</p>
+              <p className="mt-4 text-lg text-muted-foreground">Running debug query...</p>
             </div>
           ) : (
             <>
@@ -115,7 +121,7 @@ export default function DebugPage() {
                    <div className='flex justify-between items-start'>
                         <div>
                             <h2 className="text-2xl font-bold">Debug Information</h2>
-                            <p className="text-muted-foreground">Results from each step of the SPARQL query process.</p>
+                            <p className="text-muted-foreground">Results from the Land Registry SPARQL query.</p>
                         </div>
                         <Button variant="outline" onClick={handleReset}>Search Again</Button>
                     </div>
@@ -127,9 +133,7 @@ export default function DebugPage() {
                         <AlertDescription>{error}</AlertDescription>
                         </Alert>
                     )}
-                  {debugInfo.map((step, index) => (
-                    <DebugStepView key={index} step={step} />
-                  ))}
+                  <DebugView debugInfo={debugInfo} />
                 </div>
               )}
             </>
