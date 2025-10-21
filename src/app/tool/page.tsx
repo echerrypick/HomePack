@@ -12,6 +12,7 @@ type Step = 'address' | 'report';
 type ReportResult = {
   propertyData: PropertyData;
   summary: string;
+  logs: string[];
   error?: string;
 };
 

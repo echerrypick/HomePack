@@ -4,20 +4,42 @@
 import { useState } from 'react';
 import type { Address, PropertyData, LandRegistryResult } from '@/app/actions';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Download } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, BookCopy } from 'lucide-react';
 import { AiSummary } from './ai-summary';
 import { ImageUploader } from './image-uploader';
 import { AiConditionReport } from './ai-condition-report';
 import { DataSection, DataItem } from './data-section';
-import { Landmark, Zap, Waves, ClipboardList } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 type ReportDisplayProps = {
   address: Address;
-  reportData: { propertyData: PropertyData; summary: string; error?: string } | null;
+  reportData: { propertyData: PropertyData; summary: string; logs: string[], error?: string } | null;
   isLoading: boolean;
   onReset: () => void;
 };
+
+function DebugLogDisplay({ logs }: { logs: string[] }) {
+    if (!logs || logs.length === 0) return null;
+
+    return (
+        <Accordion type="single" collapsible className="w-full mt-4">
+            <AccordionItem value="debug-log">
+                <AccordionTrigger>
+                    <div className="flex items-center gap-2 text-sm">
+                        <BookCopy className="h-4 w-4" />
+                        <span>Show Fetch Log</span>
+                    </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                    <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                        {logs.join('\n')}
+                    </pre>
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
+    )
+}
 
 export function ReportDisplay({ address, reportData, isLoading, onReset }: ReportDisplayProps) {
   const [conditionReport, setConditionReport] = useState<string | null>(null);
@@ -38,7 +60,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
 
   if (!reportData) return null;
 
-  const { propertyData, summary } = reportData;
+  const { propertyData, summary, logs } = reportData;
   const { landRegistry } = propertyData;
   
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
@@ -90,6 +112,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
                   <DataItem label="Last Sold" value={"No recent sales data found"} />
                 </>
             )}
+            <DebugLogDisplay logs={logs} />
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">

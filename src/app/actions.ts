@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -43,17 +42,22 @@ export type PropertyData = {
 
 
 // --- API Calls ---
-export async function fetchPropertyData(address: Address): Promise<PropertyData> {
-  console.log(`[SERVER] fetchPropertyData called for: ${address.street}, ${address.town}, ${address.postcode}`);
+export async function fetchPropertyData(address: Address): Promise<{data: PropertyData, logs: string[]}> {
+  const logs: string[] = [];
+  logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
   
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
 
   // --- Normalise input ---
   const postcode = address.postcode.trim().toUpperCase();
+  logs.push(`[NORMALIZE] Postcode: "${postcode}"`);
+  
   const streetName = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
+  logs.push(`[NORMALIZE] Street Name for query: "${streetName}"`);
 
   // Helper to safely send SPARQL queries
   async function sendQuery(sparqlQuery: string) {
+    logs.push(`[QUERY] Sending SPARQL query:\n${sparqlQuery}`);
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -64,10 +68,16 @@ export async function fetchPropertyData(address: Address): Promise<PropertyData>
         body: `query=${encodeURIComponent(sparqlQuery)}`,
       });
 
-      if (!res.ok) throw new Error(`Land Registry request failed: ${res.status}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        logs.push(`[ERROR] Land Registry request failed: ${res.status}. Response: ${errorText}`);
+        throw new Error(`Land Registry request failed: ${res.status}`);
+      }
       const data = await res.json();
+      logs.push(`[RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
       return data.results?.bindings || [];
-    } catch (err) {
+    } catch (err: any) {
+      logs.push(`[FATAL] SPARQL fetch error: ${err.message}`);
       console.error("❌ SPARQL fetch error:", err);
       return [];
     }
@@ -97,11 +107,12 @@ export async function fetchPropertyData(address: Address): Promise<PropertyData>
   `;
 
   // --- 1️⃣ Attempt: exact address with house number ---
+  logs.push('[ATTEMPT 1] Querying with house number filter.');
   let results = await sendQuery(makeQuery(true));
 
   // --- 2️⃣ Fallback: same street, no house number ---
   if (results.length === 0) {
-    console.warn("⚠️ No exact match found — retrying without house number...");
+    logs.push('[ATTEMPT 2] No results in first attempt. Retrying without house number filter.');
     results = await sendQuery(makeQuery(false));
   }
 
@@ -112,6 +123,7 @@ export async function fetchPropertyData(address: Address): Promise<PropertyData>
     estateType: r.estateType?.value,
     addressString: r.addressString?.value,
   }));
+  logs.push(`[FORMAT] Formatted ${formattedResults.length} results.`);
 
   const propertyData: PropertyData = {
     address: `${address.street}, ${address.town}, ${address.postcode}`,
@@ -131,18 +143,18 @@ export async function fetchPropertyData(address: Address): Promise<PropertyData>
     ],
   };
 
-  console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(propertyData, null, 2));
-  return propertyData;
+  logs.push(`[END] Returning property data object.`);
+  return { data: propertyData, logs };
 }
 
 
 
 // --- Main Server Actions ---
 
-export async function getPropertyReport(address: Address): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
+export async function getPropertyReport(address: Address): Promise<{ propertyData: PropertyData, summary: string, logs: string[], error?: string }> {
   console.log(`[SERVER] getPropertyReport called for: ${address.street}, ${address.postcode}`);
   
-  const propertyData = await fetchPropertyData(address);
+  const { data: propertyData, logs } = await fetchPropertyData(address);
   
   console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
 
@@ -155,6 +167,7 @@ export async function getPropertyReport(address: Address): Promise<{ propertyDat
     return {
       propertyData: propertyData,
       summary: summaryResult.summary,
+      logs,
     };
   } catch (error) {
     console.error("AI Summary generation failed:", error);
@@ -162,6 +175,7 @@ export async function getPropertyReport(address: Address): Promise<{ propertyDat
     return {
       propertyData,
       summary: "AI summary could not be generated at this time. Please review the property data manually.",
+      logs,
       error: "AI summary error"
     }
   }
@@ -204,7 +218,6 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
   const postcode = address.postcode.trim().toUpperCase();
   
-  // Corrected: Use the full street name without aggressive normalization
   const streetName = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
   const houseNumberFilter = `FILTER regex(?addressString, "${address.street.split(" ")[0]}", "i")`;
 
