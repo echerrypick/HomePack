@@ -86,6 +86,22 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
   }
 }
 
+function parseAddress(fullAddress: string): { paon: string, street: string, postcode: string } | null {
+    const addressParts = fullAddress.split(',').map(p => p.trim());
+    const postcode = addressParts[addressParts.length - 1];
+
+    if (!/^[A-Z]{1,2}\d[A-Z\d]? \d[A-Z]{2}$/i.test(postcode)) {
+        console.error("Could not parse postcode from address:", fullAddress);
+        return null;
+    }
+
+    const paon = addressParts[0];
+    const street = addressParts.slice(1, -2).join(', '); // simplistic street extraction
+
+    return { paon, street, postcode };
+}
+
+
 async function fetchPropertyData(address: Address): Promise<PropertyData> {
   const fullAddress = address.address;
   console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
@@ -121,6 +137,7 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
         return propertyData;
     }
     
+    // Use the first line of the address as the PAON (Primary Addressable Object Name)
     const firstLine = fullAddress.split(',')[0].trim().toUpperCase();
 
     const sparqlQuery = `
@@ -133,9 +150,13 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
               lrppi:pricePaid ?pricePaid ;
               lrppi:transactionDate ?transactionDate ;
               lrppi:propertyAddress ?addrURI ;
-              lrppi:estateType ?estateType.
-        ?addrURI lrcommon:postcode "${postcode}" .
-        ?addrURI lrcommon:address ?addressString .
+              lrppi:estateType ?estateTypeURI.
+
+        ?addrURI lrcommon:postcode "${postcode}" ;
+                 lrcommon:address ?addressString .
+        
+        ?estateTypeURI rdfs:label ?estateType .
+
         FILTER(CONTAINS(UCASE(STR(?addressString)), "${firstLine}"))
       }
       ORDER BY DESC(?transactionDate)
@@ -158,7 +179,7 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
             const latestTransaction = results[0];
             propertyData.landRegistry = {
                 titleNumber: 'N/A', // Title number is not in this dataset
-                tenure: latestTransaction.estateType?.value.split('/').pop() || 'Data not found',
+                tenure: latestTransaction.estateType?.value || 'Data not found',
                 pricePaid: `£${parseInt(latestTransaction.pricePaid?.value, 10).toLocaleString()}`,
                 date: latestTransaction.transactionDate?.value,
             };
@@ -276,16 +297,21 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
   const sparqlQuery = `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
     PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
-    
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
     SELECT ?addressString ?pricePaid ?transactionDate ?estateType
     WHERE {
       ?transx a lrppi:TransactionRecord ;
             lrppi:pricePaid ?pricePaid ;
             lrppi:transactionDate ?transactionDate ;
             lrppi:propertyAddress ?addrURI ;
-            lrppi:estateType ?estateType.
-      ?addrURI lrcommon:postcode "${postcode}" .
-      ?addrURI lrcommon:address ?addressString .
+            lrppi:estateType ?estateTypeURI.
+
+      ?addrURI lrcommon:postcode "${postcode}" ;
+                lrcommon:address ?addressString .
+      
+      ?estateTypeURI rdfs:label ?estateType .
+
       FILTER(CONTAINS(UCASE(STR(?addressString)), "${firstLine}"))
     }
     ORDER BY DESC(?transactionDate)
@@ -338,4 +364,3 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 }
-
