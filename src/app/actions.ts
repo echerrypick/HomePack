@@ -86,21 +86,6 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
   }
 }
 
-function parseAddress(fullAddress: string): { paon: string, street: string, postcode: string } | null {
-    const addressParts = fullAddress.split(',').map(p => p.trim());
-    const postcode = addressParts[addressParts.length - 1];
-
-    if (!/^[A-Z]{1,2}\d[A-Z\d]? \d[A-Z]{2}$/i.test(postcode)) {
-        console.error("Could not parse postcode from address:", fullAddress);
-        return null;
-    }
-
-    const paon = addressParts[0];
-    const street = addressParts.slice(1, -2).join(', '); // simplistic street extraction
-
-    return { paon, street, postcode };
-}
-
 
 async function fetchPropertyData(address: Address): Promise<PropertyData> {
   const fullAddress = address.address;
@@ -143,6 +128,7 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
     const sparqlQuery = `
       PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
       PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
       
       SELECT ?pricePaid ?transactionDate ?estateType
       WHERE {
