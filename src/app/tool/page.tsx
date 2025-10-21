@@ -29,7 +29,7 @@ export default function ToolPage() {
     setStep('report'); // Change step immediately for better UX
     console.log('[CLIENT] Address selected:', address);
     try {
-      const report = await getPropertyReport(address.address);
+      const report = await getPropertyReport(address);
       console.log('[CLIENT] Received report result from server action:', report);
       setSelectedAddress(address);
       setReportData(report);

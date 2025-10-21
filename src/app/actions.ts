@@ -86,7 +86,8 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
   }
 }
 
-async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
+async function fetchPropertyData(address: Address): Promise<PropertyData> {
+  const fullAddress = address.address;
   console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
 
   const propertyData: PropertyData = {
@@ -113,14 +114,13 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   };
 
   try {
-    const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
-    if (!postcodeMatch) {
-      console.log('[SERVER] Could not extract postcode from address:', fullAddress);
-      propertyData.landRegistry.pricePaid = 'Could not find postcode in address.';
-      return propertyData;
+    const postcode = address.postcode;
+    if (!postcode) {
+        console.log('[SERVER] No postcode provided for address:', fullAddress);
+        propertyData.landRegistry.pricePaid = 'Could not find postcode in address.';
+        return propertyData;
     }
     
-    const postcode = postcodeMatch[0];
     const firstLine = fullAddress.split(',')[0].trim().toUpperCase();
 
     const sparqlQuery = `
@@ -169,7 +169,7 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
     } else {
         const errorText = await response.text();
         console.error(`[SERVER] Land Registry SPARQL Error: ${response.status} - ${errorText}`);
-        propertyData.landRegistry.pricePaid = `Error: ${response.status} - ${errorText}`;
+        propertyData.landRegistry.pricePaid = `Error fetching sales data. Raw Response: ${errorText}`;
     }
 
   } catch (error: any) {
@@ -188,10 +188,10 @@ export async function getAddressSuggestions(query: string): Promise<Address[]> {
   return fetchAddressesFromQuery(query);
 }
 
-export async function getPropertyReport(fullAddress: string): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
-  console.log(`[SERVER] getPropertyReport called for: ${fullAddress}`);
+export async function getPropertyReport(address: Address): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
+  console.log(`[SERVER] getPropertyReport called for: ${address.address}`);
   
-  const propertyData = await fetchPropertyData(fullAddress);
+  const propertyData = await fetchPropertyData(address);
   
   console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
 
