@@ -132,10 +132,11 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         ?transx a lrppi:TransactionRecord ;
               lrppi:pricePaid ?pricePaid ;
               lrppi:transactionDate ?transactionDate ;
-              lrppi:propertyAddress ?addr ;
+              lrppi:propertyAddress ?addrURI ;
               lrppi:estateType ?estateType.
-        ?addr lrcommon:postcode "${postcode}" .
-        FILTER(CONTAINS(UCASE(STR(?addr)), "${firstLine}"))
+        ?addrURI lrcommon:postcode "${postcode}" .
+        ?addrURI lrcommon:address ?addressString .
+        FILTER(CONTAINS(UCASE(STR(?addressString)), "${firstLine}"))
       }
       ORDER BY DESC(?transactionDate)
       LIMIT 1
@@ -276,15 +277,16 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
     PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
     
-    SELECT ?address ?pricePaid ?transactionDate ?estateType
+    SELECT ?addressString ?pricePaid ?transactionDate ?estateType
     WHERE {
       ?transx a lrppi:TransactionRecord ;
             lrppi:pricePaid ?pricePaid ;
             lrppi:transactionDate ?transactionDate ;
-            lrppi:propertyAddress ?addr ;
+            lrppi:propertyAddress ?addrURI ;
             lrppi:estateType ?estateType.
-      ?addr lrcommon:postcode "${postcode}" .
-      FILTER(CONTAINS(UCASE(STR(?addr)), "${firstLine}"))
+      ?addrURI lrcommon:postcode "${postcode}" .
+      ?addrURI lrcommon:address ?addressString .
+      FILTER(CONTAINS(UCASE(STR(?addressString)), "${firstLine}"))
     }
     ORDER BY DESC(?transactionDate)
     LIMIT 10
@@ -336,3 +338,4 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
 }
+
