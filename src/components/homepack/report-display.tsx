@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Address, PropertyData } from '@/app/actions';
+import type { Address, PropertyData, LandRegistryResult } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Download } from 'lucide-react';
 import { AiSummary } from './ai-summary';
@@ -43,14 +43,13 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   
   const epcValue = (7 - (propertyData.epc.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
 
-  // Display logic for last sold data
-  const lastSoldDate = landRegistry.date && landRegistry.date !== 'N/A' && !isNaN(new Date(landRegistry.date).getTime())
-    ? new Date(landRegistry.date).toLocaleDateString('en-GB')
-    : null;
-    
-  const lastSoldText = landRegistry.pricePaid.startsWith('£') && lastSoldDate
-    ? `${landRegistry.pricePaid} on ${lastSoldDate}`
-    : landRegistry.pricePaid; // This will now show the price, or the error message.
+  const getPrimaryTransaction = (results: LandRegistryResult[]) => {
+     if (!results || results.length === 0) return null;
+     const primaryMatch = results.find(r => r.addressString.toLowerCase().startsWith(address.street.toLowerCase()));
+     return primaryMatch || results[0];
+  }
+
+  const primaryTransaction = getPrimaryTransaction(landRegistry);
 
 
   return (
@@ -75,9 +74,33 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           <AiSummary summary={summary} />
 
           <DataSection icon={Landmark} title="Land Registry">
-            <DataItem label="Title Number" value={landRegistry.titleNumber} />
-            <DataItem label="Tenure" value={landRegistry.tenure || 'No tenure data available'} />
-            <DataItem label="Last Sold" value={lastSoldText} />
+            {landRegistry.length > 0 ? (
+                <>
+                {primaryTransaction && (
+                    <>
+                        <DataItem label="Last Sold Price" value={`£${parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}`} />
+                        <DataItem label="Last Sold Date" value={new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')} />
+                        <DataItem label="Tenure" value={primaryTransaction.estateType} />
+                        <DataItem label="Matched Address" value={primaryTransaction.addressString} />
+                    </>
+                )}
+                 {landRegistry.length > 1 && (
+                    <div className="pt-4">
+                        <p className="text-sm font-semibold mb-2">Other recent sales on this street:</p>
+                        <ul className="space-y-2 text-xs">
+                        {landRegistry.filter(r => r !== primaryTransaction).slice(0,3).map((item, index) => (
+                            <li key={index} className="flex justify-between p-2 rounded-md bg-muted/50">
+                                <span>{item.addressString}</span>
+                                <span className="font-mono">{`£${parseInt(item.pricePaid, 10).toLocaleString()}`}</span>
+                            </li>
+                        ))}
+                        </ul>
+                    </div>
+                 )}
+                </>
+            ) : (
+                <p className="text-muted-foreground text-sm">No recent sales data found for this property or street.</p>
+            )}
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">
