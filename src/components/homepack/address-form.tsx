@@ -1,65 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from '@/components/ui/command';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Search } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
-import { getAddressSuggestions, Address } from '@/app/actions';
-import { useDebounce } from '@/hooks/use-debounce';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import type { Address } from '@/app/actions';
 
 type AddressFormProps = {
-  onAddressSelect: (address: Address) => void;
+  onAddressSubmit: (address: Address) => void;
   isLoading: boolean;
   error: string | null;
 };
 
-export function AddressForm({ onAddressSelect, isLoading, error }: AddressFormProps) {
-  const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<Address[]>([]);
-  const [isFetching, setIsFetching] = useState(false);
-  const debouncedQuery = useDebounce(query, 300);
+const addressSchema = z.object({
+  street: z.string().min(3, 'Street address is required.'),
+  town: z.string().min(2, 'Town/City is required.'),
+  postcode: z.string().regex(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s?[0-9][A-Z]{2}$/i, 'Invalid UK postcode format.'),
+});
 
-  useEffect(() => {
-    const searchAddresses = async () => {
-      if (debouncedQuery.length < 3) {
-        setSuggestions([]);
-        return;
-      }
-      setIsFetching(true);
-      try {
-        const results = await getAddressSuggestions(debouncedQuery);
-        setSuggestions(results);
-      } catch (error) {
-        console.error("Failed to fetch address suggestions:", error);
-        setSuggestions([]); // Optionally, you could set an error state here
-      } finally {
-        setIsFetching(false);
-      }
-    };
+export function AddressForm({ onAddressSubmit, isLoading, error }: AddressFormProps) {
+  const form = useForm<Address>({
+    resolver: zodResolver(addressSchema),
+    defaultValues: {
+      street: '',
+      town: '',
+      postcode: '',
+    },
+  });
 
-    searchAddresses();
-  }, [debouncedQuery]);
-
-
-  const handleInputChange = (value: string) => {
-    setQuery(value);
-  };
-  
-  const handleSelect = (addressString: string) => {
-    const selected = suggestions.find(s => s.address === addressString);
-    if(selected) {
-        onAddressSelect(selected);
-    }
-  };
+  function onSubmit(values: Address) {
+    onAddressSubmit(values);
+  }
 
   return (
     <Card className="shadow-lg animate-fade-in-up">
       <CardHeader>
         <CardTitle className="text-2xl font-headline">Create your Property Info Pack</CardTitle>
         <CardDescription>
-          Start by typing an address or postcode to find the property.
+          Enter the property address to generate your report.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -71,34 +54,53 @@ export function AddressForm({ onAddressSelect, isLoading, error }: AddressFormPr
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Command shouldFilter={false} className="overflow-visible">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              {isFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-muted-foreground" />}
-              <CommandInput
-                placeholder="Start typing an address or postcode..."
-                className="text-lg h-12 pl-10"
-                value={query}
-                onValueChange={handleInputChange}
-                disabled={isLoading}
-              />
-            </div>
-            <CommandList>
-                {suggestions.length > 0 ? (
-                  suggestions.map((suggestion) => (
-                    <CommandItem
-                    key={suggestion.id}
-                    value={suggestion.address}
-                    onSelect={handleSelect}
-                    >
-                    {suggestion.address}
-                    </CommandItem>
-                  ))
-                ) : (
-                  query.length > 2 && !isFetching && <CommandEmpty>No results found.</CommandEmpty>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="street"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Street Address (e.g., 10 Downing Street)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., 10 Downing Street" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-            </CommandList>
-          </Command>
+              />
+              <FormField
+                control={form.control}
+                name="town"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Town/City</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., London" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="postcode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Postcode</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., SW1A 2AA" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isLoading ? 'Generating Report...' : 'Generate Report'}
+              </Button>
+            </form>
+          </Form>
         </div>
       </CardContent>
     </Card>

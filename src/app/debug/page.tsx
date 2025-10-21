@@ -17,7 +17,7 @@ export default function DebugPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(true);
 
-  const handleAddressSelect = async (address: Address) => {
+  const handleAddressSubmit = async (address: Address) => {
     if (!address) return;
 
     setIsLoading(true);
@@ -54,7 +54,7 @@ export default function DebugPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                  <AddressForm onAddressSelect={handleAddressSelect} isLoading={isLoading} error={error} />
+                  <AddressForm onAddressSubmit={handleAddressSubmit} isLoading={isLoading} error={error} />
               </CardContent>
             </Card>
           ) : isLoading ? (

@@ -9,9 +9,9 @@ import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-repo
 
 // Define types for the data we expect from the APIs
 export type Address = {
-  id: string;
-  address: string;
-  postcode?: string;
+  street: string;
+  town: string;
+  postcode: string;
 }
 
 export type PropertyData = {
@@ -40,55 +40,10 @@ export type PropertyData = {
   }[];
 }
 
+
 // --- API Calls ---
-
-async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
-  const apiKey = process.env.MAPBOX_API_KEY;
-  if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-    console.error('[SERVER] MAPBOX_API_KEY is not set. Cannot fetch addresses.');
-    throw new Error('Server configuration error: Mapbox API key is missing.');
-  }
-
-  if (!query) return [];
-
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-    query
-  )}.json?access_token=${apiKey}&country=gb&types=address,postcode&limit=10`;
-
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[SERVER] Mapbox API Error Response: ${errorText}`);
-      throw new Error(`Failed to fetch addresses from Mapbox. The API responded with status: ${response.status}.`);
-    }
-
-    const data = await response.json();
-
-    if (!data.features) {
-      return [];
-    }
-
-    const mappedAddresses: Address[] = data.features.map((feature: any) => {
-        const postcodeContext = feature.context?.find((c: any) => c.id.startsWith('postcode.'));
-        return {
-          id: feature.id,
-          address: feature.place_name,
-          postcode: postcodeContext?.text,
-        };
-    });
-    
-    return mappedAddresses;
-
-  } catch (error: any) {
-    console.error("[SERVER] Error in fetchAddressesFromQuery:", error.message);
-    throw new Error("There was a problem fetching addresses. Please check your search and try again.");
-  }
-}
-
-
 async function fetchPropertyData(address: Address): Promise<PropertyData> {
-  const fullAddress = address.address;
+  const fullAddress = `${address.street}, ${address.town}, ${address.postcode}`;
   console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
 
   const propertyData: PropertyData = {
@@ -115,15 +70,13 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
   };
 
   try {
-    const postcode = address.postcode;
-    if (!postcode) {
-        console.log('[SERVER] No postcode provided for address:', fullAddress);
-        propertyData.landRegistry.pricePaid = 'Could not find postcode in address.';
-        return propertyData;
+    const { street, postcode } = address;
+    if (!postcode || !street) {
+        throw new Error('Postcode and street are required to fetch property data.');
     }
     
-    // Use the first line of the address as the PAON (Primary Addressable Object Name)
-    const firstLine = fullAddress.split(',')[0].trim().toUpperCase();
+    // Extract PAON (house number/name) from street
+    const paon = street.split(' ')[0].trim().toUpperCase();
 
     const sparqlQuery = `
       PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
@@ -139,11 +92,9 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
               lrppi:estateType ?estateTypeURI.
 
         ?addrURI lrcommon:postcode "${postcode}" ;
-                 lrcommon:address ?addressString .
+                 lrcommon:paon "${paon}" .
         
         ?estateTypeURI rdfs:label ?estateType .
-
-        FILTER(CONTAINS(UCASE(STR(?addressString)), "${firstLine}"))
       }
       ORDER BY DESC(?transactionDate)
       LIMIT 1
@@ -170,7 +121,7 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
                 date: latestTransaction.transactionDate?.value,
             };
         } else {
-            console.log('[SERVER] No matching transaction found for address via SPARQL:', firstLine);
+            console.log('[SERVER] No matching transaction found for address via SPARQL:', fullAddress);
             propertyData.landRegistry.pricePaid = 'No recent sales data found';
         }
     } else {
@@ -191,12 +142,8 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
 
 // --- Main Server Actions ---
 
-export async function getAddressSuggestions(query: string): Promise<Address[]> {
-  return fetchAddressesFromQuery(query);
-}
-
 export async function getPropertyReport(address: Address): Promise<{ propertyData: PropertyData, summary: string, error?: string }> {
-  console.log(`[SERVER] getPropertyReport called for: ${address.address}`);
+  console.log(`[SERVER] getPropertyReport called for: ${address.street}, ${address.postcode}`);
   
   const propertyData = await fetchPropertyData(address);
   
@@ -265,20 +212,20 @@ export type DebugInfo = {
 }
 
 export async function getDebugInfo(address: Address): Promise<DebugInfo> {
-  const fullAddress = address.address;
-  const postcode = address.postcode || null;
+  const fullAddress = `${address.street}, ${address.town}, ${address.postcode}`;
+  const { street, postcode } = address;
 
-  if (!fullAddress || !postcode) {
+  if (!street || !postcode) {
     return {
       fullAddressUsed: fullAddress || 'No address provided',
       postcode: postcode || 'N/A',
       sparqlQuery: 'Could not be constructed.',
-      landRegistryRawResponse: 'Could not find postcode from Mapbox API response. Therefore, could not query Land Registry.',
-      error: 'Could not find postcode from Mapbox API response.'
+      landRegistryRawResponse: 'Street or Postcode was missing.',
+      error: 'Street or Postcode was missing.'
     };
   }
   
-  const firstLine = fullAddress.split(',')[0].trim().toUpperCase();
+  const paon = street.split(' ')[0].trim().toUpperCase();
 
   const sparqlQuery = `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
@@ -294,11 +241,10 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
             lrppi:estateType ?estateTypeURI.
 
       ?addrURI lrcommon:postcode "${postcode}" ;
-                lrcommon:address ?addressString .
+               lrcommon:paon "${paon}" ;
+               lrcommon:address ?addressString .
       
       ?estateTypeURI rdfs:label ?estateType .
-
-      FILTER(CONTAINS(UCASE(STR(?addressString)), "${firstLine}"))
     }
     ORDER BY DESC(?transactionDate)
     LIMIT 10
