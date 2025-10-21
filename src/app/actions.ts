@@ -75,15 +75,14 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
         throw new Error('Postcode and street are required to fetch property data.');
     }
     
-    // Extract PAON (house number/name) from street
-    const paon = street.split(' ')[0].trim().toUpperCase();
+    const streetName = street.replace(/[0-9]/g, '').replace(/flat/i, '').trim();
 
     const sparqlQuery = `
       PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
       PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
       
-      SELECT ?pricePaid ?transactionDate ?estateType
+      SELECT ?pricePaid ?transactionDate ?estateType ?addressString
       WHERE {
         ?transx a lrppi:TransactionRecord ;
               lrppi:pricePaid ?pricePaid ;
@@ -92,12 +91,13 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
               lrppi:estateType ?estateTypeURI.
 
         ?addrURI lrcommon:postcode "${postcode}" ;
-                 lrcommon:paon "${paon}" .
-        
+                 lrcommon:street "${streetName}" ;
+                 lrcommon:address ?addressString .
+
         ?estateTypeURI rdfs:label ?estateType .
       }
       ORDER BY DESC(?transactionDate)
-      LIMIT 1
+      LIMIT 10
     `;
     
     const response = await fetch("https://landregistry.data.gov.uk/landregistry/query", {
@@ -113,7 +113,11 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
         const json = await response.json();
         const results = json.results?.bindings;
         if (results && results.length > 0) {
-            const latestTransaction = results[0];
+            // Find the best match from the results
+            const streetUpper = address.street.toUpperCase();
+            const found = results.find((res: any) => res.addressString?.value?.toUpperCase().startsWith(streetUpper));
+            const latestTransaction = found || results[0];
+
             propertyData.landRegistry = {
                 titleNumber: 'N/A', // Title number is not in this dataset
                 tenure: latestTransaction.estateType?.value || 'Data not found',
@@ -225,7 +229,7 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     };
   }
   
-  const paon = street.split(' ')[0].trim().toUpperCase();
+  const streetName = street.replace(/[0-9]/g, '').replace(/flat/i, '').trim();
 
   const sparqlQuery = `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
@@ -241,7 +245,7 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
             lrppi:estateType ?estateTypeURI.
 
       ?addrURI lrcommon:postcode "${postcode}" ;
-               lrcommon:paon "${paon}" ;
+               lrcommon:street "${streetName}" ;
                lrcommon:address ?addressString .
       
       ?estateTypeURI rdfs:label ?estateType .
