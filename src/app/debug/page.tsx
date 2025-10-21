@@ -50,7 +50,7 @@ export default function DebugPage() {
               <CardHeader>
                 <CardTitle>Land Registry Debug Tool</CardTitle>
                 <CardDescription>
-                  Enter an address to see the raw data returned by the Land Registry API for the corresponding postcode.
+                  Enter an address to see the raw data returned by the Land Registry SPARQL endpoint for the corresponding postcode.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -70,7 +70,7 @@ export default function DebugPage() {
                     <div className='flex justify-between items-start'>
                         <div>
                             <CardTitle>Debug Information</CardTitle>
-                            <CardDescription>Raw data returned from the Land Registry API.</CardDescription>
+                            <CardDescription>Raw data returned from the Land Registry SPARQL endpoint.</CardDescription>
                         </div>
                         <Button variant="outline" onClick={handleReset}>Search Again</Button>
                     </div>
@@ -92,8 +92,10 @@ export default function DebugPage() {
                       <p className="p-2 bg-muted rounded-md">{debugInfo.postcode}</p>
                     </div>
                     <div>
-                      <h3 className="font-semibold text-base mb-1">Land Registry URL Queried:</h3>
-                      <p className="p-2 bg-muted rounded-md break-all">{debugInfo.landRegistryUrl}</p>
+                      <h3 className="font-semibold text-base mb-1">SPARQL Query:</h3>
+                      <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                        {debugInfo.sparqlQuery}
+                      </pre>
                     </div>
                     <div>
                       <h3 className="font-semibold text-base mb-1">Raw API Response:</h3>

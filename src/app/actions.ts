@@ -40,11 +40,6 @@ export type PropertyData = {
   }[];
 }
 
-const FETCH_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Accept': 'application/json',
-};
-
 // --- API Calls ---
 
 async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
@@ -61,7 +56,7 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
   )}.json?access_token=${apiKey}&country=gb&types=address,postcode&limit=10`;
 
   try {
-    const response = await fetch(url, { headers: FETCH_HEADERS });
+    const response = await fetch(url);
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[SERVER] Mapbox API Error Response: ${errorText}`);
@@ -94,7 +89,6 @@ async function fetchAddressesFromQuery(query: string): Promise<Address[]> {
 async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
   console.log(`[SERVER] fetchPropertyData called for: ${fullAddress}`);
 
-  // Start with a complete, default data structure.
   const propertyData: PropertyData = {
     address: fullAddress,
     landRegistry: {
@@ -120,57 +114,64 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
 
   try {
     const postcodeMatch = fullAddress.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
-    if (postcodeMatch) {
-      const postcode = postcodeMatch[0];
+    if (!postcodeMatch) {
+      console.log('[SERVER] Could not extract postcode from address:', fullAddress);
+      propertyData.landRegistry.pricePaid = 'Could not find postcode in address.';
+      return propertyData;
+    }
+    
+    const postcode = postcodeMatch[0];
+    const firstLine = fullAddress.split(',')[0].trim().toUpperCase();
+
+    const sparqlQuery = `
+      PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
+      PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
       
-      const ppdUrl = `https://landregistry.data.gov.uk/app/ppd/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate`;
-      console.log(`[SERVER] Fetching Land Registry data from: ${ppdUrl}`);
-
-      const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
-      if (response.ok) {
+      SELECT ?pricePaid ?transactionDate ?estateType
+      WHERE {
+        ?transx a lrppi:TransactionRecord ;
+              lrppi:pricePaid ?pricePaid ;
+              lrppi:transactionDate ?transactionDate ;
+              lrppi:propertyAddress ?addr ;
+              lrppi:estateType ?estateType.
+        ?addr lrcommon:postcode "${postcode}" .
+        FILTER(CONTAINS(UCASE(STR(?addr)), "${firstLine}"))
+      }
+      ORDER BY DESC(?transactionDate)
+      LIMIT 1
+    `;
+    
+    const response = await fetch("https://landregistry.data.gov.uk/landregistry/query", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/sparql-results+json'
+        },
+        body: new URLSearchParams({ query: sparqlQuery })
+    });
+    
+    if (response.ok) {
         const json = await response.json();
-        const transactions = json.result?.items || [];
-        
-        console.log(`[SERVER] Found ${transactions.length} transactions for postcode: "${postcode}"`);
-
-        const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
-
-        // Pass 1: Exact Match on the address line
-        let latestTransaction = transactions.find((item: any) => {
-            const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-            return itemAddress.startsWith(addressStart);
-        });
-
-        // Pass 2: Fallback to "includes" if no exact match was found
-        if (!latestTransaction) {
-            console.log('[SERVER] No exact start match found, trying fallback "includes" search.');
-            latestTransaction = transactions.find((item: any) => {
-                const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-                return itemAddress.includes(addressStart);
-            });
-        }
-
-        if (latestTransaction) {
-          console.log('[SERVER] Found matching transaction:', JSON.stringify(latestTransaction, null, 2));
-          propertyData.landRegistry = {
-            titleNumber: 'N/A', // Title number is not in this dataset
-            tenure: latestTransaction.estateType?.label || 'Data not found',
-            pricePaid: latestTransaction.pricePaid ? `£${latestTransaction.pricePaid.toLocaleString()}` : 'Data not found',
-            date: latestTransaction.transactionDate || 'N/A',
-          };
+        const results = json.results?.bindings;
+        if (results && results.length > 0) {
+            const latestTransaction = results[0];
+            propertyData.landRegistry = {
+                titleNumber: 'N/A', // Title number is not in this dataset
+                tenure: latestTransaction.estateType?.value.split('/').pop() || 'Data not found',
+                pricePaid: `£${parseInt(latestTransaction.pricePaid?.value, 10).toLocaleString()}`,
+                date: latestTransaction.transactionDate?.value,
+            };
         } else {
-            console.log('[SERVER] No matching transaction found for address:', addressStart);
+            console.log('[SERVER] No matching transaction found for address via SPARQL:', firstLine);
             propertyData.landRegistry.pricePaid = 'No recent sales data found';
         }
-      } else {
-        console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
-        propertyData.landRegistry.pricePaid = 'Could not fetch sales data';
-      }
     } else {
-      console.log('[SERVER] Could not extract postcode from address:', fullAddress);
+        console.error(`[SERVER] Land Registry SPARQL Error: ${response.status} - ${await response.text()}`);
+        propertyData.landRegistry.pricePaid = 'Could not fetch sales data';
     }
+
   } catch (error: any) {
-    console.error('[SERVER] Error fetching Land Registry data:', error.message);
+    console.error('[SERVER] Error fetching Land Registry data via SPARQL:', error.message);
     propertyData.landRegistry.pricePaid = 'Error fetching sales data';
   }
 
@@ -249,7 +250,7 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
 export type DebugInfo = {
   fullAddressUsed: string;
   postcode: string | null;
-  landRegistryUrl: string;
+  sparqlQuery: string;
   landRegistryRawResponse: any;
   error?: string;
 }
@@ -258,47 +259,61 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
   const fullAddress = address.address;
   const postcode = address.postcode || null;
 
-  if (!fullAddress) {
+  if (!fullAddress || !postcode) {
     return {
-      fullAddressUsed: 'No address provided',
-      postcode: null,
-      landRegistryUrl: '',
-      landRegistryRawResponse: 'No address was provided to debug.',
-      error: 'No address was provided.'
-    };
-  }
-  
-  if (!postcode) {
-    return {
-      fullAddressUsed: fullAddress,
-      postcode: 'N/A',
-      landRegistryUrl: 'Could not be constructed.',
+      fullAddressUsed: fullAddress || 'No address provided',
+      postcode: postcode || 'N/A',
+      sparqlQuery: 'Could not be constructed.',
       landRegistryRawResponse: 'Could not find postcode from Mapbox API response. Therefore, could not query Land Registry.',
       error: 'Could not find postcode from Mapbox API response.'
     };
   }
+  
+  const firstLine = fullAddress.split(',')[0].trim().toUpperCase();
 
-  const ppdUrl = `https://landregistry.data.gov.uk/app/ppd/transaction-record?propertyAddress.postcode=${encodeURIComponent(postcode)}&_sort=-transactionDate`;
+  const sparqlQuery = `
+    PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
+    PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
+    
+    SELECT ?address ?pricePaid ?transactionDate ?estateType
+    WHERE {
+      ?transx a lrppi:TransactionRecord ;
+            lrppi:pricePaid ?pricePaid ;
+            lrppi:transactionDate ?transactionDate ;
+            lrppi:propertyAddress ?addr ;
+            lrppi:estateType ?estateType.
+      ?addr lrcommon:postcode "${postcode}" ;
+            lrcommon:address ?address .
+      FILTER(CONTAINS(UCASE(STR(?address)), "${firstLine}"))
+    }
+    ORDER BY DESC(?transactionDate)
+    LIMIT 10
+  `;
 
   try {
-    const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
+    const response = await fetch("https://landregistry.data.gov.uk/landregistry/query", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/sparql-results+json'
+        },
+        body: new URLSearchParams({ query: sparqlQuery })
+    });
     
     const responseText = await response.text();
     let rawData: any = `Status: ${response.status}. Response Body: ${responseText}`;
 
     try {
-        // We try to parse it as JSON, if it fails, we use the raw text.
         rawData = JSON.parse(responseText);
     } catch (e) {
         console.log("Response was not JSON, showing raw text.");
-        // If parsing fails, rawData is already set to the text content.
     }
 
     if (!response.ok) {
         return {
             fullAddressUsed: fullAddress,
             postcode: postcode,
-            landRegistryUrl: ppdUrl,
+            sparqlQuery: sparqlQuery,
             landRegistryRawResponse: rawData,
             error: `Land Registry API responded with status: ${response.status}`
         };
@@ -307,7 +322,7 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     return {
       fullAddressUsed: fullAddress,
       postcode: postcode,
-      landRegistryUrl: ppdUrl,
+      sparqlQuery: sparqlQuery,
       landRegistryRawResponse: rawData,
     };
 
@@ -315,7 +330,7 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     return {
       fullAddressUsed: fullAddress,
       postcode: postcode,
-      landRegistryUrl: ppdUrl,
+      sparqlQuery: sparqlQuery,
       landRegistryRawResponse: `An error occurred while fetching the Land Registry data. Error: ${e.message}`,
       error: 'An unexpected error occurred in the debug action.'
     };
