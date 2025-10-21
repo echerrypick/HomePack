@@ -102,9 +102,8 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   const makeQuery = () => {
     let filterClause = `regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")`;
     if (buildingIdentifier) {
-      // Match the number at the start of the address string, followed by a space.
-      // This is more reliable as street name matching is brittle.
-      filterClause += ` && regex(?addressString, "^${buildingIdentifier}\\\\s", "i")`;
+      // Match the number at the start of the address string, followed by a non-word character or end of line.
+      filterClause += ` && regex(?addressString, "^${buildingIdentifier}(\\\\W|$)", "i")`;
     }
 
     return `
@@ -282,7 +281,7 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const query2 = `${prefixes} ${baseSelect} ${filter2} ${ordering}`;
   
   // Query 3: Postcode + Building ID at start of string (Regex)
-  let filter3 = `FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i") && regex(?addressString, "^${buildingIdentifier}\\\\s", "i"))`;
+  let filter3 = `FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i") && regex(?addressString, "^${buildingIdentifier}(\\\\W|$)", "i"))`;
   const query3 = `${prefixes} ${baseSelect} ${filter3} ${ordering}`;
 
   async function sendQuery(sparqlQuery: string) {
