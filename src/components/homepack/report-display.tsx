@@ -11,6 +11,7 @@ import { AiConditionReport } from './ai-condition-report';
 import { DataSection, DataItem } from './data-section';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Separator } from '@/components/ui/separator';
 
 type ReportDisplayProps = {
   address: Address;
@@ -67,10 +68,8 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
 
   const getPrimaryTransaction = (results: LandRegistryResult[]) => {
      if (!results || results.length === 0) return null;
-     // Find the first result that starts with the same address as the query
-     const primaryMatch = results.find(r => r.addressString.toLowerCase().startsWith(address.street.toLowerCase()));
-     // If no exact match, return the most recent transaction (the first in the sorted list)
-     return primaryMatch || results[0];
+     // The API returns results sorted by date, so the first one is the most recent.
+     return results[0];
   }
 
   const primaryTransaction = getPrimaryTransaction(landRegistry);
@@ -102,8 +101,18 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
                 <>
                   <DataItem label="Title Number" value={"N/A"} />
                   <DataItem label="Tenure" value={primaryTransaction.estateType} />
-                  <DataItem label="Last Sold Price" value={`£${parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}`} />
-                  <DataItem label="Last Sold Date" value={new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')} />
+                  <Separator className="my-4" />
+                  <h3 className="text-md font-semibold text-foreground mb-2">Sales History</h3>
+                  <div className="space-y-3">
+                    {landRegistry.map((transaction, index) => (
+                      <div key={index} className="p-2 rounded-md even:bg-muted/50">
+                        <div className="flex justify-between items-center text-sm">
+                           <p className="font-medium text-primary">£{parseInt(transaction.pricePaid, 10).toLocaleString()}</p>
+                           <p className="text-muted-foreground">{new Date(transaction.transactionDate).toLocaleDateString('en-GB')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </>
             ) : (
                 <>
