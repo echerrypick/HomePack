@@ -202,8 +202,10 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
 export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
   const postcode = address.postcode.trim().toUpperCase();
+  
+  // Corrected: Use the full street name without aggressive normalization
   const streetName = address.street.replace(/\d/g, "").replace(/flat/i, "").trim();
-  const houseNumber = address.street.split(" ")[0].trim();
+  const houseNumberFilter = `FILTER regex(?addressString, "${address.street.split(" ")[0]}", "i")`;
 
   const prefixes = `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
@@ -236,7 +238,7 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const query2 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetName}" . ${ordering}`;
   
   // Query 3: Postcode + Street + House Number Filter
-  const query3 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetName}" . FILTER regex(?addressString, "${houseNumber}", "i") ${ordering}`;
+  const query3 = `${prefixes} ${baseSelect} ?addrURI lrcommon:postcode "${postcode}" ; lrcommon:street "${streetName}" . ${houseNumberFilter} ${ordering}`;
 
   async function sendQuery(sparqlQuery: string) {
     try {

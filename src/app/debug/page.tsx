@@ -32,8 +32,7 @@ type StepByStepDebugInfo = {
 
 function DebugStepView({ step, title, debugInfo }: { step: number; title: string; debugInfo: DebugInfo }) {
   const hasResults = debugInfo.response?.results?.bindings?.length > 0;
-  const hasError = !!debugInfo.error || debugInfo.response?.results?.bindings?.length === 0;
-
+  
   return (
     <Card>
       <CardHeader>
@@ -80,6 +79,7 @@ export default function DebugPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(true);
+  const [submittedAddress, setSubmittedAddress] = useState<Address | null>(null);
 
   const handleAddressSubmit = async (address: Address) => {
     if (!address) return;
@@ -88,6 +88,7 @@ export default function DebugPage() {
     setError(null);
     setDebugInfo(null);
     setIsSearching(false);
+    setSubmittedAddress(address);
     try {
         const result = await getStepByStepDebugInfo(address);
         setDebugInfo(result);
@@ -102,6 +103,7 @@ export default function DebugPage() {
     setIsSearching(true);
     setDebugInfo(null);
     setError(null);
+    setSubmittedAddress(null);
   };
 
   return (
@@ -133,7 +135,11 @@ export default function DebugPage() {
                    <div className='flex justify-between items-start'>
                         <div>
                             <h2 className="text-2xl font-bold">Debug Information</h2>
-                            <p className="text-muted-foreground">Results from the Land Registry SPARQL query.</p>
+                            {submittedAddress && (
+                               <p className="text-muted-foreground">
+                                Showing results for: {submittedAddress.street}, {submittedAddress.town}, {submittedAddress.postcode}
+                               </p>
+                            )}
                         </div>
                         <Button variant="outline" onClick={handleReset}>Search Again</Button>
                     </div>
