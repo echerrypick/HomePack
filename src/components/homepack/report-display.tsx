@@ -121,7 +121,6 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
                   <DataItem label="Last Sold" value={"No recent sales data found"} />
                 </>
             )}
-            <DebugLogDisplay logs={logs} />
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">

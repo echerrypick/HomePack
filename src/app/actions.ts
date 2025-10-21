@@ -45,7 +45,7 @@ export type PropertyData = {
 // --- API Calls ---
 export async function fetchPropertyData(address: Address): Promise<{data: PropertyData, logs: string[]}> {
   const logs: string[] = [];
-  logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
+  // logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
   
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
 
@@ -56,31 +56,31 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   let paon = ''; // Primary Addressable Object Name (building number/name)
   let street = '';
 
-  const streetParts = streetInput.split(' ');
-  if (/\d/.test(streetParts[0])) { // Starts with a number or contains a number
-    paon = streetParts[0];
-    street = streetParts.slice(1).join(' ');
+  // Improved logic to split building identifier from street name
+  const paonMatch = streetInput.match(/^(\d+[a-zA-Z]?(-\d+[a-zA-Z]?)?)/); // Matches "10", "10a", "10-12", "10a-12b"
+  if (paonMatch) {
+    paon = paonMatch[1];
+    street = streetInput.substring(paonMatch[0].length).trim();
   } else {
-    // This is a naive assumption for cases like 'The Cottage'
-    // A more robust solution might be needed if this fails often.
-    paon = streetParts[0];
-    street = streetParts.slice(1).join(' ');
+    // Fallback for non-numeric names like 'The Cottage'
+    const streetParts = streetInput.split(' ');
+    if (streetParts.length > 1) {
+        paon = streetParts[0];
+        street = streetParts.slice(1).join(' ');
+    } else {
+        street = streetInput;
+    }
   }
 
-  if (!street && paon) {
-      street = paon;
-      paon = '';
-  }
 
-
-  logs.push(`[NORMALIZE] Postcode for query: "${postcode}"`);
-  logs.push(`[NORMALIZE] PAON for query: "${paon}"`);
-  logs.push(`[NORMALIZE] Street for query: "${street}"`);
+  // logs.push(`[NORMALIZE] Postcode for query: "${postcode}"`);
+  // logs.push(`[NORMALIZE] PAON for query: "${paon}"`);
+  // logs.push(`[NORMALIZE] Street for query: "${street}"`);
 
 
   // Helper to safely send SPARQL queries
   async function sendQuery(sparqlQuery: string) {
-    logs.push(`[QUERY] Sending SPARQL query:\n${sparqlQuery}`);
+    // logs.push(`[QUERY] Sending SPARQL query:\n${sparqlQuery}`);
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -93,21 +93,21 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 
       if (!res.ok) {
         const errorText = await res.text();
-        logs.push(`[ERROR] Land Registry request failed: ${res.status}. Response: ${errorText}`);
+        // logs.push(`[ERROR] Land Registry request failed: ${res.status}. Response: ${errorText}`);
         throw new Error(`Land Registry request failed: ${res.status}`);
       }
       const data = await res.json();
-      logs.push(`[RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
+      // logs.push(`[RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
       return data.results?.bindings || [];
     } catch (err: any) {
-      logs.push(`[FATAL] SPARQL fetch error: ${err.message}`);
+      // logs.push(`[FATAL] SPARQL fetch error: ${err.message}`);
       console.error("❌ SPARQL fetch error:", err);
       return [];
     }
   }
 
-  // --- SPARQL query using individual components ---
   const makeQuery = () => {
+    // Use the final, correct query structure
     return `
       PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
       PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
@@ -142,7 +142,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     `;
   }
   
-  logs.push('[ATTEMPT] Querying with component regex filters.');
+  // logs.push('[ATTEMPT] Querying with component regex filters.');
   let results = await sendQuery(makeQuery());
 
   // --- Format result ---
@@ -167,7 +167,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     }
   });
 
-  logs.push(`[FORMAT] Formatted ${formattedResults.length} results.`);
+  // logs.push(`[FORMAT] Formatted ${formattedResults.length} results.`);
 
   const propertyData: PropertyData = {
     address: `${address.street}, ${address.town}, ${address.postcode}`,
@@ -187,7 +187,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     ],
   };
 
-  logs.push(`[END] Returning property data object.`);
+  // logs.push(`[END] Returning property data object.`);
   return { data: propertyData, logs };
 }
 
@@ -265,27 +265,24 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   let paon = '';
   let street = '';
-  const streetParts = streetInput.split(' ');
-  if (/\d/.test(streetParts[0])) {
-    paon = streetParts[0];
-    street = streetParts.slice(1).join(' ');
+  const paonMatch = streetInput.match(/^(\d+[a-zA-Z]?(-\d+[a-zA-Z]?)?)/);
+  if (paonMatch) {
+    paon = paonMatch[1];
+    street = streetInput.substring(paonMatch[0].length).trim();
   } else {
-    paon = streetParts[0];
-    street = streetParts.slice(1).join(' ');
+    const streetParts = streetInput.split(' ');
+    if (streetParts.length > 1) {
+      paon = streetParts[0];
+      street = streetParts.slice(1).join(' ');
+    } else {
+      street = streetInput;
+    }
   }
-   if (!street && paon) {
-      street = paon;
-      paon = '';
-  }
-
-
-  const prefixes = `
+  
+  const query1 = `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
     PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-  `;
-  
-  const baseSelect = `
     SELECT ?pricePaid ?transactionDate ?estateType ?addressString
     WHERE {
       ?transx a lrppi:TransactionRecord ;
@@ -293,24 +290,32 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
               lrppi:transactionDate ?transactionDate ;
               lrppi:propertyAddress ?addrURI ;
               lrppi:estateType ?estateTypeURI .
-      ?estateTypeURI rdfs:label ?estateType .
       ?addrURI lrcommon:address ?addressString ;
-              lrcommon:postcode ?postcodeValue .
-  `;
-  
-  const ordering = `
-    }
-    ORDER BY DESC(?transactionDate)
-    LIMIT 10
-  `;
+               lrcommon:postcode ?postcodeValue .
+      FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i"))
+      ?estateTypeURI rdfs:label ?estateType .
+    } ORDER BY DESC(?transactionDate) LIMIT 10`;
 
-  // Query 1: Postcode only
-  const query1 = `${prefixes} ${baseSelect} FILTER(regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")) } ORDER BY DESC(?transactionDate) LIMIT 10`;
-
-  // Query 2: Postcode + Street Name
-  const query2 = `${prefixes} ${baseSelect} FILTER(regex(?addressString, "${street}", "i") && regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")) } ORDER BY DESC(?transactionDate) LIMIT 10`;
+  const query2 = `
+    PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
+    PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    SELECT ?pricePaid ?transactionDate ?estateType ?addressString
+    WHERE {
+      ?transx a lrppi:TransactionRecord ;
+              lrppi:pricePaid ?pricePaid ;
+              lrppi:transactionDate ?transactionDate ;
+              lrppi:propertyAddress ?addrURI ;
+              lrppi:estateType ?estateTypeURI .
+      ?addrURI lrcommon:address ?addressString ;
+               lrcommon:postcode ?postcodeValue .
+      FILTER (
+        regex(?addressString, "${street}", "i") && 
+        regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i")
+      )
+      ?estateTypeURI rdfs:label ?estateType .
+    } ORDER BY DESC(?transactionDate) LIMIT 10`;
   
-  // Query 3: Postcode + PAON + Street Name
   const query3 = `
       PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
       PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
