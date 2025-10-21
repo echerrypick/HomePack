@@ -50,10 +50,11 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 
   // --- Normalise input ---
   const postcode = address.postcode.trim().toUpperCase();
-  logs.push(`[NORMALIZE] Postcode: "${postcode}"`);
+  logs.push(`[NORMALIZE] Postcode for query: "${postcode}"`);
   
-  const streetName = address.street.trim();
-  logs.push(`[NORMALIZE] Street Name for query: "${streetName}"`);
+  // Use the street name as provided, but just the non-numeric part for broader matching.
+  const street = address.street.replace(/\d+/g, "").trim();
+  logs.push(`[NORMALIZE] Street Name for query: "${street}"`);
 
   // Helper to safely send SPARQL queries
   async function sendQuery(sparqlQuery: string) {
@@ -83,8 +84,8 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     }
   }
 
-  // --- Base SPARQL query template ---
-  const makeQuery = (useFullStreet: boolean) => `
+  // --- SPARQL query template with Regex ---
+  const makeQuery = () => `
     PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
     PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -96,24 +97,17 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
               lrppi:transactionDate ?transactionDate ;
               lrppi:propertyAddress ?addrURI ;
               lrppi:estateType ?estateTypeURI .
-      ?addrURI lrcommon:postcode "${postcode}" ;
-               lrcommon:street "${useFullStreet ? streetName : streetName.replace(/\d/g, "").trim()}" ;
-               lrcommon:address ?addressString .
+      ?addrURI lrcommon:address ?addressString ;
+              lrcommon:postcode ?postcodeValue .
+      FILTER (regex(?addressString, "${street}", "i") && regex(?postcodeValue, "${postcode.replace(/\s+/g, '')}", "i"))
       ?estateTypeURI rdfs:label ?estateType .
     }
     ORDER BY DESC(?transactionDate)
     LIMIT 10
   `;
 
-  // --- 1️⃣ Attempt: exact address with house number in street ---
-  logs.push('[ATTEMPT 1] Querying with full street name (including number).');
-  let results = await sendQuery(makeQuery(true));
-
-  // --- 2️⃣ Fallback: same street, no house number ---
-  if (results.length === 0) {
-    logs.push('[ATTEMPT 2] No results in first attempt. Retrying with street name only (no number).');
-    results = await sendQuery(makeQuery(false));
-  }
+  // --- Execute Query ---
+  const results = await sendQuery(makeQuery());
 
   // --- Format result ---
   const formattedResults = results.map((r: any) => ({
