@@ -48,11 +48,19 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
     const endpoint = "https://epc.opendatacommunities.org/api/v1/domestic/search";
     const url = `${endpoint}?postcode=${encodeURIComponent(address.postcode)}&address=${encodeURIComponent(address.street)}&size=1`;
     logs.push(`[EPC] Fetching from: ${url}`);
+    
+    const headers: HeadersInit = {
+        "Accept": "application/json",
+    };
+    if (process.env.EPC_API_KEY) {
+        headers["Authorization"] = `Bearer ${process.env.EPC_API_KEY}`;
+        logs.push("[EPC] Using API Key for authentication.");
+    } else {
+        logs.push("[EPC] No API Key found, making unauthenticated request.");
+    }
 
     try {
-        const res = await fetch(url, {
-            headers: { Accept: "application/json" },
-        });
+        const res = await fetch(url, { headers });
 
         if (!res.ok) {
             logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
@@ -414,3 +422,4 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
+
