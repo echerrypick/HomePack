@@ -53,11 +53,9 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
         "Accept": "application/json",
     };
 
-    if (process.env.EPC_API_EMAIL && process.env.EPC_API_KEY) {
-        const credentials = `${process.env.EPC_API_EMAIL}:${process.env.EPC_API_KEY}`;
-        const encodedCredentials = Buffer.from(credentials).toString('base64');
-        headers["Authorization"] = `Basic ${encodedCredentials}`;
-        logs.push("[EPC] Using Basic authentication with email and API Key.");
+    if (process.env.EPC_ENCODED_TOKEN) {
+        headers["Authorization"] = `Basic ${process.env.EPC_ENCODED_TOKEN}`;
+        logs.push("[EPC] Using Basic authentication with encoded token.");
     } else {
         logs.push("[EPC] No API credentials found, making unauthenticated request.");
     }
@@ -101,7 +99,7 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
 // --- API Calls ---
 export async function fetchPropertyData(address: Address): Promise<{data: PropertyData, logs: string[]}> {
   const logs: string[] = [];
-  logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
+  // logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
   
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
 
@@ -425,5 +423,6 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
+
 
 
