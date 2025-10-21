@@ -131,18 +131,19 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         const json = await response.json();
         const transactions = json.result?.items || [];
         
+        console.log(`[SERVER] Found ${transactions.length} transactions for postcode: "${postcode}"`);
+
         const addressStart = fullAddress.split(',')[0].trim().toUpperCase();
-        console.log(`[SERVER] Searching for address matching: "${addressStart}" within postcode: "${postcode}"`);
 
         // Pass 1: Exact Match on the address line
         let latestTransaction = transactions.find((item: any) => {
             const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
-            return itemAddress === addressStart;
+            return itemAddress.startsWith(addressStart);
         });
 
         // Pass 2: Fallback to "includes" if no exact match was found
         if (!latestTransaction) {
-            console.log('[SERVER] No exact match found, trying fallback "includes" search.');
+            console.log('[SERVER] No exact start match found, trying fallback "includes" search.');
             latestTransaction = transactions.find((item: any) => {
                 const itemAddress = item.propertyAddress?.label?.toUpperCase() || '';
                 return itemAddress.includes(addressStart);
@@ -163,12 +164,14 @@ async function fetchPropertyData(fullAddress: string): Promise<PropertyData> {
         }
       } else {
         console.error(`[SERVER] Land Registry API Error: ${response.status} - ${await response.text()}`);
+        propertyData.landRegistry.pricePaid = 'Could not fetch sales data';
       }
     } else {
       console.log('[SERVER] Could not extract postcode from address:', fullAddress);
     }
   } catch (error: any) {
     console.error('[SERVER] Error fetching Land Registry data:', error.message);
+    propertyData.landRegistry.pricePaid = 'Error fetching sales data';
   }
 
   console.log('[SERVER] fetchPropertyData is returning this property object:', JSON.stringify(propertyData, null, 2));
@@ -245,7 +248,7 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
 
 export type DebugInfo = {
   fullAddressUsed: string;
-  postcode: string;
+  postcode: string | null;
   landRegistryUrl: string;
   landRegistryRawResponse: any;
   error?: string;
@@ -253,18 +256,18 @@ export type DebugInfo = {
 
 export async function getDebugInfo(address: Address): Promise<DebugInfo> {
   const fullAddress = address.address;
-  const postcode = address.postcode;
+  const postcode = address.postcode || null;
 
   if (!fullAddress) {
     return {
       fullAddressUsed: 'No address provided',
-      postcode: '',
+      postcode: null,
       landRegistryUrl: '',
       landRegistryRawResponse: 'No address was provided to debug.',
       error: 'No address was provided.'
     };
   }
-
+  
   if (!postcode) {
     return {
       fullAddressUsed: fullAddress,
@@ -281,37 +284,14 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
     const response = await fetch(ppdUrl, { headers: FETCH_HEADERS });
     
     const responseText = await response.text();
-    
-    if (!responseText) {
-        if (response.status === 200) {
-            return {
-                fullAddressUsed: fullAddress,
-                postcode: postcode,
-                landRegistryUrl: ppdUrl,
-                landRegistryRawResponse: `API returned an empty response with status 200. This usually means the query was successful but no matching records were found in the public dataset (e.g., no sales since 1995, or a non-market sale).`,
-                error: `Empty response from Land Registry API with status code: ${response.status}.`
-            };
-        }
-        return {
-            fullAddressUsed: fullAddress,
-            postcode: postcode,
-            landRegistryUrl: ppdUrl,
-            landRegistryRawResponse: `API returned an empty response. Status: ${response.status}`,
-            error: `Empty response from Land Registry API with status code: ${response.status}.`
-        };
-    }
-    
-    let rawData;
+    let rawData: any = `Status: ${response.status}. Response Body: ${responseText}`;
+
     try {
+        // We try to parse it as JSON, if it fails, we use the raw text.
         rawData = JSON.parse(responseText);
-    } catch (e: any) {
-        return {
-            fullAddressUsed: fullAddress,
-            postcode: postcode,
-            landRegistryUrl: ppdUrl,
-            landRegistryRawResponse: `Failed to parse API response as JSON. Error: ${e.message}. Raw Response: ${responseText}`,
-            error: 'Could not parse non-JSON response from Land Registry API.'
-        };
+    } catch (e) {
+        console.log("Response was not JSON, showing raw text.");
+        // If parsing fails, rawData is already set to the text content.
     }
 
     if (!response.ok) {
@@ -336,8 +316,10 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
       fullAddressUsed: fullAddress,
       postcode: postcode,
       landRegistryUrl: ppdUrl,
-      landRegistryRawResponse: `An error occurred while fetching or parsing the Land Registry data. This often happens if the API returns a non-JSON response (like HTML). Error: ${e.message}`,
+      landRegistryRawResponse: `An error occurred while fetching the Land Registry data. Error: ${e.message}`,
       error: 'An unexpected error occurred in the debug action.'
     };
   }
 }
+
+    
