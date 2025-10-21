@@ -111,7 +111,7 @@ async function fetchPropertyData(address: Address): Promise<PropertyData> {
     pricePaid: r.pricePaid?.value,
     transactionDate: r.transactionDate?.value,
     estateType: r.estateType?.value,
-    addressString: r.addressString?.value,
+addressString: r.addressString?.value,
   }));
 
   const propertyData: PropertyData = {
@@ -240,6 +240,8 @@ export async function getDebugInfo(address: Address): Promise<DebugInfo> {
       ?addrURI lrcommon:postcode "${postcode}" ;
                lrcommon:street "${streetName}" ;
                lrcommon:address ?addressString .
+      
+      FILTER regex(str(?addressString), "${street.split(" ")[0]}", "i")
       
       ?estateTypeURI rdfs:label ?estateType .
     }
