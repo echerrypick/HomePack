@@ -47,7 +47,7 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
     const logs: string[] = [];
     const endpoint = "https://epc.opendatacommunities.org/api/v1/domestic/search";
     const url = `${endpoint}?postcode=${encodeURIComponent(address.postcode)}&address=${encodeURIComponent(address.street)}&size=1`;
-    // logs.push(`[EPC] Fetching from: ${url}`);
+    logs.push(`[EPC] Fetching from: ${url}`);
 
     try {
         const res = await fetch(url, {
@@ -55,12 +55,12 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
         });
 
         if (!res.ok) {
-            // logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
+            logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
             return { data: null, logs };
         }
 
         const data = await res.json();
-        // logs.push(`[EPC RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
+        logs.push(`[EPC RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
 
         if (data.rows && data.rows.length > 0) {
             const latestEpc = data.rows[0]; // API returns most recent first
@@ -70,15 +70,15 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
                 validUntil: latestEpc['valid-until'],
                 energyUse: latestEpc['energy-consumption-current'],
             };
-            // logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
+            logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
             return { data: formattedEpc, logs };
         } else {
-            // logs.push("[EPC] No EPC certificate found for this address.");
+            logs.push("[EPC] No EPC certificate found for this address.");
             return { data: null, logs };
         }
 
     } catch (err: any) {
-        // logs.push(`[EPC FATAL] Fetch error: ${err.message}`);
+        logs.push(`[EPC FATAL] Fetch error: ${err.message}`);
         console.error("❌ EPC fetch error:", err);
         return { data: null, logs };
     }
@@ -88,7 +88,7 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
 // --- API Calls ---
 export async function fetchPropertyData(address: Address): Promise<{data: PropertyData, logs: string[]}> {
   const logs: string[] = [];
-  // logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
+  logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
   
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
 

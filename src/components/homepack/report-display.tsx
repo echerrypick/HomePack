@@ -27,9 +27,9 @@ function DebugLogDisplay({ logs }: { logs: string[] }) {
         <Accordion type="single" collapsible className="w-full mt-4">
             <AccordionItem value="debug-log">
                 <AccordionTrigger>
-                    <div className="flex items-center gap-2 text-sm">
-                        {/* <BookCopy className="h-4 w-4" />
-                        <span>Show Fetch Log</span> */}
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <BookCopy className="h-4 w-4" />
+                        <span>Show Fetch Log</span>
                     </div>
                 </AccordionTrigger>
                 <AccordionContent>
@@ -42,9 +42,14 @@ function DebugLogDisplay({ logs }: { logs: string[] }) {
     )
 }
 
-function EpcDisplay({ epcData }: { epcData: EpcData }) {
+function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
     if (!epcData) {
-        return <DataItem label="EPC Details" value="Not available" />;
+        return (
+            <>
+                <DataItem label="EPC Details" value="Not available" />
+                <DebugLogDisplay logs={logs} />
+            </>
+        );
     }
 
     const epcValue = (7 - (epcData.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
@@ -64,6 +69,7 @@ function EpcDisplay({ epcData }: { epcData: EpcData }) {
             </div>
             <DataItem label="Valid Until" value={new Date(epcData.validUntil).toLocaleDateString()} />
             <DataItem label="Estimated Energy Use" value={`${epcData.energyUse} kWh/m²/yr`} />
+            <DebugLogDisplay logs={logs} />
         </>
     );
 }
@@ -146,11 +152,11 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
                   <DataItem label="Last Sold" value={"No recent sales data found"} />
                 </>
             )}
-            <DebugLogDisplay logs={logs} />
+            {/* <DebugLogDisplay logs={logs} /> */}
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">
-              <EpcDisplay epcData={epc} />
+              <EpcDisplay epcData={epc} logs={logs} />
           </DataSection>
           
           <DataSection icon={Waves} title="Flood Risk">
