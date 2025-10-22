@@ -124,14 +124,31 @@ function EpcDisplay({ epcData }: { epcData: EpcData }) {
     );
 }
 
-function FloodRiskDisplay({ floodRiskData }: { floodRiskData: FloodRiskData }) {
+function FloodRiskDisplay({ floodRiskData, logs }: { floodRiskData: FloodRiskData, logs: string[] }) {
     if (!floodRiskData) {
         return <DataItem label="Flood Risk" value="Data not available" />;
     }
+    const floodLogs = logs.filter(log => log.startsWith('[FLOOD'));
+
     return (
         <>
             <DataItem label="Rivers and Sea" value={floodRiskData.riverAndSea} />
             <DataItem label="Surface Water" value={floodRiskData.surfaceWater} />
+
+            {floodLogs.length > 0 && (
+                <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="log">
+                        <AccordionTrigger className="text-sm text-primary hover:underline">
+                            Show Fetch Log
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                                {floodLogs.join('\n')}
+                            </pre>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            )}
         </>
     );
 }
@@ -156,7 +173,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
 
   if (!reportData) return null;
 
-  const { propertyData, summary } = reportData;
+  const { propertyData, summary, logs } = reportData;
   const { landRegistry, epc, floodRisk } = propertyData;
   
 
@@ -224,7 +241,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           </DataSection>
           
           <DataSection icon={Waves} title="Flood Risk">
-            <FloodRiskDisplay floodRiskData={floodRisk} />
+            <FloodRiskDisplay floodRiskData={floodRisk} logs={logs} />
           </DataSection>
 
           <DataSection icon={ClipboardList} title="Planning History">
@@ -247,5 +264,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
     </div>
   );
 }
+
+    
 
     

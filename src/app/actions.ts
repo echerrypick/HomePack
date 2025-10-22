@@ -214,10 +214,10 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
 async function fetchFloodRiskData(address: Address): Promise<{ data: FloodRiskData | null, logs: string[] }> {
     const logs: string[] = [];
     const csvFilePath = path.join(process.cwd(), 'src/data/RoFRS_PostcodesAtRisk_v202501.csv');
-    // logs.push(`[FLOOD] Looking for CSV at: ${csvFilePath}`);
+    logs.push(`[FLOOD] Looking for CSV at: ${csvFilePath}`);
 
     if (!fs.existsSync(csvFilePath)) {
-        // logs.push(`[FLOOD ERROR] CSV file not found.`);
+        logs.push(`[FLOOD ERROR] CSV file not found.`);
         return { 
             data: {
                 postcode: address.postcode,
@@ -241,7 +241,7 @@ async function fetchFloodRiskData(address: Address): Promise<{ data: FloodRiskDa
                 }
             })
             .on('end', () => {
-                // logs.push(`[FLOOD] Loaded and filtered CSV.`);
+                logs.push(`[FLOOD] Loaded and filtered CSV.`);
                 if (results.length > 0) {
                     const match = results[0]; // Take the first match
                     const bandMap: { [key: string]: string } = {
@@ -254,15 +254,15 @@ async function fetchFloodRiskData(address: Address): Promise<{ data: FloodRiskDa
                         reservoir: 'N/A', // These fields are not in the postcode dataset
                         groundwater: 'N/A',
                     };
-                    // logs.push(`[FLOOD] Found risk for ${address.postcode}: ${JSON.stringify(formatted)}`);
+                    logs.push(`[FLOOD] Found risk for ${address.postcode}: ${JSON.stringify(formatted)}`);
                     resolve({ data: formatted, logs });
                 } else {
-                    // logs.push(`[FLOOD] No flood risk data found for postcode ${address.postcode}.`);
+                    logs.push(`[FLOOD] No flood risk data found for postcode ${address.postcode}.`);
                     resolve({ data: null, logs });
                 }
             })
             .on('error', (err) => {
-                // logs.push(`[FLOOD FATAL] CSV parsing error: ${err.message}`);
+                logs.push(`[FLOOD FATAL] CSV parsing error: ${err.message}`);
                 resolve({ data: null, logs });
             });
     });
@@ -381,11 +381,11 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 
   // --- Fetch EPC Data ---
   const { data: epcData, logs: epcLogs } = await fetchEpcData(address);
-  // logs.push(...epcLogs);
+  logs.push(...epcLogs);
 
   // --- Fetch Flood Risk Data ---
   const { data: floodRiskData, logs: floodLogs } = await fetchFloodRiskData(address);
-  // logs.push(...floodLogs);
+  logs.push(...floodLogs);
 
 
   const propertyData: PropertyData = {
@@ -585,5 +585,7 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
 
 
+
+    
 
     
