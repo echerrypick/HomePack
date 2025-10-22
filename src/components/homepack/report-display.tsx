@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Address, PropertyData, LandRegistryResult, EpcData } from '@/app/actions';
+import type { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList } from 'lucide-react';
 import { AiSummary } from './ai-summary';
@@ -124,6 +124,19 @@ function EpcDisplay({ epcData }: { epcData: EpcData }) {
     );
 }
 
+function FloodRiskDisplay({ floodRiskData }: { floodRiskData: FloodRiskData }) {
+    if (!floodRiskData) {
+        return <DataItem label="Flood Risk" value="Data not available" />;
+    }
+    return (
+        <>
+            <DataItem label="Rivers and Sea" value={floodRiskData.riverAndSea} />
+            <DataItem label="Surface Water" value={floodRiskData.surfaceWater} />
+        </>
+    );
+}
+
+
 export function ReportDisplay({ address, reportData, isLoading, onReset }: ReportDisplayProps) {
   const [conditionReport, setConditionReport] = useState<string | null>(null);
   const [isConditionReportLoading, setIsConditionReportLoading] = useState(false);
@@ -144,7 +157,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   if (!reportData) return null;
 
   const { propertyData, summary } = reportData;
-  const { landRegistry, epc } = propertyData;
+  const { landRegistry, epc, floodRisk } = propertyData;
   
 
   const getPrimaryTransaction = (results: LandRegistryResult[]) => {
@@ -211,8 +224,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           </DataSection>
           
           <DataSection icon={Waves} title="Flood Risk">
-            <DataItem label="Rivers and Sea" value={propertyData.floodRisk.riverAndSea} />
-            <DataItem label="Surface Water" value={propertyData.floodRisk.surfaceWater} />
+            <FloodRiskDisplay floodRiskData={floodRisk} />
           </DataSection>
 
           <DataSection icon={ClipboardList} title="Planning History">

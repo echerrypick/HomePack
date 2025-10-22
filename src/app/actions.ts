@@ -3,6 +3,10 @@
 
 import { config } from 'dotenv';
 config();
+import fs from 'fs';
+import path from 'path';
+import csv from 'csv-parser';
+
 
 import { generateAiSummary } from '@/ai/flows/generate-ai-summary';
 import { generateAiConditionReport } from '@/ai/flows/generate-ai-condition-report';
@@ -22,73 +26,79 @@ export type LandRegistryResult = {
 }
 
 export type EpcData = {
-  address1: string;
-  address2: string;
-  address3: string;
-  posttown: string;
-  county: string;
-  postcode: string;
-  lodgementDate: string;
-  inspectionDate: string;
-  rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-  potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-  propertyType: string;
-  tenure: string;
-  uprn: string;
-  buildingReferenceNumber: string;
-  constructionAgeBand: string;
-  localAuthorityLabel: string;
-  totalFloorArea: string;
-  mainheatcontDescription: string;
-  reportType: string;
-  energyTariff: string;
-  mechanicalVentilation: string;
-  co2EmissCurrPerFloorArea: string;
-  mainsGasFlag: string;
-  constituencyLabel: string;
-  mainFuel: string;
-  lightingDescription: string;
-  multiGlazeProportion: string;
-  mainHeatingControls: string;
-  secondheatDescription: string;
-  transactionType: string;
-  lowEnergyLighting: string;
-  hotwaterDescription: string;
-  builtForm: string;
-  currentEnergyEfficiency: string;
-  potentialEnergyEfficiency: string;
-  mainHeatDescription: string;
-  wallsDescription: string;
-  roofDescription: string;
-  windowsDescription: string;
-  co2EmissionsCurrent: string;
-  co2EmissionsPotential: string;
-  heatingCostCurrent: string;
-  heatingCostPotential: string;
-  hotWaterCostCurrent: string;
-  hotWaterCostPotential: string;
-  lightingCostCurrent: string;
-  lightingCostPotential: string;
-  energyConsumptionCurrent: string;
-  energyConsumptionPotential: string;
-  floorDescription: string;
-  roofEnergyEff: string;
-  windowsEnergyEff: string;
-  wallsEnergyEff: string;
-  hotWaterEnergyEff: string;
-  lightingEnergyEff: string;
-  numberHabitableRooms: string;
-  numberHeatedRooms: string;
-} | null;
+    address1: string;
+    address2: string;
+    address3: string;
+    posttown: string;
+    postcode: string;
+    county: string;
+    lodgementDate: string;
+    inspectionDate: string;
+    rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+    potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+    propertyType: string;
+    tenure: string;
+    uprn: string;
+    buildingReferenceNumber: string;
+    constructionAgeBand: string;
+    localAuthorityLabel: string;
+    totalFloorArea: string;
+    mainheatcontDescription: string;
+    reportType: string;
+    energyTariff: string;
+    mechanicalVentilation: string;
+    co2EmissCurrPerFloorArea: string;
+    mainsGasFlag: string;
+    constituencyLabel: string;
+    mainFuel: string;
+    lightingDescription: string;
+    multiGlazeProportion: string;
+    mainHeatingControls: string;
+    secondheatDescription: string;
+    transactionType: string;
+    lowEnergyLighting: string;
+    hotwaterDescription: string;
+    builtForm: string;
+    currentEnergyEfficiency: string;
+    potentialEnergyEfficiency: string;
+    mainHeatDescription: string;
+    wallsDescription: string;
+    roofDescription: string;
+    windowsDescription: string;
+    co2EmissionsCurrent: string;
+    co2EmissionsPotential: string;
+    heatingCostCurrent: string;
+    heatingCostPotential: string;
+    hotWaterCostCurrent: string;
+    hotWaterCostPotential: string;
+    lightingCostCurrent: string;
+    lightingCostPotential: string;
+    energyConsumptionCurrent: string;
+    energyConsumptionPotential: string;
+    floorDescription: string;
+    roofEnergyEff: string;
+    windowsEnergyEff: string;
+    wallsEnergyEff: string;
+    hotWaterEnergyEff: string;
+    lightingEnergyEff: string;
+    numberHabitableRooms: string;
+    numberHeatedRooms: string;
+  } | null;
+
+  export type FloodRiskData = {
+    postcode: string;
+    riverAndSea: string;
+    surfaceWater: string;
+    reservoir: string;
+    groundwater: string;
+  } | null;
+  
 
 export type PropertyData = {
   address: string;
   landRegistry: LandRegistryResult[];
   epc: EpcData;
-  floodRisk: {
-    riverAndSea: string;
-    surfaceWater: string;
-  };
+  floodRisk: FloodRiskData;
   planningHistory: {
     application: string;
     decision: string;
@@ -199,6 +209,63 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
         console.error("❌ EPC fetch error:", err);
         return { data: null, logs };
     }
+}
+
+async function fetchFloodRiskData(address: Address): Promise<{ data: FloodRiskData | null, logs: string[] }> {
+    const logs: string[] = [];
+    const csvFilePath = path.join(process.cwd(), 'src/data/RoFRS_Postcodes_in_Flood_Risk_Areas.csv');
+    // logs.push(`[FLOOD] Looking for CSV at: ${csvFilePath}`);
+
+    if (!fs.existsSync(csvFilePath)) {
+        // logs.push(`[FLOOD ERROR] CSV file not found.`);
+        return { 
+            data: {
+                postcode: address.postcode,
+                riverAndSea: 'File Not Found',
+                surfaceWater: 'File Not Found',
+                reservoir: 'File Not Found',
+                groundwater: 'File Not Found',
+            },
+            logs 
+        };
+    }
+
+    const results: any[] = [];
+    
+    return new Promise((resolve) => {
+        fs.createReadStream(csvFilePath)
+            .pipe(csv())
+            .on('data', (row) => {
+                if (row.POSTCODE === address.postcode.replace(/\s/g, '')) {
+                    results.push(row);
+                }
+            })
+            .on('end', () => {
+                // logs.push(`[FLOOD] Loaded and filtered CSV.`);
+                if (results.length > 0) {
+                    const match = results[0]; // Take the first match
+                    const bandMap: { [key: string]: string } = {
+                        'H': 'High', 'M': 'Medium', 'L': 'Low', 'V': 'Very Low', 'N': 'None'
+                    };
+                    const formatted: FloodRiskData = {
+                        postcode: address.postcode,
+                        riverAndSea: bandMap[match.RIVERSEA_BAND] || 'Unknown',
+                        surfaceWater: bandMap[match.SURFACE_WATER_BAND] || 'Unknown',
+                        reservoir: 'N/A', // These fields are not in the postcode dataset
+                        groundwater: 'N/A',
+                    };
+                    // logs.push(`[FLOOD] Found risk for ${address.postcode}: ${JSON.stringify(formatted)}`);
+                    resolve({ data: formatted, logs });
+                } else {
+                    // logs.push(`[FLOOD] No flood risk data found for postcode ${address.postcode}.`);
+                    resolve({ data: null, logs });
+                }
+            })
+            .on('error', (err) => {
+                // logs.push(`[FLOOD FATAL] CSV parsing error: ${err.message}`);
+                resolve({ data: null, logs });
+            });
+    });
 }
 
 
@@ -316,14 +383,16 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   const { data: epcData, logs: epcLogs } = await fetchEpcData(address);
   logs.push(...epcLogs);
 
+  // --- Fetch Flood Risk Data ---
+  const { data: floodRiskData, logs: floodLogs } = await fetchFloodRiskData(address);
+  logs.push(...floodLogs);
+
+
   const propertyData: PropertyData = {
     address: formattedResults.length > 0 ? formattedResults[0].addressString : `${address.street}, ${address.town}, ${address.postcode}`,
     landRegistry: formattedResults,
     epc: epcData,
-    floodRisk: {
-      riverAndSea: 'Low',
-      surfaceWater: 'Very Low',
-    },
+    floodRisk: floodRiskData,
     planningHistory: [
       { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
     ],
