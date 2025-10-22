@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import type { Address, PropertyData, LandRegistryResult, EpcData } from '@/app/actions';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, BookCopy } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList } from 'lucide-react';
 import { AiSummary } from './ai-summary';
 import { ImageUploader } from './image-uploader';
 import { AiConditionReport } from './ai-condition-report';
@@ -14,6 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Separator } from '@/components/ui/separator';
 import { epcTooltips } from '@/lib/epc-tooltips';
 
+
 type ReportDisplayProps = {
   address: Address;
   reportData: { propertyData: PropertyData; summary: string; logs: string[], error?: string } | null;
@@ -21,29 +22,8 @@ type ReportDisplayProps = {
   onReset: () => void;
 };
 
-function DebugLogDisplay({ logs }: { logs: string[] }) {
-    if (!logs || logs.length === 0) return null;
 
-    return (
-        <Accordion type="single" collapsible className="w-full mt-4">
-            <AccordionItem value="debug-log">
-                <AccordionTrigger>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <BookCopy className="h-4 w-4" />
-                        <span>Show Fetch Log</span>
-                    </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                    <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
-                        {logs.join('\n')}
-                    </pre>
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
-    )
-}
-
-function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
+function EpcDisplay({ epcData }: { epcData: EpcData }) {
     if (!epcData) {
         return (
             <>
@@ -163,7 +143,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
 
   if (!reportData) return null;
 
-  const { propertyData, summary, logs } = reportData;
+  const { propertyData, summary } = reportData;
   const { landRegistry, epc } = propertyData;
   
 
@@ -227,7 +207,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">
-              <EpcDisplay epcData={epc} logs={logs} />
+              <EpcDisplay epcData={epc} />
           </DataSection>
           
           <DataSection icon={Waves} title="Flood Risk">
@@ -255,3 +235,5 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
     </div>
   );
 }
+
+    
