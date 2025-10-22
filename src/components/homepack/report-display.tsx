@@ -125,15 +125,36 @@ function EpcDisplay({ epcData }: { epcData: EpcData }) {
 }
 
 function FloodRiskDisplay({ floodRiskData, logs }: { floodRiskData: FloodRiskData, logs: string[] }) {
-    if (!floodRiskData) {
-        return <DataItem label="Flood Risk" value="Data not available" />;
-    }
     const floodLogs = logs.filter(log => log.startsWith('[FLOOD'));
 
+    if (!floodRiskData) {
+        return (
+            <>
+                <DataItem label="Flood Risk" value="Data not available" />
+                {floodLogs.length > 0 && (
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="log">
+                            <AccordionTrigger className="text-sm text-primary hover:underline">
+                                Show Fetch Log
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                                    {floodLogs.join('\n')}
+                                </pre>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                )}
+            </>
+        );
+    }
+    
     return (
         <>
             <DataItem label="Rivers and Sea" value={floodRiskData.riverAndSea} />
             <DataItem label="Surface Water" value={floodRiskData.surfaceWater} />
+            <DataItem label="Reservoir" value={floodRiskData.reservoir} />
+            <DataItem label="Groundwater" value={floodRiskData.groundwater} />
 
             {floodLogs.length > 0 && (
                 <Accordion type="single" collapsible className="w-full">
