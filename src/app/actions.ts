@@ -213,7 +213,7 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
 
 async function fetchFloodRiskData(address: Address): Promise<{ data: FloodRiskData | null, logs: string[] }> {
     const logs: string[] = [];
-    const csvFilePath = path.join(process.cwd(), 'src/data/RoFRS_Postcodes_in_Flood_Risk_Areas.csv');
+    const csvFilePath = path.join(process.cwd(), 'src/data/RoFRS_PostcodesAtRisk_v202501.csv');
     // logs.push(`[FLOOD] Looking for CSV at: ${csvFilePath}`);
 
     if (!fs.existsSync(csvFilePath)) {
@@ -381,11 +381,11 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 
   // --- Fetch EPC Data ---
   const { data: epcData, logs: epcLogs } = await fetchEpcData(address);
-  logs.push(...epcLogs);
+  // logs.push(...epcLogs);
 
   // --- Fetch Flood Risk Data ---
   const { data: floodRiskData, logs: floodLogs } = await fetchFloodRiskData(address);
-  logs.push(...floodLogs);
+  // logs.push(...floodLogs);
 
 
   const propertyData: PropertyData = {
