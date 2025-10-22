@@ -86,11 +86,11 @@ export type EpcData = {
   } | null;
 
   export type FloodRiskData = {
-    postcode: string;
-    riverAndSea: string;
-    surfaceWater: string;
-    reservoir: string;
-    groundwater: string;
+    uprn: string;
+    riskOfFloodingFromRiversAndSea: string;
+    riskOfFloodingFromSurfaceWater: string;
+    riskOfFloodingFromReservoirs: string;
+    riskOfFloodingFromGroundwater: string;
   } | null;
   
 
@@ -211,20 +211,25 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
     }
 }
 
-async function fetchFloodRiskData(address: Address): Promise<{ data: FloodRiskData | null, logs: string[] }> {
+async function fetchFloodRiskData(uprn: string): Promise<{ data: FloodRiskData | null, logs: string[] }> {
     const logs: string[] = [];
-    const csvFilePath = path.join(process.cwd(), 'src/data/RoFRS_PostcodesAtRisk_v202501.csv');
-    logs.push(`[FLOOD] Looking for CSV at: ${csvFilePath}`);
+    const csvFilePath = path.join(process.cwd(), 'src/data/RoFRS_PropertiesAtRisk_v202501.csv');
+    logs.push(`[FLOOD] Looking for property-level CSV at: ${csvFilePath}`);
+
+    if (!uprn) {
+        logs.push(`[FLOOD ERROR] No UPRN provided. Cannot perform property-level flood risk lookup.`);
+        return { data: null, logs };
+    }
 
     if (!fs.existsSync(csvFilePath)) {
         logs.push(`[FLOOD ERROR] CSV file not found.`);
         return { 
             data: {
-                postcode: address.postcode,
-                riverAndSea: 'File Not Found',
-                surfaceWater: 'File Not Found',
-                reservoir: 'File Not Found',
-                groundwater: 'File Not Found',
+                uprn: uprn,
+                riskOfFloodingFromRiversAndSea: 'File Not Found',
+                riskOfFloodingFromSurfaceWater: 'File Not Found',
+                riskOfFloodingFromReservoirs: 'File Not Found',
+                riskOfFloodingFromGroundwater: 'File Not Found',
             },
             logs 
         };
@@ -236,28 +241,28 @@ async function fetchFloodRiskData(address: Address): Promise<{ data: FloodRiskDa
         fs.createReadStream(csvFilePath)
             .pipe(csv())
             .on('data', (row) => {
-                if (row.POSTCODE === address.postcode.replace(/\s/g, '')) {
+                if (row.UPRN === uprn) {
                     results.push(row);
                 }
             })
             .on('end', () => {
-                logs.push(`[FLOOD] Loaded and filtered CSV.`);
+                logs.push(`[FLOOD] Loaded and filtered CSV by UPRN: ${uprn}.`);
                 if (results.length > 0) {
                     const match = results[0]; // Take the first match
                     const bandMap: { [key: string]: string } = {
-                        'H': 'High', 'M': 'Medium', 'L': 'Low', 'V': 'Very Low', 'N': 'None'
+                        'High': 'High', 'Medium': 'Medium', 'Low': 'Low', 'Very Low': 'Very Low'
                     };
                     const formatted: FloodRiskData = {
-                        postcode: address.postcode,
-                        riverAndSea: bandMap[match.RIVERSEA_BAND] || 'Unknown',
-                        surfaceWater: bandMap[match.SURFACE_WATER_BAND] || 'Unknown',
-                        reservoir: 'N/A', // These fields are not in the postcode dataset
-                        groundwater: 'N/A',
+                        uprn: uprn,
+                        riskOfFloodingFromRiversAndSea: bandMap[match.prob_4_categories] || 'Unknown',
+                        riskOfFloodingFromSurfaceWater: 'N/A', // Update if column exists
+                        riskOfFloodingFromReservoirs: 'N/A', // Update if column exists
+                        riskOfFloodingFromGroundwater: 'N/A', // Update if column exists
                     };
-                    logs.push(`[FLOOD] Found risk for ${address.postcode}: ${JSON.stringify(formatted)}`);
+                    logs.push(`[FLOOD] Found risk for UPRN ${uprn}: ${JSON.stringify(formatted)}`);
                     resolve({ data: formatted, logs });
                 } else {
-                    logs.push(`[FLOOD] No flood risk data found for postcode ${address.postcode}.`);
+                    logs.push(`[FLOOD] No flood risk data found for UPRN ${uprn}.`);
                     resolve({ data: null, logs });
                 }
             })
@@ -384,7 +389,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   logs.push(...epcLogs);
 
   // --- Fetch Flood Risk Data ---
-  const { data: floodRiskData, logs: floodLogs } = await fetchFloodRiskData(address);
+  const { data: floodRiskData, logs: floodLogs } = await fetchFloodRiskData(epcData?.uprn || '');
   logs.push(...floodLogs);
 
 

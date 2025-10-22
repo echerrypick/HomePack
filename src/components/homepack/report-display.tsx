@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState } from 'react';
@@ -151,10 +152,10 @@ function FloodRiskDisplay({ floodRiskData, logs }: { floodRiskData: FloodRiskDat
     
     return (
         <>
-            <DataItem label="Rivers and Sea" value={floodRiskData.riverAndSea} />
-            <DataItem label="Surface Water" value={floodRiskData.surfaceWater} />
-            <DataItem label="Reservoir" value={floodRiskData.reservoir} />
-            <DataItem label="Groundwater" value={floodRiskData.groundwater} />
+            <DataItem label="Rivers and Sea" value={floodRiskData.riskOfFloodingFromRiversAndSea} />
+            <DataItem label="Surface Water" value={floodRiskData.riskOfFloodingFromSurfaceWater} />
+            <DataItem label="Reservoir" value={floodRiskData.riskOfFloodingFromReservoirs} />
+            <DataItem label="Groundwater" value={floodRiskData.riskOfFloodingFromGroundwater} />
 
             {floodLogs.length > 0 && (
                 <Accordion type="single" collapsible className="w-full">
@@ -289,3 +290,4 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
     
 
     
+
