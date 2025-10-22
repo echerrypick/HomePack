@@ -27,6 +27,7 @@ export type EpcData = {
   address3: string;
   posttown: string;
   county: string;
+  postcode: string;
   lodgementDate: string;
   inspectionDate: string;
   rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
@@ -99,7 +100,7 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
     const logs: string[] = [];
     const endpoint = "https://epc.opendatacommunities.org/api/v1/domestic/search";
     const url = `${endpoint}?postcode=${encodeURIComponent(address.postcode)}&address=${encodeURIComponent(address.street)}&size=1`;
-    logs.push(`[EPC] Fetching from: ${url}`);
+    // logs.push(`[EPC] Fetching from: ${url}`);
     
     const headers: HeadersInit = {
         "Accept": "application/json",
@@ -107,23 +108,23 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
 
     if (process.env.EPC_ENCODED_TOKEN) {
         headers["Authorization"] = `Basic ${process.env.EPC_ENCODED_TOKEN}`;
-        logs.push("[EPC] Using Basic authentication with encoded token.");
+        // logs.push("[EPC] Using Basic authentication with encoded token.");
     } else {
-        logs.push("[EPC] No API credentials found, making unauthenticated request.");
+        // logs.push("[EPC] No API credentials found, making unauthenticated request.");
     }
 
     try {
         const res = await fetch(url, { headers });
 
         if (!res.ok) {
-            logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
+            // logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
             const errorText = await res.text();
-            logs.push(`[EPC ERROR] Response: ${errorText}`);
+            // logs.push(`[EPC ERROR] Response: ${errorText}`);
             return { data: null, logs };
         }
 
         const data = await res.json();
-        logs.push(`[EPC RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
+        // logs.push(`[EPC RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
 
         if (data.rows && data.rows.length > 0) {
             const latestEpc = data.rows[0]; // API returns most recent first
@@ -132,6 +133,7 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
                 address2: latestEpc['address2'],
                 address3: latestEpc['address3'],
                 posttown: latestEpc['posttown'],
+                postcode: latestEpc['postcode'],
                 county: latestEpc['county'],
                 lodgementDate: latestEpc['lodgement-date'],
                 inspectionDate: latestEpc['inspection-date'],
@@ -185,15 +187,15 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
                 numberHabitableRooms: latestEpc['number-habitable-rooms'],
                 numberHeatedRooms: latestEpc['number-heated-rooms'],
             };
-            logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
+            // logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
             return { data: formattedEpc, logs };
         } else {
-            logs.push("[EPC] No EPC certificate found for this address.");
+            // logs.push("[EPC] No EPC certificate found for this address.");
             return { data: null, logs };
         }
 
     } catch (err: any) {
-        logs.push(`[EPC FATAL] Fetch error: ${err.message}`);
+        // logs.push(`[EPC FATAL] Fetch error: ${err.message}`);
         console.error("❌ EPC fetch error:", err);
         return { data: null, logs };
     }
@@ -509,6 +511,7 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
+
 
 
 

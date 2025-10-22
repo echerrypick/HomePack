@@ -48,7 +48,6 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
         return (
             <>
                 <DataItem label="EPC Details" value="Not available" />
-                <DebugLogDisplay logs={logs} />
             </>
         );
     }
@@ -141,7 +140,6 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
               </AccordionItem>
             </Accordion>
             
-            <DebugLogDisplay logs={logs} />
         </>
     );
 }
