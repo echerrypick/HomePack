@@ -1,6 +1,7 @@
 
 
 
+
 'use client';
 
 import { useState } from 'react';
@@ -129,6 +130,8 @@ function EpcDisplay({ epcData }: { epcData: EpcData }) {
 function FloodRiskDisplay({ floodRiskData, logs }: { floodRiskData: FloodRiskData, logs: string[] }) {
     const floodLogs = logs.filter(log => log.startsWith('[FLOOD'));
 
+    const isNullOrEmpty = (value: string | undefined | null) => value === null || value === undefined || value.trim() === '' || value.toLowerCase() === 'null';
+
     if (!floodRiskData) {
         return (
             <>
@@ -154,8 +157,13 @@ function FloodRiskDisplay({ floodRiskData, logs }: { floodRiskData: FloodRiskDat
     return (
         <>
             <DataItem label="Risk from Rivers and Sea" value={floodRiskData.riskOfFloodingFromRiversAndSea} tooltip={dataTooltips.PROB_4BAND} />
-            <DataItem label="Data Suitability" value={floodRiskData.suitability} tooltip={dataTooltips.SUITABILITY} />
-            <DataItem label="Publication Date" value={new Date(floodRiskData.publishDate).toLocaleDateString()} tooltip={dataTooltips.PUB_DATE} />
+            <DataItem label="Data Suitability" value={isNullOrEmpty(floodRiskData.suitability) ? ' - ' : floodRiskData.suitability} tooltip={dataTooltips.SUITABILITY} />
+            <DataItem label="Publication Date" value={isNullOrEmpty(floodRiskData.publishDate) ? ' - ' : new Date(floodRiskData.publishDate).toLocaleDateString()} tooltip={dataTooltips.PUB_DATE} />
+             <Separator className="my-2" />
+             <DataItem label="Easting" value={floodRiskData.easting} tooltip={dataTooltips.easting} />
+            <DataItem label="Northing" value={floodRiskData.northing} tooltip={dataTooltips.northing} />
+            <DataItem label="Latitude" value={floodRiskData.latitude} tooltip={dataTooltips.latitude} />
+            <DataItem label="Longitude" value={floodRiskData.longitude} tooltip={dataTooltips.longitude} />
 
             {floodLogs.length > 0 && (
                 <Accordion type="single" collapsible className="w-full">
@@ -290,5 +298,6 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
     
 
     
+
 
 

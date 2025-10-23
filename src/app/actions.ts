@@ -91,6 +91,10 @@ export type EpcData = {
     riskOfFloodingFromRiversAndSea: string;
     suitability: string;
     publishDate: string;
+    easting: string;
+    northing: string;
+    latitude: string;
+    longitude: string;
   } | null;
   
 
@@ -293,6 +297,10 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
                         riskOfFloodingFromRiversAndSea: match.PROB_4BAND || 'Unknown',
                         suitability: match.SUITABILITY || 'Unknown',
                         publishDate: match.PUB_DATE || 'Unknown',
+                        easting: match.easting || 'Unknown',
+                        northing: match.northing || 'Unknown',
+                        latitude: match.latitude || 'Unknown',
+                        longitude: match.longitude || 'Unknown',
                     };
                     logs.push(`[FLOOD] Found risk for postcode ${postcode}: ${JSON.stringify(formatted)}`);
                     resolve({ data: formatted, logs });
@@ -630,6 +638,7 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
     
 
     
+
 
 
 

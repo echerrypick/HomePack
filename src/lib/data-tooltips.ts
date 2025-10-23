@@ -52,4 +52,8 @@ export const dataTooltips: Record<string, string> = {
   PROB_4BAND: 'Likelihood of flooding from rivers and sea. High: >3.3%, Medium: 1%-3.3%, Low: 0.1%-1%, Very Low: <0.1%.',
   SUITABILITY: 'The scale at which it is suitable to use the likelihood information.',
   PUB_DATE: 'Date (financial quarter) of publication of the flood risk data.',
+  easting: 'Along with northing defines the point within the postcode used to match a flood risk area.',
+  northing: 'Along with easting defines the point within the postcode used to match a flood risk area.',
+  latitude: 'Along with longitude defines the point within the postcode used to match a flood risk area.',
+  longitude: 'Along with latitude defines the point within the postcode used to match a flood risk area.',
 };
