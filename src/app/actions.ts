@@ -222,7 +222,7 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
     }
 
     if (!fs.existsSync(csvFilePath)) {
-        logs.push(`[FLOOD ERROR] CSV file not found.`);
+        logs.push(`[FLOOD ERROR] CSV file not found at path: ${csvFilePath}`);
         return { data: null, logs };
     }
 
@@ -232,32 +232,53 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
         fs.createReadStream(csvFilePath)
             .pipe(csv())
             .on('data', (row) => {
-                if (row.postcode) {
-                    results.push(row);
-                }
+                results.push(row);
             })
             .on('end', () => {
                 logs.push(`[FLOOD] Loaded ${results.length} rows from CSV.`);
                 
                 const normalizedPostcode = postcode.replace(/\s+/g, '').toLowerCase();
-                logs.push(`[FLOOD] Searching for normalized postcode: ${normalizedPostcode}`);
+                logs.push(`[FLOOD] Searching for normalized input postcode: "${normalizedPostcode}"`);
+                logs.push(`[FLOOD] First 3 rows from CSV for inspection: ${JSON.stringify(results.slice(0, 3), null, 2)}`);
+
                 
                 // Pass 1: Exact match
-                let match = results.find(row => row.postcode.replace(/\s+/g, '').toLowerCase() === normalizedPostcode);
+                let match = results.find(row => {
+                    if (row.postcode) {
+                        const rowPostcode = row.postcode.replace(/\s+/g, '').toLowerCase();
+                        return rowPostcode === normalizedPostcode;
+                    }
+                    return false;
+                });
                 
                 if (match) {
                     logs.push(`[FLOOD] Found exact match for postcode ${postcode}.`);
                 } else {
                     // Pass 2: Wildcard match
                     logs.push(`[FLOOD] No exact match found. Searching for wildcard match.`);
+                    
+                    let sampleComparisons: string[] = [];
+                    let hasChecked = false;
+
                     match = results.find(row => {
-                        if (row.postcode.includes('*')) {
+                        if (row.postcode && row.postcode.includes('*')) {
                             const normalizedRowPostcode = row.postcode.replace(/\s+/g, '').toLowerCase();
                             const prefix = normalizedRowPostcode.replace('*', '');
+                            
+                            if(!hasChecked && sampleComparisons.length < 5) {
+                                sampleComparisons.push(`Comparing: input "${normalizedPostcode}" with prefix "${prefix}"`);
+                            }
+
                             return normalizedPostcode.startsWith(prefix);
                         }
                         return false;
                     });
+
+                    if (sampleComparisons.length > 0) {
+                        logs.push(`[FLOOD] Sample wildcard comparisons:\n${sampleComparisons.join('\n')}`);
+                    }
+
+
                     if (match) {
                         logs.push(`[FLOOD] Found wildcard match for postcode ${postcode} with rule ${match.postcode}.`);
                     }
@@ -273,7 +294,7 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
                     logs.push(`[FLOOD] Found risk for postcode ${postcode}: ${JSON.stringify(formatted)}`);
                     resolve({ data: formatted, logs });
                 } else {
-                    logs.push(`[FLOOD] No flood risk data found for postcode ${postcode}.`);
+                    logs.push(`[FLOOD] No flood risk data found for postcode ${postcode}. Searched ${results.length} records.`);
                     resolve({ data: null, logs });
                 }
             })
@@ -606,6 +627,7 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
     
 
     
+
 
 
 
