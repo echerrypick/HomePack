@@ -328,8 +328,16 @@ async function fetchPlanningHistory(uprn: string): Promise<{ data: PlanningHisto
         return { data: [], logs };
     }
 
+    let q = uprn;
+    if (/^\d{12}$/.test(uprn)) {
+      const year = uprn.substring(0, 2);
+      const rest = uprn.substring(2);
+      const formattedRef = `${year}/${rest}`;
+      q = `${uprn},${formattedRef}`;
+    }
+
     const endpoint = 'https://www.planning.data.gov.uk/entity.json';
-    const url = `${endpoint}?dataset=planning-application&limit=100&q=${uprn}`;
+    const url = `${endpoint}?dataset=planning-application&limit=100&q=${q}`;
     logs.push(`[PLANNING] Fetching from: ${url}`);
 
     try {
