@@ -332,8 +332,7 @@ async function fetchPlanningHistory(uprn: string): Promise<{ data: PlanningHisto
     if (/^\d{12}$/.test(uprn)) {
       const year = uprn.substring(0, 2);
       const rest = uprn.substring(2);
-      const formattedRef = `${year}/${rest}`;
-      q = `${uprn},${formattedRef}`;
+      q = `${year}/${rest}`;
     }
 
     const endpoint = 'https://www.planning.data.gov.uk/entity.json';
