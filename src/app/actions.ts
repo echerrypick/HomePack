@@ -351,9 +351,9 @@ async function fetchPlanningHistory(uprn: string): Promise<{ data: PlanningHisto
         }
 
         const formattedData: PlanningHistoryItem[] = rawData.entities.map((entity: any) => ({
-            application: entity.name || 'No description available',
+            application: entity.description || entity.name || 'No description available',
             decision: entity['planning-application-status'] || 'Unknown',
-            date: entity['start-date'] ? new Date(entity['start-date']).toLocaleDateString() : 'Unknown',
+            date: entity['decision-date'] ? new Date(entity['decision-date']).toLocaleDateString() : (entity['start-date'] ? new Date(entity['start-date']).toLocaleDateString() : 'Unknown'),
             reference: entity.reference || 'N/A',
             url: `https://www.planning.data.gov.uk/entity/${entity.entity}`
         }));
