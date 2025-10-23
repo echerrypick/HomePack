@@ -1,5 +1,3 @@
-
-
 'use server';
 
 import { config } from 'dotenv';
@@ -118,7 +116,7 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
     const logs: string[] = [];
     const endpoint = "https://epc.opendatacommunities.org/api/v1/domestic/search";
     const url = `${endpoint}?postcode=${encodeURIComponent(address.postcode)}&address=${encodeURIComponent(address.street)}&size=1`;
-    // logs.push(`[EPC] Fetching from: ${url}`);
+    logs.push(`[EPC] Fetching from: ${url}`);
     
     const headers: HeadersInit = {
         "Accept": "application/json",
@@ -126,23 +124,23 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
 
     if (process.env.EPC_ENCODED_TOKEN) {
         headers["Authorization"] = `Basic ${process.env.EPC_ENCODED_TOKEN}`;
-        // logs.push("[EPC] Using Basic authentication with encoded token.");
+        logs.push("[EPC] Using Basic authentication with encoded token.");
     } else {
-        // logs.push("[EPC] No API credentials found, making unauthenticated request.");
+        logs.push("[EPC] No API credentials found, making unauthenticated request.");
     }
 
     try {
         const res = await fetch(url, { headers });
 
         if (!res.ok) {
-            // logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
+            logs.push(`[EPC ERROR] API request failed with status: ${res.status}`);
             const errorText = await res.text();
-            // logs.push(`[EPC ERROR] Response: ${errorText}`);
+            logs.push(`[EPC ERROR] Response: ${errorText}`);
             return { data: null, logs };
         }
 
         const data = await res.json();
-        // logs.push(`[EPC RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
+        logs.push(`[EPC RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
 
         if (data.rows && data.rows.length > 0) {
             const latestEpc = data.rows[0]; // API returns most recent first
@@ -205,15 +203,15 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
                 numberHabitableRooms: latestEpc['number-habitable-rooms'],
                 numberHeatedRooms: latestEpc['number-heated-rooms'],
             };
-            // logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
+            logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
             return { data: formattedEpc, logs };
         } else {
-            // logs.push("[EPC] No EPC certificate found for this address.");
+            logs.push("[EPC] No EPC certificate found for this address.");
             return { data: null, logs };
         }
 
     } catch (err: any) {
-        // logs.push(`[EPC FATAL] Fetch error: ${err.message}`);
+        logs.push(`[EPC FATAL] Fetch error: ${err.message}`);
         console.error("❌ EPC fetch error:", err);
         return { data: null, logs };
     }
@@ -372,7 +370,7 @@ async function fetchPlanningHistory(uprn: string): Promise<{ data: PlanningHisto
 // --- API Calls ---
 export async function fetchPropertyData(address: Address): Promise<{data: PropertyData, logs: string[]}> {
   const logs: string[] = [];
-  // logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
+  logs.push(`[START] Fetching data for: ${address.street}, ${address.town}, ${address.postcode}`);
   
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
 
@@ -392,7 +390,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 
   // Helper to safely send SPARQL queries
   async function sendQuery(sparqlQuery: string) {
-    // logs.push(`[QUERY] Sending SPARQL query:\n${sparqlQuery}`);
+    logs.push(`[QUERY] Sending SPARQL query:\n${sparqlQuery}`);
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -405,14 +403,14 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 
       if (!res.ok) {
         const errorText = await res.text();
-        // logs.push(`[ERROR] Land Registry request failed: ${res.status}. Response: ${errorText}`);
+        logs.push(`[ERROR] Land Registry request failed: ${res.status}. Response: ${errorText}`);
         throw new Error(`Land Registry request failed: ${res.status}`);
       }
       const data = await res.json();
-      // logs.push(`[RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
+      logs.push(`[RESPONSE] Raw JSON response:\n${JSON.stringify(data, null, 2)}`);
       return data.results?.bindings || [];
     } catch (err: any) {
-      // logs.push(`[FATAL] SPARQL fetch error: ${err.message}`);
+      logs.push(`[FATAL] SPARQL fetch error: ${err.message}`);
       console.error("❌ SPARQL fetch error:", err);
       return [];
     }
@@ -453,7 +451,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     `;
   }
   
-  // logs.push('[ATTEMPT] Querying with component regex filters.');
+  logs.push('[ATTEMPT] Querying with component regex filters.');
   const landRegistryResults = await sendQuery(makeQuery());
 
   // --- Format result ---
@@ -477,7 +475,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     }
   });
 
-  // logs.push(`[FORMAT] Formatted ${formattedResults.length} results.`);
+  logs.push(`[FORMAT] Formatted ${formattedResults.length} results.`);
 
   // --- Fetch EPC Data ---
   const { data: epcData, logs: epcLogs } = await fetchEpcData(address);
@@ -500,7 +498,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
     planningHistory: planningData,
   };
 
-  // logs.push(`[END] Returning property data object.`);
+  logs.push(`[END] Returning property data object.`);
   return { data: propertyData, logs };
 }
 
@@ -509,18 +507,18 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
 // --- Main Server Actions ---
 
 export async function getPropertyReport(address: Address): Promise<{ propertyData: PropertyData, summary: string, logs: string[], error?: string }> {
-  // console.log(`[SERVER] getPropertyReport called for: ${address.street}, ${address.postcode}`);
+  console.log(`[SERVER] getPropertyReport called for: ${address.street}, ${address.postcode}`);
   
   const { data: propertyData, logs } = await fetchPropertyData(address);
   
-  // console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
+  console.log('[SERVER] Data received from fetchPropertyData inside getPropertyReport:', JSON.stringify(propertyData, null, 2));
 
   try {
     const summaryResult = await generateAiSummary({
       propertyData: JSON.stringify(propertyData, null, 2),
     });
     
-    // console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
+    console.log('[SERVER] getPropertyReport is returning SUCCESS with updated data.');
     return {
       propertyData: propertyData,
       summary: summaryResult.summary,
@@ -528,7 +526,7 @@ export async function getPropertyReport(address: Address): Promise<{ propertyDat
     };
   } catch (error) {
     console.error("AI Summary generation failed:", error);
-    // console.log('[SERVER] getPropertyReport is returning FAILURE but still with property data.');
+    console.log('[SERVER] getPropertyReport is returning FAILURE but still with property data.');
     return {
       propertyData,
       summary: "AI summary could not be generated at this time. Please review the property data manually.",
@@ -546,7 +544,7 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
   // Basic URI validation
   for (const uri of imageURIs) {
     if (!uri.startsWith('data:image/')) {
-      // console.error(`[SERVER] Invalid image URI format: ${uri}`);
+      console.error(`[SERVER] Invalid image URI format: ${uri}`);
       return { 
         report: "An invalid image format was provided. Please upload valid image files.",
         error: "Invalid image format"
@@ -710,7 +708,7 @@ export async function getPlanningDebugInfo(uprn: string): Promise<any> {
     const [uprnResult, livenessResult, knownGoodResult] = await Promise.all([
         sendQuery(queries.uprnQuery),
         sendQuery(queries.livenessQuery),
-        sendQuery(queries.knownGoodQuery)
+        sendQuery(queries.knownGoodResult)
     ]);
 
     return { uprnResult, livenessResult, knownGoodResult };

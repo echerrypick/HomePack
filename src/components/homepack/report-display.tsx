@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 'use client';
 
 import { useState } from 'react';
@@ -30,11 +23,27 @@ type ReportDisplayProps = {
 };
 
 
-function EpcDisplay({ epcData }: { epcData: EpcData }) {
+function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
+    const epcLogs = logs.filter(log => log.startsWith('[EPC'));
+
     if (!epcData) {
         return (
             <>
                 <DataItem label="EPC Details" value="Not available" />
+                 {epcLogs.length > 0 && (
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="log">
+                            <AccordionTrigger className="text-sm text-primary hover:underline">
+                                Show Fetch Log
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                                    {epcLogs.join('\n')}
+                                </pre>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                )}
             </>
         );
     }
@@ -125,6 +134,18 @@ function EpcDisplay({ epcData }: { epcData: EpcData }) {
                     </div>
                 </AccordionContent>
               </AccordionItem>
+              {epcLogs.length > 0 && (
+                <AccordionItem value="log">
+                    <AccordionTrigger className="text-sm text-primary hover:underline">
+                        Show Fetch Log
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                            {epcLogs.join('\n')}
+                        </pre>
+                    </AccordionContent>
+                </AccordionItem>
+              )}
             </Accordion>
             
         </>
@@ -256,7 +277,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   const [isConditionReportLoading, setIsConditionReportLoading] = useState(false);
 
   // Debug log for incoming data
-  // console.log('[CLIENT] Report Data in UI:', reportData);
+  console.log('[CLIENT] Report Data in UI:', reportData);
 
   if (isLoading) {
     return (
@@ -334,7 +355,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           </DataSection>
 
           <DataSection icon={Zap} title="Energy Performance (EPC)">
-              <EpcDisplay epcData={epc} />
+              <EpcDisplay epcData={epc} logs={logs} />
           </DataSection>
           
           <DataSection icon={Waves} title="Flood Risk">
