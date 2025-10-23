@@ -2,12 +2,13 @@
 
 
 
+
 'use client';
 
 import { useState } from 'react';
-import type { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData } from '@/app/actions';
+import type { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem } from '@/app/actions';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink } from 'lucide-react';
 import { AiSummary } from './ai-summary';
 import { ImageUploader } from './image-uploader';
 import { AiConditionReport } from './ai-condition-report';
@@ -183,6 +184,55 @@ function FloodRiskDisplay({ floodRiskData, logs }: { floodRiskData: FloodRiskDat
     );
 }
 
+function PlanningHistoryDisplay({ planningHistory, logs }: { planningHistory: PlanningHistoryItem[], logs: string[] }) {
+    const planningLogs = logs.filter(log => log.startsWith('[PLANNING'));
+
+    const display = (
+        <>
+            {planningHistory.length > 0 ? (
+                <ul className="space-y-4">
+                    {planningHistory.map((item, index) => (
+                        <li key={index} className="text-sm border-l-2 border-primary/50 pl-4 py-1">
+                            <p className="font-semibold">{item.application}</p>
+                            <p className="text-muted-foreground">
+                                Status: <span className={`font-medium ${item.decision.toLowerCase().includes('approve') ? 'text-green-600' : 'text-red-600'}`}>{item.decision}</span> on {item.date}
+                            </p>
+                            <div className='flex justify-between items-center'>
+                               <p className="text-muted-foreground text-xs">Reference: {item.reference}</p>
+                               <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                                   View <ExternalLink className="h-3 w-3" />
+                               </a>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-sm text-muted-foreground">No planning history found for this property's UPRN.</p>
+            )}
+        </>
+    );
+
+    return (
+        <>
+            {display}
+            {planningLogs.length > 0 && (
+                <Accordion type="single" collapsible className="w-full mt-4">
+                    <AccordionItem value="log">
+                        <AccordionTrigger className="text-sm text-primary hover:underline">
+                            Show Fetch Log
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                                {planningLogs.join('\n')}
+                            </pre>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            )}
+        </>
+    );
+}
+
 
 export function ReportDisplay({ address, reportData, isLoading, onReset }: ReportDisplayProps) {
   const [conditionReport, setConditionReport] = useState<string | null>(null);
@@ -204,7 +254,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   if (!reportData) return null;
 
   const { propertyData, summary, logs } = reportData;
-  const { landRegistry, epc, floodRisk } = propertyData;
+  const { landRegistry, epc, floodRisk, planningHistory } = propertyData;
   
 
   const getPrimaryTransaction = (results: LandRegistryResult[]) => {
@@ -275,14 +325,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           </DataSection>
 
           <DataSection icon={ClipboardList} title="Planning History">
-            <ul className="space-y-3">
-              {propertyData.planningHistory.map((item, index) => (
-                <li key={index} className="text-sm border-l-2 border-primary/50 pl-4">
-                  <p className="font-semibold">{item.application}</p>
-                  <p className="text-muted-foreground">Status: <span className={`font-medium ${item.decision === 'Approved' ? 'text-green-600' : 'text-red-600'}`}>{item.decision}</span> on {new Date(item.date).toLocaleDateString()}</p>
-                </li>
-              ))}
-            </ul>
+            <PlanningHistoryDisplay planningHistory={planningHistory} logs={logs} />
           </DataSection>
 
         </div>
@@ -294,10 +337,3 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
     </div>
   );
 }
-
-    
-
-    
-
-
-

@@ -96,6 +96,14 @@ export type EpcData = {
     latitude: string;
     longitude: string;
   } | null;
+
+  export type PlanningHistoryItem = {
+    application: string;
+    decision: string;
+    date: string;
+    reference: string;
+    url: string;
+  };
   
 
 export type PropertyData = {
@@ -103,11 +111,7 @@ export type PropertyData = {
   landRegistry: LandRegistryResult[];
   epc: EpcData;
   floodRisk: FloodRiskData;
-  planningHistory: {
-    application: string;
-    decision: string;
-    date: string;
-  }[];
+  planningHistory: PlanningHistoryItem[];
 }
 
 async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: string[]}> {
@@ -317,6 +321,53 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
 }
 
 
+async function fetchPlanningHistory(uprn: string): Promise<{ data: PlanningHistoryItem[], logs: string[] }> {
+    const logs: string[] = [];
+    if (!uprn) {
+        logs.push('[PLANNING] No UPRN provided. Skipping planning history search.');
+        return { data: [], logs };
+    }
+
+    const endpoint = 'https://www.planning.data.gov.uk/entity.json';
+    const url = `${endpoint}?dataset=planning-application&limit=100&q=${uprn}`;
+    logs.push(`[PLANNING] Fetching from: ${url}`);
+
+    try {
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        logs.push(`[PLANNING] API response status: ${res.status}`);
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            logs.push(`[PLANNING ERROR] API request failed. Response: ${errorText}`);
+            return { data: [], logs };
+        }
+
+        const rawData = await res.json();
+        logs.push(`[PLANNING RESPONSE] Raw JSON response:\n${JSON.stringify(rawData, null, 2)}`);
+
+        if (!rawData.entities || rawData.entities.length === 0) {
+            logs.push('[PLANNING] No planning applications found for this UPRN.');
+            return { data: [], logs };
+        }
+
+        const formattedData: PlanningHistoryItem[] = rawData.entities.map((entity: any) => ({
+            application: entity.name || 'No description available',
+            decision: entity['planning-application-status'] || 'Unknown',
+            date: entity['start-date'] ? new Date(entity['start-date']).toLocaleDateString() : 'Unknown',
+            reference: entity.reference || 'N/A',
+            url: `https://www.planning.data.gov.uk/entity/${entity.entity}`
+        }));
+        
+        logs.push(`[PLANNING] Found and formatted ${formattedData.length} planning application(s).`);
+        return { data: formattedData, logs };
+
+    } catch (err: any) {
+        logs.push(`[PLANNING FATAL] Fetch error: ${err.message}`);
+        console.error("❌ Planning History fetch error:", err);
+        return { data: [], logs };
+    }
+}
+
 
 // --- API Calls ---
 export async function fetchPropertyData(address: Address): Promise<{data: PropertyData, logs: string[]}> {
@@ -436,15 +487,17 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   const { data: floodRiskData, logs: floodLogs } = await fetchFloodRiskData(address.postcode);
   logs.push(...floodLogs);
 
+  // --- Fetch Planning History ---
+  const { data: planningData, logs: planningLogs } = await fetchPlanningHistory(epcData?.uprn || '');
+  logs.push(...planningLogs);
+
 
   const propertyData: PropertyData = {
     address: formattedResults.length > 0 ? formattedResults[0].addressString : `${address.street}, ${address.town}, ${address.postcode}`,
     landRegistry: formattedResults,
     epc: epcData,
     floodRisk: floodRiskData,
-    planningHistory: [
-      { application: 'Single-storey rear extension', decision: 'Approved', date: '2019-05-10' },
-    ],
+    planningHistory: planningData,
   };
 
   // logs.push(`[END] Returning property data object.`);
@@ -629,20 +682,3 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
 
   return { result1, result2, result3 };
 }
-
-
-
-
-
-
-    
-
-    
-
-
-
-
-
-
-
-
