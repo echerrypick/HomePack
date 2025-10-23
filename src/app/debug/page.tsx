@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { AddressForm } from '@/components/homepack/address-form';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import Link from 'next/link';
 
 type DebugInfo = {
   query: string;
@@ -114,7 +115,88 @@ export default function DebugPage() {
       <HomePackHeader />
       <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-5xl mx-auto space-y-8">
-          {isSearching ? (
+            <Card>
+                <CardHeader>
+                    <CardTitle>HomePack Debugging Tools</CardTitle>
+                    <CardDescription>Select a tool to diagnose issues with data sources.</CardDescription>
+                </CardHeader>
+                <CardContent className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Land Registry</CardTitle>
+                            <CardDescription>Debug SPARQL queries for land registry data.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <Button onClick={() => setIsSearching(true)} className='w-full'>Start Debugging</Button>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Planning History</CardTitle>
+                            <CardDescription>Debug API queries for planning history data.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button asChild className='w-full'><Link href="/debug/planning">Start Debugging</Link></Button>
+                        </CardContent>
+                    </Card>
+                </CardContent>
+            </Card>
+
+          {!isSearching && (
+            isLoading ? (
+                <div className="text-center py-20">
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+                <p className="mt-4 text-lg text-muted-foreground">Running debug queries for Land Registry...</p>
+                </div>
+            ) : (
+                <>
+                {debugInfo && (
+                    <div className="animate-fade-in space-y-6">
+                    <div className='flex justify-between items-start'>
+                            <div>
+                                <h2 className="text-2xl font-bold">Land Registry Debug Information</h2>
+                                {submittedAddress && (
+                                <p className="text-muted-foreground">
+                                    Showing results for: {submittedAddress.street}, {submittedAddress.town}, {submittedAddress.postcode}
+                                </p>
+                                )}
+                            </div>
+                            <Button variant="outline" onClick={handleReset}>Search Again</Button>
+                        </div>
+
+                    {error && (
+                            <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Error</AlertTitle>
+                            <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+                    <div className="space-y-4">
+                        <DebugStepView 
+                        step={1} 
+                        title="Postcode Only" 
+                        description="Tests if any data exists for the postcode."
+                        debugInfo={debugInfo.result1} 
+                        />
+                        <DebugStepView 
+                        step={2} 
+                        title="Postcode + Street Name"
+                        description="Tests matching the street name within the full address string."
+                        debugInfo={debugInfo.result2} 
+                        />
+                        <DebugStepView 
+                        step={3} 
+                        title="Postcode + Building ID + Street" 
+                        description="Tests matching against specific database fields (paon, street, postcode)."
+                        debugInfo={debugInfo.result3} 
+                        />
+                    </div>
+                    </div>
+                )}
+                </>
+            )
+          )}
+           {isSearching && !debugInfo && (
             <Card>
               <CardHeader>
                 <CardTitle>Land Registry SPARQL Step-by-Step Debugger</CardTitle>
@@ -126,58 +208,8 @@ export default function DebugPage() {
                   <AddressForm onAddressSubmit={handleAddressSubmit} isLoading={isLoading} error={error} />
               </CardContent>
             </Card>
-          ) : isLoading ? (
-            <div className="text-center py-20">
-              <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-              <p className="mt-4 text-lg text-muted-foreground">Running debug queries...</p>
-            </div>
-          ) : (
-            <>
-              {debugInfo && (
-                <div className="animate-fade-in space-y-6">
-                   <div className='flex justify-between items-start'>
-                        <div>
-                            <h2 className="text-2xl font-bold">Debug Information</h2>
-                            {submittedAddress && (
-                               <p className="text-muted-foreground">
-                                Showing results for: {submittedAddress.street}, {submittedAddress.town}, {submittedAddress.postcode}
-                               </p>
-                            )}
-                        </div>
-                        <Button variant="outline" onClick={handleReset}>Search Again</Button>
-                    </div>
-
-                  {error && (
-                        <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
-                        </Alert>
-                    )}
-                  <div className="space-y-4">
-                    <DebugStepView 
-                      step={1} 
-                      title="Postcode Only" 
-                      description="Tests if any data exists for the postcode."
-                      debugInfo={debugInfo.result1} 
-                    />
-                    <DebugStepView 
-                      step={2} 
-                      title="Postcode + Street Name"
-                      description="Tests matching the street name within the full address string."
-                      debugInfo={debugInfo.result2} 
-                    />
-                    <DebugStepView 
-                      step={3} 
-                      title="Postcode + Building ID + Street" 
-                      description="Tests matching against specific database fields (paon, street, postcode)."
-                      debugInfo={debugInfo.result3} 
-                    />
-                  </div>
-                </div>
-              )}
-            </>
           )}
+
         </div>
       </main>
     </div>

@@ -569,7 +569,7 @@ export async function generateConditionReportAction(imageURIs: string[]): Promis
 }
 
 
-// --- Step-by-Step Debug Action ---
+// --- Step-by-Step Debug Actions ---
 
 export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
@@ -681,4 +681,37 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
   ]);
 
   return { result1, result2, result3 };
+}
+
+
+export async function getPlanningDebugInfo(uprn: string): Promise<any> {
+    const baseEndpoint = 'https://www.planning.data.gov.uk/entity.json';
+
+    const queries = {
+        uprnQuery: `${baseEndpoint}?dataset=planning-application&limit=100&q=${uprn}`,
+        livenessQuery: `${baseEndpoint}?dataset=planning-application&limit=5`,
+        knownGoodQuery: `${baseEndpoint}?dataset=planning-application&limit=5&q=23/00002/FUL`
+    };
+
+    async function sendQuery(url: string) {
+        try {
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) {
+                const errorText = await res.text();
+                return { url, error: `Request failed: ${res.status} - ${errorText}` };
+            }
+            const data = await res.json();
+            return { url, response: data };
+        } catch (err: any) {
+            return { url, error: err.message };
+        }
+    }
+
+    const [uprnResult, livenessResult, knownGoodResult] = await Promise.all([
+        sendQuery(queries.uprnQuery),
+        sendQuery(queries.livenessQuery),
+        sendQuery(queries.knownGoodQuery)
+    ]);
+
+    return { uprnResult, livenessResult, knownGoodResult };
 }
