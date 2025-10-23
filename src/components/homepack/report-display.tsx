@@ -3,12 +3,13 @@
 
 
 
+
 'use client';
 
 import { useState } from 'react';
 import type { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem } from '@/app/actions';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink, Search } from 'lucide-react';
 import { AiSummary } from './ai-summary';
 import { ImageUploader } from './image-uploader';
 import { AiConditionReport } from './ai-condition-report';
@@ -17,6 +18,7 @@ import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
 import { dataTooltips } from '@/lib/data-tooltips';
+import Link from 'next/link';
 
 
 type ReportDisplayProps = {
@@ -215,20 +217,28 @@ function PlanningHistoryDisplay({ planningHistory, logs }: { planningHistory: Pl
     return (
         <>
             {display}
-            {planningLogs.length > 0 && (
-                <Accordion type="single" collapsible className="w-full mt-4">
-                    <AccordionItem value="log">
-                        <AccordionTrigger className="text-sm text-primary hover:underline">
-                            Show Fetch Log
-                        </AccordionTrigger>
-                        <AccordionContent>
-                            <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
-                                {planningLogs.join('\n')}
-                            </pre>
-                        </AccordionContent>
-                    </AccordionItem>
+             <div className="mt-4 flex flex-col gap-2">
+                <Accordion type="single" collapsible className="w-full">
+                    {planningLogs.length > 0 && (
+                        <AccordionItem value="log">
+                            <AccordionTrigger className="text-sm text-primary hover:underline">
+                                Show Fetch Log
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                                    {planningLogs.join('\n')}
+                                </pre>
+                            </AccordionContent>
+                        </AccordionItem>
+                    )}
                 </Accordion>
-            )}
+                 <Button asChild variant="outline" size="sm" className="mt-2">
+                    <Link href="/debug/planning">
+                        <Search className="mr-2 h-4 w-4" />
+                        Debug Planning History
+                    </Link>
+                </Button>
+            </div>
         </>
     );
 }
@@ -299,7 +309,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
                     {landRegistry.map((transaction, index) => (
                       <div key={index} className="p-2 rounded-md even:bg-muted/50">
                         <div className="flex justify-between items-center text-sm">
-                           <p className="font-medium text-primary">£{parseInt(transaction.pricePaid, 10).toLocaleString()}</p>
+                           <p className="font-medium text-primary">£${parseInt(transaction.pricePaid, 10).toLocaleString()}</p>
                            <p className="text-muted-foreground">{new Date(transaction.transactionDate).toLocaleDateString('en-GB')}</p>
                         </div>
                       </div>
