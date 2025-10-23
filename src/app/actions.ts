@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -34,7 +35,7 @@ export type EpcData = {
     lodgementDate: string;
     inspectionDate: string;
     rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-    potentialRating: 'A' | 'B' | 'C'- | 'D' | 'E' | 'F' | 'G';
+    potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
     propertyType: string;
     tenure: string;
     uprn: string;
@@ -116,7 +117,7 @@ export type EpcData = {
     floorLevel: string | null;
   } | null;
 
-  export type FloodRiskData = {
+export type FloodRiskData = {
     postcode: string;
     riskOfFloodingFromRiversAndSea: string;
     suitability: string;
@@ -127,7 +128,7 @@ export type EpcData = {
     longitude: string;
   } | null;
 
-  export type PlanningHistoryItem = {
+export type PlanningHistoryItem = {
     application: string;
     decision: string;
     date: string;
@@ -301,7 +302,7 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
     return new Promise((resolve) => {
         fs.createReadStream(csvFilePath)
             .pipe(csv({
-                headers: ['postcode', 'FID', 'PROB_4BAND', 'SUITABILITY', 'PUB_DATE', 'RISK_FOR_INSURANCE_SOP', 'easting', 'northing', 'latitude', 'longitude'],
+                headers: ['postcode', 'PROB_4BAND', 'SUITABILITY', 'PUB_DATE', 'RISK_FOR_INSURANCE_SOP', 'easting', 'northing', 'latitude', 'longitude'],
                 skipLines: 1 
             }))
             .on('data', (row) => {
@@ -312,10 +313,7 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
                 
                 const normalizedPostcode = postcode.replace(/\s+/g, '').toLowerCase();
                 logs.push(`[FLOOD] Searching for normalized input postcode: "${normalizedPostcode}"`);
-                logs.push(`[FLOOD] First 3 rows from CSV for inspection: ${JSON.stringify(results.slice(0, 3), null, 2)}`);
-
                 
-                // Pass 1: Exact match
                 let match = results.find(row => {
                     if (row.postcode) {
                         const rowPostcode = row.postcode.replace(/\s+/g, '').toLowerCase();
@@ -327,7 +325,6 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
                 if (match) {
                     logs.push(`[FLOOD] Found exact match for postcode ${postcode}.`);
                 } else {
-                    // Pass 2: Wildcard match
                     logs.push(`[FLOOD] No exact match found. Searching for wildcard match.`);
                     
                     let sampleComparisons: string[] = [];

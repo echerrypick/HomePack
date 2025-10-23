@@ -1,3 +1,4 @@
+
 export const dataTooltips: Record<string, string> = {
   // EPC
   address1: 'Address line 1.',
@@ -72,13 +73,13 @@ export const dataTooltips: Record<string, string> = {
   localAuthority: 'The local authority ID.',
   numberOpenFireplaces: 'The number of open fireplaces.',
   glazedArea: 'The glazed area of the property.',
-a-corridor: 'Heat loss corridor.',
+  heatLossCorridor: 'Heat loss corridor.',
   flatStoreyCount: 'The number of storeys in the flat.',
   roofEnvEff: 'The environmental efficiency of the roof.',
   environmentImpactCurrent: 'A measure of a home’s impact on the environment in terms of carbon dioxide (CO2) emissions. The higher the rating the less impact it has on the environment.',
   floorEnergyEff: 'The energy efficiency of the floor.',
   hotWaterEnvEff: 'The environmental efficiency of the hot water system.',
-aEnergyEff: 'The energy efficiency of the main heating controls.',
+  mainheatcEnergyEff: 'The energy efficiency of the main heating controls.',
   wallsEnvEff: 'The environmental efficiency of the walls.',
   photoSupply: 'The photo supply.',
   mainheatEnvEff: 'The environmental efficiency of the main heating system.',
@@ -97,6 +98,4 @@ aEnergyEff: 'The energy efficiency of the main heating controls.',
   mainsGasFlag: 'Indicates if mains gas is available.',
   energyTariff: 'The energy tariff.',
   reportType: 'The type of report.',
-  heatLossCorridor: 'Indicates if there is a heat loss corridor.',
-  mainheatcEnergyEff: 'The energy efficiency of the main heating controls.',
 };
