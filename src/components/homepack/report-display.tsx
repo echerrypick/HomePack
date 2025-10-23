@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -241,7 +242,7 @@ function FloodRiskDisplay({ floodRiskData, logs }: { floodRiskData: FloodRiskDat
     );
 }
 
-function PlanningHistoryDisplay({ planningHistory, uprn, logs }: { planningHistory: PlanningHistoryItem[], uprn: string, logs: string[] }) {
+function PlanningHistoryDisplay({ planningHistory, uprn, localAuthorityId, logs }: { planningHistory: PlanningHistoryItem[], uprn: string, localAuthorityId: string | null | undefined, logs: string[] }) {
     const planningLogs = logs.filter(log => log.startsWith('[PLANNING'));
 
     const display = (
@@ -250,6 +251,11 @@ function PlanningHistoryDisplay({ planningHistory, uprn, logs }: { planningHisto
                  <DataItem label="UPRN Used" value={uprn} tooltip="The Unique Property Reference Number used for this search." />
             ) : (
                 <DataItem label="UPRN Used" value="Not available" tooltip="A UPRN could not be found for this property." />
+            )}
+            {localAuthorityId ? (
+                <DataItem label="Local Authority ID Used" value={localAuthorityId} tooltip="The Local Authority ID used to filter the search." />
+            ) : (
+                <DataItem label="Local Authority ID Used" value="Not available" tooltip="A Local Authority ID could not be found for this property." />
             )}
             <Separator className="my-2" />
             {planningHistory.length > 0 ? (
@@ -396,7 +402,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           </DataSection>
 
           <DataSection icon={ClipboardList} title="Planning History">
-            <PlanningHistoryDisplay planningHistory={planningHistory} uprn={epc?.uprn || ''} logs={logs} />
+            <PlanningHistoryDisplay planningHistory={planningHistory} uprn={epc?.uprn || ''} localAuthorityId={epc?.localAuthority} logs={logs} />
           </DataSection>
 
         </div>

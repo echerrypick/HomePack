@@ -380,7 +380,7 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
 }
 
 
-async function fetchPlanningHistory(uprn: string): Promise<{ data: PlanningHistoryItem[], logs: string[] }> {
+async function fetchPlanningHistory(uprn: string, organisationId?: string | null): Promise<{ data: PlanningHistoryItem[], logs: string[] }> {
     const logs: string[] = [];
     if (!uprn) {
         logs.push('[PLANNING] No UPRN provided. Skipping planning history search.');
@@ -388,7 +388,11 @@ async function fetchPlanningHistory(uprn: string): Promise<{ data: PlanningHisto
     }
 
     const endpoint = 'https://www.planning.data.gov.uk/entity.json';
-    const url = `${endpoint}?dataset=planning-application&limit=10&q=${uprn}`;
+    let url = `${endpoint}?dataset=planning-application&limit=10&q=${uprn}`;
+    if (organisationId) {
+        url += `&organisation-entity=${organisationId}`;
+    }
+    
     logs.push(`[PLANNING] Fetching from: ${url}`);
 
     try {
@@ -547,7 +551,7 @@ export async function fetchPropertyData(address: Address): Promise<{data: Proper
   logs.push(...floodLogs);
 
   // --- Fetch Planning History ---
-  const { data: planningData, logs: planningLogs } = await fetchPlanningHistory(epcData?.uprn || '');
+  const { data: planningData, logs: planningLogs } = await fetchPlanningHistory(epcData?.uprn || '', epcData?.localAuthority);
   logs.push(...planningLogs);
 
 
