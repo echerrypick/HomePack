@@ -252,7 +252,8 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
                     logs.push(`[FLOOD] No exact match found. Searching for wildcard match.`);
                     match = results.find(row => {
                         if (row.postcode.includes('*')) {
-                            const prefix = row.postcode.replace(/\s+/g, '').toLowerCase().replace('*', '');
+                            const normalizedRowPostcode = row.postcode.replace(/\s+/g, '').toLowerCase();
+                            const prefix = normalizedRowPostcode.replace('*', '');
                             return normalizedPostcode.startsWith(prefix);
                         }
                         return false;
@@ -605,5 +606,6 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
     
 
     
+
 
 
