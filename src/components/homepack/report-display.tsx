@@ -4,6 +4,7 @@
 
 
 
+
 'use client';
 
 import { useState } from 'react';
@@ -186,11 +187,17 @@ function FloodRiskDisplay({ floodRiskData, logs }: { floodRiskData: FloodRiskDat
     );
 }
 
-function PlanningHistoryDisplay({ planningHistory, logs }: { planningHistory: PlanningHistoryItem[], logs: string[] }) {
+function PlanningHistoryDisplay({ planningHistory, uprn, logs }: { planningHistory: PlanningHistoryItem[], uprn: string, logs: string[] }) {
     const planningLogs = logs.filter(log => log.startsWith('[PLANNING'));
 
     const display = (
         <>
+            {uprn ? (
+                 <DataItem label="UPRN Used" value={uprn} tooltip="The Unique Property Reference Number used for this search." />
+            ) : (
+                <DataItem label="UPRN Used" value="Not available" tooltip="A UPRN could not be found for this property." />
+            )}
+            <Separator className="my-2" />
             {planningHistory.length > 0 ? (
                 <ul className="space-y-4">
                     {planningHistory.map((item, index) => (
@@ -335,7 +342,7 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
           </DataSection>
 
           <DataSection icon={ClipboardList} title="Planning History">
-            <PlanningHistoryDisplay planningHistory={planningHistory} logs={logs} />
+            <PlanningHistoryDisplay planningHistory={planningHistory} uprn={epc?.uprn || ''} logs={logs} />
           </DataSection>
 
         </div>
