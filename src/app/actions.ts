@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { config } from 'dotenv';
@@ -231,15 +232,37 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
         fs.createReadStream(csvFilePath)
             .pipe(csv())
             .on('data', (row) => {
-                // Normalize both postcodes for a reliable comparison
-                if (row.postcode && row.postcode.replace(/\s+/g, '').toLowerCase() === postcode.replace(/\s+/g, '').toLowerCase()) {
+                if (row.postcode) {
                     results.push(row);
                 }
             })
             .on('end', () => {
-                logs.push(`[FLOOD] Loaded and filtered CSV by postcode: ${postcode}. Found ${results.length} matches.`);
-                if (results.length > 0) {
-                    const match = results[0]; // Take the first match
+                logs.push(`[FLOOD] Loaded ${results.length} rows from CSV.`);
+                
+                const normalizedPostcode = postcode.replace(/\s+/g, '').toLowerCase();
+                logs.push(`[FLOOD] Searching for normalized postcode: ${normalizedPostcode}`);
+                
+                // Pass 1: Exact match
+                let match = results.find(row => row.postcode.replace(/\s+/g, '').toLowerCase() === normalizedPostcode);
+                
+                if (match) {
+                    logs.push(`[FLOOD] Found exact match for postcode ${postcode}.`);
+                } else {
+                    // Pass 2: Wildcard match
+                    logs.push(`[FLOOD] No exact match found. Searching for wildcard match.`);
+                    match = results.find(row => {
+                        if (row.postcode.includes('*')) {
+                            const prefix = row.postcode.replace(/\s+/g, '').toLowerCase().replace('*', '');
+                            return normalizedPostcode.startsWith(prefix);
+                        }
+                        return false;
+                    });
+                    if (match) {
+                        logs.push(`[FLOOD] Found wildcard match for postcode ${postcode} with rule ${match.postcode}.`);
+                    }
+                }
+
+                if (match) {
                     const formatted: FloodRiskData = {
                         postcode: match.postcode,
                         riskOfFloodingFromRiversAndSea: match.PROB_4BAND || 'Unknown',
@@ -582,4 +605,5 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
     
 
     
+
 
