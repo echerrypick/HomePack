@@ -84,6 +84,7 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
                         <Separator className="md:col-span-2" />
                         <DataItem label="Lodgement Date" value={epcData.lodgementDate ? new Date(epcData.lodgementDate).toLocaleDateString() : 'N/A'} tooltip={dataTooltips.lodgementDate}/>
                         <DataItem label="Inspection Date" value={epcData.inspectionDate ? new Date(epcData.inspectionDate).toLocaleDateString() : 'N/A'} tooltip={dataTooltips.inspectionDate} />
+                        <DataItem label="Lodgement Datetime" value={epcData.lodgementDatetime ? new Date(epcData.lodgementDatetime).toLocaleString() : 'N/A'} tooltip={dataTooltips.lodgementDatetime}/>
                         <Separator className="md:col-span-2" />
                         <DataItem label="Current Rating" value={dataOrNA(epcData.rating)} tooltip={dataTooltips.rating} />
                         <DataItem label="Potential Rating" value={dataOrNA(epcData.potentialRating)} tooltip={dataTooltips.potentialRating} />
@@ -95,6 +96,7 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
                         <DataItem label="Construction Age" value={dataOrNA(epcData.constructionAgeBand)} tooltip={dataTooltips.constructionAgeBand} />
                         <DataItem label="Tenure" value={dataOrNA(epcData.tenure)} tooltip={dataTooltips.tenure} />
                         <DataItem label="UPRN" value={dataOrNA(epcData.uprn)} tooltip={dataTooltips.uprn} />
+                        <DataItem label="UPRN Source" value={dataOrNA(epcData.uprnSource)} tooltip={dataTooltips.uprnSource} />
                         <DataItem label="Building Reference" value={dataOrNA(epcData.buildingReferenceNumber)} tooltip={dataTooltips.buildingReferenceNumber} />
                         <DataItem label="Local Authority" value={dataOrNA(epcData.localAuthorityLabel)} tooltip={dataTooltips.localAuthorityLabel} />
                         <DataItem label="Constituency" value={dataOrNA(epcData.constituencyLabel)} tooltip={dataTooltips.constituencyLabel} />
@@ -122,6 +124,9 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
                         <Separator className="md:col-span-2" />
                         <DataItem label="CO₂ Emissions (Current)" value={`${dataOrNA(epcData.co2EmissionsCurrent)} tonnes/year`} tooltip={dataTooltips.co2EmissionsCurrent} />
                         <DataItem label="CO₂ Emissions (Potential)" value={`${dataOrNA(epcData.co2EmissionsPotential)} tonnes/year`} tooltip={dataTooltips.co2EmissionsPotential} />
+                        <DataItem label="Environment Impact (Current)" value={dataOrNA(epcData.environmentImpactCurrent)} tooltip={dataTooltips.environmentImpactCurrent} />
+                        <DataItem label="Environment Impact (Potential)" value={dataOrNA(epcData.environmentImpactPotential)} tooltip={dataTooltips.environmentImpactPotential} />
+                        <Separator className="md:col-span-2" />
                         <DataItem label="Energy Consumption (Current)" value={`${dataOrNA(epcData.energyConsumptionCurrent)} kWh/m² per year`} tooltip={dataTooltips.energyConsumptionCurrent} />
                         <DataItem label="Energy Consumption (Potential)" value={`${dataOrNA(epcData.energyConsumptionPotential)} kWh/m² per year`} tooltip={dataTooltips.energyConsumptionPotential} />
                         <Separator className="md:col-span-2" />
@@ -131,6 +136,34 @@ function EpcDisplay({ epcData, logs }: { epcData: EpcData, logs: string[] }) {
                         <DataItem label="Hot Water Cost (Potential)" value={`£${dataOrNA(epcData.hotWaterCostPotential)} / year`} tooltip={dataTooltips.hotWaterCostPotential} />
                         <DataItem label="Lighting Cost (Current)" value={`£${dataOrNA(epcData.lightingCostCurrent)} / year`} tooltip={dataTooltips.lightingCostCurrent} />
                         <DataItem label="Lighting Cost (Potential)" value={`£${dataOrNA(epcData.lightingCostPotential)} / year`} tooltip={dataTooltips.lightingCostPotential} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Glazing Type" value={dataOrNA(epcData.glazedType)} tooltip={dataTooltips.glazedType} />
+                        <DataItem label="Glazed Area" value={dataOrNA(epcData.glazedArea)} tooltip={dataTooltips.glazedArea} />
+                        <DataItem label="Multi-glaze Proportion" value={`${dataOrNA(epcData.multiGlazeProportion)}%`} tooltip={dataTooltips.multiGlazeProportion} />
+                        <DataItem label="Low Energy Lighting" value={`${dataOrNA(epcData.lowEnergyLighting)}%`} tooltip={dataTooltips.lowEnergyLighting} />
+                        <DataItem label="Low Energy Fixed Light Count" value={dataOrNA(epcData.lowEnergyFixedLightCount)} tooltip={dataTooltips.lowEnergyFixedLightCount} />
+                        <DataItem label="Fixed Lighting Outlets Count" value={dataOrNA(epcData.fixedLightingOutletsCount)} tooltip={dataTooltips.fixedLightingOutletsCount} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Main Heat Energy Eff." value={dataOrNA(epcData.mainheatEnergyEff)} tooltip={dataTooltips.mainheatEnergyEff} />
+                        <DataItem label="Main Heat Env. Eff." value={dataOrNA(epcData.mainheatEnvEff)} tooltip={dataTooltips.mainheatEnvEff} />
+                        <DataItem label="Main Heat Ctrl Energy Eff." value={dataOrNA(epcData.mainheatcEnergyEff)} tooltip={dataTooltips.mainheatcEnergyEff} />
+                        <DataItem label="Main Heat Ctrl Env. Eff." value={dataOrNA(epcData.mainheatcEnvEff)} tooltip={dataTooltips.mainheatcEnvEff} />
+                        <DataItem label="Walls Env. Eff." value={dataOrNA(epcData.wallsEnvEff)} tooltip={dataTooltips.wallsEnvEff} />
+                        <DataItem label="Roof Env. Eff." value={dataOrNA(epcData.roofEnvEff)} tooltip={dataTooltips.roofEnvEff} />
+                        <DataItem label="Floor Energy Eff." value={dataOrNA(epcData.floorEnergyEff)} tooltip={dataTooltips.floorEnergyEff} />
+                        <DataItem label="Floor Env. Eff." value={dataOrNA(epcData.floorEnvEff)} tooltip={dataTooltips.floorEnvEff} />
+                        <DataItem label="Windows Env. Eff." value={dataOrNA(epcData.windowsEnvEff)} tooltip={dataTooltips.windowsEnvEff} />
+                        <DataItem label="Hot Water Env. Eff." value={dataOrNA(epcData.hotWaterEnvEff)} tooltip={dataTooltips.hotWaterEnvEff} />
+                        <DataItem label="Lighting Env. Eff." value={dataOrNA(epcData.lightingEnvEff)} tooltip={dataTooltips.lightingEnvEff} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="Number of Open Fireplaces" value={dataOrNA(epcData.numberOpenFireplaces)} tooltip={dataTooltips.numberOpenFireplaces} />
+                        <DataItem label="Solar Water Heating" value={dataOrNA(epcData.solarWaterHeatingFlag)} tooltip={dataTooltips.solarWaterHeatingFlag} />
+                        <DataItem label="Wind Turbine Count" value={dataOrNA(epcData.windTurbineCount)} tooltip={dataTooltips.windTurbineCount} />
+                        <DataItem label="Photo Supply" value={dataOrNA(epcData.photoSupply)} tooltip={dataTooltips.photoSupply} />
+                        <Separator className="md:col-span-2" />
+                        <DataItem label="LMK Key" value={dataOrNA(epcData.lmkKey)} tooltip={dataTooltips.lmkKey} />
+                        <DataItem label="Constituency ID" value={dataOrNA(epcData.constituency)} tooltip={dataTooltips.constituency} />
+                        <DataItem label="Local Authority ID" value={dataOrNA(epcData.localAuthority)} tooltip={dataTooltips.localAuthority} />
                     </div>
                 </AccordionContent>
               </AccordionItem>

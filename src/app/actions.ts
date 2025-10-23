@@ -34,7 +34,7 @@ export type EpcData = {
     lodgementDate: string;
     inspectionDate: string;
     rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-    potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+    potentialRating: 'A' | 'B' | 'C'- | 'D' | 'E' | 'F' | 'G';
     propertyType: string;
     tenure: string;
     uprn: string;
@@ -82,6 +82,38 @@ export type EpcData = {
     lightingEnergyEff: string;
     numberHabitableRooms: string;
     numberHeatedRooms: string;
+    lowEnergyFixedLightCount: string | null;
+    uprnSource: string | null;
+    floorHeight: string | null;
+    mainheatEnergyEff: string | null;
+    windowsEnvEff: string | null;
+    lightingEnvEff: string | null;
+    environmentImpactPotential: string | null;
+    glazedType: string | null;
+    sheatingEnergyEff: string | null;
+    fixedLightingOutletsCount: string | null;
+    solarWaterHeatingFlag: string | null;
+    constituency: string | null;
+    localAuthority: string | null;
+    numberOpenFireplaces: string | null;
+    glazedArea: string | null;
+    heatLossCorridor: string | null;
+    flatStoreyCount: string | null;
+    roofEnvEff: string | null;
+    environmentImpactCurrent: string | null;
+    floorEnergyEff: string | null;
+    hotWaterEnvEff: string | null;
+    mainheatcEnergyEff: string | null;
+    wallsEnvEff: string | null;
+    photoSupply: string | null;
+    mainheatEnvEff: string | null;
+    lodgementDatetime: string | null;
+    flatTopStorey: string | null;
+    extensionCount: string | null;
+    mainheatcEnvEff: string | null;
+    lmkKey: string | null;
+    windTurbineCount: string | null;
+    floorLevel: string | null;
   } | null;
 
   export type FloodRiskData = {
@@ -202,6 +234,38 @@ async function fetchEpcData(address: Address): Promise<{data: EpcData, logs: str
                 lightingEnergyEff: latestEpc['lighting-energy-eff'],
                 numberHabitableRooms: latestEpc['number-habitable-rooms'],
                 numberHeatedRooms: latestEpc['number-heated-rooms'],
+                lowEnergyFixedLightCount: latestEpc['low-energy-fixed-light-count'],
+                uprnSource: latestEpc['uprn-source'],
+                floorHeight: latestEpc['floor-height'],
+                mainheatEnergyEff: latestEpc['mainheat-energy-eff'],
+                windowsEnvEff: latestEpc['windows-env-eff'],
+                lightingEnvEff: latestEpc['lighting-env-eff'],
+                environmentImpactPotential: latestEpc['environment-impact-potential'],
+                glazedType: latestEpc['glazed-type'],
+                sheatingEnergyEff: latestEpc['sheating-energy-eff'],
+                fixedLightingOutletsCount: latestEpc['fixed-lighting-outlets-count'],
+                solarWaterHeatingFlag: latestEpc['solar-water-heating-flag'],
+                constituency: latestEpc['constituency'],
+                localAuthority: latestEpc['local-authority'],
+                numberOpenFireplaces: latestEpc['number-open-fireplaces'],
+                glazedArea: latestEpc['glazed-area'],
+                heatLossCorridor: latestEpc['heat-loss-corridor'],
+                flatStoreyCount: latestEpc['flat-storey-count'],
+                roofEnvEff: latestEpc['roof-env-eff'],
+                environmentImpactCurrent: latestEpc['environment-impact-current'],
+                floorEnergyEff: latestEpc['floor-energy-eff'],
+                hotWaterEnvEff: latestEpc['hot-water-env-eff'],
+                mainheatcEnergyEff: latestEpc['mainheatc-energy-eff'],
+                wallsEnvEff: latestEpc['walls-env-eff'],
+                photoSupply: latestEpc['photo-supply'],
+                mainheatEnvEff: latestEpc['mainheat-env-eff'],
+                lodgementDatetime: latestEpc['lodgement-datetime'],
+                flatTopStorey: latestEpc['flat-top-storey'],
+                extensionCount: latestEpc['extension-count'],
+                mainheatcEnvEff: latestEpc['mainheatc-env-eff'],
+                lmkKey: latestEpc['lmk-key'],
+                windTurbineCount: latestEpc['wind-turbine-count'],
+                floorLevel: latestEpc['floor-level'],
             };
             logs.push(`[EPC] Formatted EPC data: ${JSON.stringify(formattedEpc, null, 2)}`);
             return { data: formattedEpc, logs };
