@@ -230,7 +230,10 @@ async function fetchFloodRiskData(postcode: string): Promise<{ data: FloodRiskDa
     
     return new Promise((resolve) => {
         fs.createReadStream(csvFilePath)
-            .pipe(csv())
+            .pipe(csv({
+                headers: ['postcode', 'FID', 'PROB_4BAND', 'SUITABILITY', 'PUB_DATE', 'RISK_FOR_INSURANCE_SOP', 'easting', 'northing', 'latitude', 'longitude'],
+                skipLines: 1 
+            }))
             .on('data', (row) => {
                 results.push(row);
             })
@@ -627,6 +630,7 @@ export async function getStepByStepDebugInfo(address: Address): Promise<any> {
     
 
     
+
 
 
 
