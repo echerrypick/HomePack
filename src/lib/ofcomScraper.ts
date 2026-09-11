@@ -332,13 +332,13 @@ export async function lookupOfcomMobile(
         } catch (e) {}
       }
     } catch (e) {
-      console.error("[OfcomScraper] Timeout waiting for address selection UI");
+      console.warn("[OfcomScraper] Timeout waiting for address selection UI");
       return { success: false, error: "Postcode not found or timed out waiting for addresses" };
     }
 
     // Check if "No addresses found" is visible in target frame
     if (await targetFrame.locator("text=No addresses found").isVisible({ timeout: 2000 })) {
-      console.error("[OfcomScraper] Ofcom says: No addresses found for this postcode");
+      console.warn("[OfcomScraper] Ofcom says: No addresses found for this postcode");
       return { success: false, error: "Ofcom reported no addresses for this postcode" };
     }
 
@@ -579,7 +579,7 @@ export async function lookupOfcomBroadband(
       }, { timeout: 30000 });
       console.log("[OfcomScraper] Address options populated.");
     } catch (e) {
-      console.error("[OfcomScraper] Timeout waiting for address selection UI");
+      console.warn("[OfcomScraper] Timeout waiting for address selection UI");
       
       // Capture more debugging info
       const bodyText = await page.innerText("body");
