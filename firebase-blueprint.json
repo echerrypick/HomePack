@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and subscription details",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "phoneNumber": { "type": "string", "description": "Contact telephone number" },
+        "company": { "type": "string", "description": "Company, firm, or agency name" },
+        "jobTitle": { "type": "string", "description": "Profession or property role" },
+        "preferredRegion": { "type": "string", "description": "Default search postcode or region" },
+        "bio": { "type": "string", "description": "Short bio or property search notes" },
+        "notifications": { "type": "object", "description": "Notification and alert preferences" },
+        "role": { 
+          "type": "string", 
+          "enum": ["admin", "free", "subscription", "agency"],
+          "description": "User tier/role" 
+        },
+        "searchCount": { "type": "integer", "description": "Number of searches performed this year" },
+        "lastSearchReset": { "type": "string", "format": "date-time", "description": "Last time the search count was reset" },
+        "searchedAddresses": { 
+          "type": "array", 
+          "description": "List of addresses searched by the user" 
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Profile creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Profile last updated timestamp" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "SearchLog": {
+      "title": "SearchLog",
+      "description": "Logs of searches performed by users",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User UID" },
+        "postcode": { "type": "string" },
+        "address": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "success": { "type": "boolean" },
+        "logs": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["uid", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/searchLogs/{logId}": {
+      "schema": "SearchLog",
+      "description": "Logs of searches for admin review"
+    }
+  }
+}

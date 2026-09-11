@@ -1,0 +1,2045 @@
+<!DOCTYPE html><html lang="en-GB"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>SigInfo - UK Mobile Signal Checker | Coverage by Postcode</title>
+    <meta name="description" content="Comprehensive UK postcode signal analysis. Check mobile coverage from EE, O2, Vodafone and Three, plus broadband, aviation, weather and 30+ data points.">
+    <meta name="keywords" content="UK mobile coverage, signal strength, postcode checker, 5G coverage, 4G, EE, O2, Vodafone, Three, base stations, mast data, broadband speed">
+    <meta name="author" content="SigInfo">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://siginfo.uk/">
+    <link rel="alternate" hreflang="en-GB" href="https://siginfo.uk/">
+    <link rel="alternate" hreflang="en-IE" href="https://siginfo.uk/ireland/">
+    <link rel="alternate" hreflang="en-AU" href="https://siginfo.uk/australia/">
+    <link rel="alternate" hreflang="en-NZ" href="https://siginfo.uk/nz/">
+    <link rel="alternate" hreflang="x-default" href="https://siginfo.uk/">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="SigInfo - UK Mobile Signal Checker | Coverage by Postcode">
+    <meta property="og:description" content="Check mobile coverage, broadband speed, aviation data and 30+ data points for any UK postcode.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://siginfo.uk/">
+    <meta property="og:locale" content="en_GB">
+    <meta property="og:site_name" content="SigInfo.uk">
+    <meta property="og:image" content="https://siginfo.uk/og-image.png">
+    <meta property="og:image:width" content="1280">
+    <meta property="og:image:height" content="940">
+    <meta property="og:image:alt" content="SigInfo.uk - UK Signal &amp; Connectivity Intelligence">
+    <meta property="og:image:type" content="image/png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SigInfo - UK Mobile Signal Checker | Coverage by Postcode">
+    <meta name="twitter:description" content="30+ data points for any UK postcode. Mobile coverage, broadband, aviation, weather impact and more.">
+    <meta name="twitter:image" content="https://siginfo.uk/og-image.png">
+    <meta name="twitter:image:alt" content="SigInfo.uk - UK Mobile Signal Checker">
+
+    <!-- Structured Data: WebSite with SearchAction -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "SigInfo.uk",
+      "url": "https://siginfo.uk",
+      "description": "UK mobile signal and connectivity intelligence. Check mobile coverage, broadband speed, and 30+ data points for any UK postcode.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://siginfo.uk/report/{search_term_string}/"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "SigInfo.uk",
+      "url": "https://siginfo.uk",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://siginfo.uk/apple-touch-icon.png",
+        "width": 180,
+        "height": 180
+      },
+      "description": "Free UK mobile signal and connectivity intelligence platform",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "connect@siginfo.uk",
+        "contactType": "Customer Service"
+      },
+      "sameAs": ["https://rival.net.au", "https://abeyance.uk", "https://mastdata.com"]
+    }
+    </script>
+
+    <!-- Structured Data: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "SigInfo UK Mobile Signal Checker",
+      "url": "https://siginfo.uk",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "GBP"
+      },
+      "description": "Check mobile signal strength, broadband speed, base stations, and 30+ data points for any UK postcode.",
+      "browserRequirements": "Requires JavaScript"
+    }
+    </script>
+
+    <!-- Structured Data: FAQPage -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I check mobile signal strength for my postcode?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Enter your UK postcode in the search box on SigInfo.uk. You'll get coverage data from EE, O2, Vodafone and Three, including 4G and 5G availability, signal strength estimates, and nearby base station locations."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What data does SigInfo provide?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "SigInfo provides 30+ data points per postcode including mobile coverage from all UK operators, broadband speeds, nearby base stations, aviation restrictions, weather impact on signal, crime statistics, flood risk, and environmental data."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is SigInfo free to use?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, SigInfo is completely free. You can check signal coverage, view base stations, run network diagnostics, and generate intelligence reports for any UK postcode at no cost."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which mobile networks does SigInfo cover?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "SigInfo covers all four major UK mobile networks: EE, O2, Vodafone, and Three. Coverage data includes 2G, 3G, 4G, and 5G availability with indoor and outdoor signal strength estimates."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- DNS Prefetch for external APIs -->
+    <link rel="dns-prefetch" href="//api.postcodes.io">
+    <link rel="dns-prefetch" href="//data.police.uk">
+    <link rel="dns-prefetch" href="//api.open-meteo.com">
+    <link rel="dns-prefetch" href="//nominatim.openstreetmap.org">
+    <link rel="dns-prefetch" href="//environment.data.gov.uk">
+
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%237c3aed'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='36' height='36' rx='10' fill='url(%23g)'/%3E%3Cpath d='M9 25V20M14.5 25V15M20 25V10M25.5 25V5' stroke='white' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='25.5' cy='5' r='2' fill='%23a78bfa' opacity='0.8'/%3E%3C/svg%3E">
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script defer="" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --primary-light: #6366f1;
+            --primary-glow: rgba(79, 70, 229, 0.15);
+            --accent: #7c3aed;
+            --accent-light: #a78bfa;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --ee-color: #00a9e0;
+            --o2-color: #0019a5;
+            --vodafone-color: #e60000;
+            --three-color: #333333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-dark);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem;
+            flex: 1;
+        }
+
+        /* Header / Nav */
+        .site-header {
+            background: rgba(255,255,255,0.82);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid rgba(226,232,240,0.6);
+            padding: 0.75rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: box-shadow 0.3s;
+        }
+
+        .site-header.scrolled {
+            box-shadow: 0 4px 30px rgba(0,0,0,0.06);
+        }
+
+        .site-header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            text-decoration: none;
+            color: var(--text-dark);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            transition: transform 0.3s;
+        }
+
+        .logo:hover .logo-icon {
+            transform: scale(1.08);
+        }
+
+        .logo-text {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.03em;
+        }
+
+        .logo-tld {
+            font-weight: 500;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .header-tagline {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .header-nav-links {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .header-nav-link {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .header-nav-link:hover {
+            color: var(--primary);
+            background: rgba(79,70,229,0.06);
+        }
+
+        .country-selector { position:relative; }
+        .country-btn { display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0.7rem;background:rgba(248,250,252,0.8);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;color:var(--text-dark);font-family:inherit;transition:all 0.2s }
+        .country-btn:hover { border-color:var(--primary);color:var(--primary) }
+        .country-btn svg { width:20px;height:14px;border-radius:2px;flex-shrink:0 }
+        .country-dropdown { display:none;position:absolute;top:calc(100% + 6px);right:0;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);min-width:180px;z-index:200;overflow:hidden }
+        .country-selector.open .country-dropdown { display:block }
+        .country-dropdown a { display:flex;align-items:center;gap:0.5rem;padding:0.6rem 0.8rem;text-decoration:none;color:var(--text-dark);font-size:0.85rem;font-weight:500;transition:background 0.15s }
+        .country-dropdown a:hover { background:var(--bg-main) }
+        .country-dropdown a.active { font-weight:700;color:var(--primary);background:#f0f0ff }
+        .country-dropdown a svg { width:22px;height:16px;border-radius:2px;flex-shrink:0 }
+
+        /* ===== HERO ===== */
+        .hero-wrapper {
+            position: relative;
+            overflow: hidden;
+            margin: -1.5rem -1.5rem 0;
+            padding: 4rem 1.5rem 3rem;
+            background: linear-gradient(135deg, #0f0b2e 0%, #1a1145 25%, #251660 50%, #1e1250 75%, #0f0b2e 100%);
+        }
+
+        .hero-wrapper::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 50%, rgba(99,102,241,0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 30%, rgba(124,58,237,0.12) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(79,70,229,0.1) 0%, transparent 50%);
+            animation: heroGlow 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes heroGlow {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-2%, -1%) scale(1.05); }
+        }
+
+        .hero-grid-bg {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(99,102,241,0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99,102,241,0.06) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+            -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+        }
+
+        .hero-particles {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+        }
+
+        .hero-particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: rgba(167,139,250,0.6);
+            border-radius: 50%;
+            animation: particleFloat 6s ease-in-out infinite;
+        }
+
+        .hero-particle:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 7s; }
+        .hero-particle:nth-child(2) { left: 25%; top: 60%; animation-delay: 1s; animation-duration: 5s; }
+        .hero-particle:nth-child(3) { left: 45%; top: 30%; animation-delay: 2s; animation-duration: 8s; }
+        .hero-particle:nth-child(4) { left: 65%; top: 70%; animation-delay: 0.5s; animation-duration: 6s; }
+        .hero-particle:nth-child(5) { left: 80%; top: 15%; animation-delay: 1.5s; animation-duration: 7s; }
+        .hero-particle:nth-child(6) { left: 90%; top: 50%; animation-delay: 3s; animation-duration: 5s; }
+        .hero-particle:nth-child(7) { left: 35%; top: 80%; animation-delay: 2.5s; animation-duration: 9s; }
+        .hero-particle:nth-child(8) { left: 55%; top: 10%; animation-delay: 4s; animation-duration: 6s; }
+
+        @keyframes particleFloat {
+            0%, 100% { transform: translateY(0) scale(1); opacity: 0.4; }
+            50% { transform: translateY(-30px) scale(1.5); opacity: 0.8; }
+        }
+
+        .hero {
+            text-align: center;
+            padding: 0;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            background: rgba(99,102,241,0.15);
+            border: 1px solid rgba(99,102,241,0.25);
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #a5b4fc;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+            backdrop-filter: blur(8px);
+        }
+
+        .hero-badge-dot {
+            width: 6px;
+            height: 6px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        .hero h1 {
+            font-size: 3.25rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.04em;
+            line-height: 1.1;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #818cf8, #a78bfa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: rgba(203,213,225,0.85);
+            font-weight: 400;
+            max-width: 540px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* ===== SEARCH ===== */
+        .search-section {
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 1.75rem;
+            margin: 2rem auto 0;
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            max-width: 640px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 0.75rem;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .search-input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            font-size: 0.95rem;
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s;
+            background: rgba(255,255,255,0.06);
+            color: #ffffff;
+        }
+
+        .search-input::placeholder {
+            color: rgba(203,213,225,0.5);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-light);
+            box-shadow: 0 0 0 4px rgba(167,139,250,0.15), 0 0 40px rgba(124,58,237,0.1);
+            background: rgba(255,255,255,0.1);
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid var(--primary);
+            border-top: none;
+            border-radius: 0 0 14px 14px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 200;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            display: none;
+        }
+
+        .autocomplete-dropdown.visible {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 0.75rem 1.25rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.15s;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover, .autocomplete-item.active {
+            background: #f0f0ff;
+        }
+
+        .autocomplete-place {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .autocomplete-region {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .autocomplete-postcode {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--primary);
+            background: #f0f0ff;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .example-postcodes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .example-postcode {
+            padding: 0.35rem 0.8rem;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            color: rgba(203,213,225,0.7);
+            cursor: pointer;
+            transition: all 0.25s;
+            text-decoration: none;
+        }
+
+        .example-postcode:hover {
+            border-color: var(--accent-light);
+            color: #ffffff;
+            background: rgba(167,139,250,0.12);
+            transform: translateY(-1px);
+        }
+
+        .search-button {
+            padding: 1rem 2rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .search-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--accent) 0%, #9333ea 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .search-button:hover::before {
+            opacity: 1;
+        }
+
+        .search-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(124,58,237,0.4);
+        }
+
+        .search-button span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .search-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ===== FEATURE CARDS ===== */
+        .hero-features {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            max-width: 720px;
+            margin: 2.5rem auto 0;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-feature {
+            text-align: center;
+            padding: 1rem 0.5rem;
+        }
+
+        .hero-feature-icon {
+            width: 44px;
+            height: 44px;
+            margin: 0 auto 0.6rem;
+            background: rgba(99,102,241,0.12);
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+        }
+
+        .hero-feature:hover .hero-feature-icon {
+            transform: translateY(-3px);
+            background: rgba(99,102,241,0.2);
+            box-shadow: 0 8px 20px rgba(99,102,241,0.15);
+        }
+
+        .hero-feature-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgba(203,213,225,0.8);
+            letter-spacing: 0.02em;
+        }
+
+        .hero-feature-stat {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+            margin-top: 0.15rem;
+        }
+
+        .hero-wave-divider {
+            position: relative;
+            z-index: 2;
+            margin-top: -1px;
+        }
+
+        .hero-wave-divider svg {
+            display: block;
+            width: 100%;
+            height: 60px;
+        }
+
+        /* ===== TRUST BAR ===== */
+        .trust-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            padding: 1.25rem 0;
+            margin: 0 auto;
+            max-width: 700px;
+        }
+
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .trust-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--success);
+        }
+
+        /* Results */
+        .results-section {
+            display: none;
+        }
+
+        .results-section.visible {
+            display: block;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .location-info {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 1.25rem 1.5rem;
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .location-info h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .location-details {
+            opacity: 0.85;
+            font-size: 0.9rem;
+        }
+
+        .summary-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .summary-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .summary-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.375rem 0.875rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .summary-badge.excellent { background: var(--success); color: white; }
+        .summary-badge.good { background: #34d399; color: white; }
+        .summary-badge.fair { background: var(--warning); color: white; }
+        .summary-badge.poor { background: var(--danger); color: white; }
+
+        .fiveg-badge {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .summary-text {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-dark);
+        }
+
+        /* Data Grids */
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 1rem;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .result-card, .operator-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+        }
+
+        .result-card:hover, .operator-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        }
+
+        .card-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .stat-sub {
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            font-size: 0.85rem;
+        }
+
+        /* Operators */
+        .operators-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .operator-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .operator-name {
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+        }
+
+        .operator-name.ee { color: var(--ee-color); }
+        .operator-name.o2 { color: var(--o2-color); }
+        .operator-name.vodafone { color: var(--vodafone-color); }
+        .operator-name.three { color: var(--three-color); }
+
+        .generation-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .generation-item {
+            display: flex;
+            flex-direction: column;
+            padding: 0.625rem 0.75rem;
+            background: var(--bg-main);
+            border-radius: 8px;
+        }
+
+        .gen-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .band-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-top: 0.4rem;
+            padding-left: 0.1rem;
+        }
+
+        .band-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.1rem 0.45rem;
+            background: #e2e8f0;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #475569;
+            letter-spacing: 0.01em;
+        }
+
+        .band-freq {
+            opacity: 0.7;
+            font-weight: 500;
+        }
+
+        .gen-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+
+        .gen-badge {
+            display: inline-block;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .gen-badge.gen-5g { background: #8b5cf6; color: white; }
+        .gen-badge.gen-4g { background: #3b82f6; color: white; }
+        .gen-badge.gen-3g { background: #10b981; color: white; }
+        .gen-badge.gen-2g { background: #6b7280; color: white; }
+
+        .signal-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .signal-strength {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .signal-bars {
+            display: flex;
+            gap: 2px;
+            align-items: flex-end;
+        }
+
+        .signal-bar {
+            width: 5px;
+            background: #e2e8f0;
+            border-radius: 2px;
+        }
+
+        .signal-bar:nth-child(1) { height: 10px; }
+        .signal-bar:nth-child(2) { height: 16px; }
+        .signal-bar:nth-child(3) { height: 22px; }
+        .signal-bar:nth-child(4) { height: 28px; }
+
+        .signal-bar.active.excellent { background: var(--success); }
+        .signal-bar.active.good { background: #34d399; }
+        .signal-bar.active.fair { background: var(--warning); }
+        .signal-bar.active.poor { background: var(--danger); }
+
+        .quality-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .quality-badge.excellent { background: var(--success); color: white; }
+        .quality-badge.good { background: #34d399; color: white; }
+        .quality-badge.fair { background: var(--warning); color: white; }
+        .quality-badge.poor { background: var(--danger); color: white; }
+
+        /* Map */
+        .map-section {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        .map-header {
+            margin-bottom: 0.75rem;
+        }
+
+        .map-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .map-subtitle {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        #map {
+            height: 400px;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+        .los-banner { position:absolute;top:0;left:0;right:0;background:#3b82f6;color:white;padding:0.6rem 1rem;text-align:center;font-weight:600;font-size:0.85rem;z-index:1001;border-radius:12px 12px 0 0;pointer-events:none }
+        #elevationCanvas { width:100%;height:280px;border-radius:8px;background:#fafbfc;border:1px solid var(--border) }
+
+        .stations-list {
+            margin-top: 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .station-item {
+            padding: 0.75rem 1rem;
+            background: var(--bg-main);
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+
+        .station-id {
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .station-operators {
+            margin-top: 0.375rem;
+            display: flex;
+            gap: 0.375rem;
+            flex-wrap: wrap;
+        }
+
+        .op-badge {
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .op-badge.ee { background: var(--ee-color); }
+        .op-badge.o2 { background: var(--o2-color); }
+        .op-badge.vodafone { background: var(--vodafone-color); }
+        .op-badge.three { background: var(--three-color); }
+
+        /* Footer */
+        .site-footer {
+            background: linear-gradient(180deg, #0f0b2e 0%, #0a0820 100%);
+            padding: 3rem 1.5rem 1.5rem;
+            margin-top: 2rem;
+            color: rgba(203,213,225,0.7);
+        }
+
+        .footer-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 1fr 1fr;
+            gap: 2rem;
+            font-size: 0.8rem;
+        }
+
+        .footer-brand {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .footer-brand-name {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+        }
+
+        .footer-brand-name span {
+            font-weight: 400;
+            color: rgba(203,213,225,0.5);
+            font-size: 0.9rem;
+        }
+
+        .footer-brand-desc {
+            font-size: 0.8rem;
+            color: rgba(203,213,225,0.5);
+            line-height: 1.6;
+        }
+
+        .footer-col-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(203,213,225,0.4);
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-col-links {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .footer-col-links a {
+            color: rgba(203,213,225,0.65);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+        }
+
+        .footer-col-links a:hover {
+            color: #a78bfa;
+        }
+
+        .footer-bottom {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            font-size: 0.7rem;
+            color: rgba(203,213,225,0.35);
+        }
+
+        .footer-bottom a {
+            color: rgba(167,139,250,0.6);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer-bottom a:hover {
+            color: #a78bfa;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .footer-links a {
+            color: rgba(203,213,225,0.65);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: #a78bfa;
+        }
+
+        .footer-disclaimer {
+            font-size: 0.7rem;
+            color: rgba(203,213,225,0.35);
+            text-align: center;
+            flex-basis: 100%;
+            margin-top: 0.5rem;
+        }
+
+        /* Accordion */
+        .accordion-group { margin-bottom: 0.75rem; }
+        .accordion-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 1.25rem; background: white; border: 1px solid var(--border);
+            border-radius: 10px; cursor: pointer; transition: all 0.2s;
+            font-weight: 600; font-size: 0.95rem; color: var(--text); user-select: none;
+        }
+        .accordion-header:hover { background: var(--bg-main); }
+        .accordion-icon { transition: transform 0.3s; font-size: 1.2rem; color: var(--text-muted); }
+        .accordion-group.open .accordion-header { border-radius: 10px 10px 0 0; border-bottom-color: transparent; }
+        .accordion-group.open .accordion-icon { transform: rotate(180deg); }
+        .accordion-body {
+            display: none; padding: 1rem 1.25rem; background: white;
+            border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px;
+        }
+        .accordion-group.open .accordion-body { display: block; }
+        .accordion-body .summary-card { border: none; box-shadow: none; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+        .accordion-body .summary-card:last-child { border-bottom: none; padding-bottom: 0; }
+        .accordion-count { font-size: 0.8rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem; }
+
+        /* Loading / Error */
+        .loading {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 0.875rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .hero-wrapper {
+                margin: -1rem -1rem 0;
+                padding: 3rem 1rem 2rem;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .hero .subtitle {
+                font-size: 0.9rem;
+            }
+
+            .hero-features {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+
+            .hero-feature-stat {
+                font-size: 1.2rem;
+            }
+
+            .search-section {
+                margin-top: 1.5rem;
+            }
+
+            .search-form {
+                flex-direction: column;
+            }
+
+            .search-button {
+                width: 100%;
+            }
+
+            .data-grid, .operators-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-tagline, .header-nav-links {
+                display: none;
+            }
+
+            .trust-bar {
+                flex-wrap: wrap;
+                gap: 0.75rem;
+            }
+
+            .footer-inner {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .footer-brand {
+                grid-column: 1 / -1;
+            }
+
+            #map {
+                height: 300px;
+            }
+
+            .gen-row {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .signal-info {
+                flex-wrap: wrap;
+            }
+
+            .band-pill {
+                font-size: 0.6rem;
+            }
+
+        }
+
+        @media (max-width: 480px) {
+            .site-header {
+                padding: 0.5rem 1rem;
+            }
+
+            .hero-wrapper {
+                padding: 2.5rem 1rem 1.5rem;
+            }
+
+            .hero h1 {
+                font-size: 1.65rem;
+            }
+
+            .search-section {
+                padding: 1rem;
+            }
+
+            .summary-card, .result-card, .operator-card {
+                padding: 1rem;
+            }
+
+            .footer-inner {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+        .city-link { display: block; color: rgba(203,213,225,0.45); text-decoration: none; }
+        .city-link:hover { color: rgba(203,213,225,0.7); }
+    </style>
+</head>
+<body>
+    <a href="#resultsSection" class="skip-link" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999;padding:0.75rem 1.5rem;background:var(--primary);color:white;font-weight:700;font-size:0.9rem;border-radius:0 0 8px 0;text-decoration:none" onfocus="this.style.cssText='position:fixed;left:0;top:0;z-index:9999;padding:0.75rem 1.5rem;background:var(--primary);color:white;font-weight:700;font-size:0.9rem;border-radius:0 0 8px 0;text-decoration:none'" onblur="this.style.cssText='position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden'">Skip to content</a>
+    <!-- Header -->
+    <header class="site-header" id="siteHeader">
+        <nav class="site-header-inner">
+            <a href="/" class="logo">
+                <svg class="logo-icon" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SigInfo logo">
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#6366f1"></stop>
+                            <stop offset="100%" stop-color="#7c3aed"></stop>
+                        </linearGradient>
+                    </defs>
+                    <rect width="36" height="36" rx="10" fill="url(#logoGrad)"></rect>
+                    <path d="M9 25V20M14.5 25V15M20 25V10M25.5 25V5" stroke="white" stroke-width="3.2" stroke-linecap="round"></path>
+                    <circle cx="25.5" cy="5" r="2" fill="#a78bfa" opacity="0.8"></circle>
+                </svg>
+                <span class="logo-text">SigInfo<span class="logo-tld">.uk</span></span>
+            </a>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+                <div class="header-nav-links">
+                    <a href="/toolbox/" class="header-nav-link">Toolbox</a>
+                    <a href="/los.html" class="header-nav-link">LOS Tool</a>
+                    <a href="/ireland/" class="header-nav-link">Ireland</a>
+                </div>
+                <div class="country-selector" id="countrySelector">
+                    <button class="country-btn" onclick="this.parentElement.classList.toggle('open')">
+                        <svg viewBox="0 0 60 30"><rect width="60" height="30" fill="#012169"></rect><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"></path><path d="M0,0 L60,30 M60,0 L0,30" stroke="#C8102E" stroke-width="4"></path><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"></path><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"></path></svg>
+                        UK
+                        <svg viewBox="0 0 12 8" width="10" style="opacity:0.5"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" fill="none"></path></svg>
+                    </button>
+                    <div class="country-dropdown">
+                        <a href="/" class="active"><svg viewBox="0 0 60 30"><rect width="60" height="30" fill="#012169"></rect><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"></path><path d="M0,0 L60,30 M60,0 L0,30" stroke="#C8102E" stroke-width="4"></path><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"></path><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"></path></svg> United Kingdom</a>
+                        <a href="/ireland/"><svg viewBox="0 0 60 30"><rect width="60" height="30" fill="#fff"></rect><rect width="20" height="30" fill="#169B62"></rect><rect x="40" width="20" height="30" fill="#FF883E"></rect></svg> Ireland</a>
+                        <a href="/australia/"><svg viewBox="0 0 60 30"><rect width="60" height="30" fill="#012169"></rect><rect width="30" height="15" fill="#012169"></rect><path d="M0,0 L30,15 M30,0 L0,15" stroke="#fff" stroke-width="3"></path><path d="M0,0 L30,15 M30,0 L0,15" stroke="#C8102E" stroke-width="2"></path><path d="M15,0v15M0,7.5h30" stroke="#fff" stroke-width="5"></path><path d="M15,0v15M0,7.5h30" stroke="#C8102E" stroke-width="3"></path><circle cx="45" cy="22" r="2" fill="#fff"></circle><circle cx="50" cy="10" r="1.5" fill="#fff"></circle><circle cx="55" cy="17" r="1.5" fill="#fff"></circle><circle cx="48" cy="15" r="2.5" fill="#fff"></circle><circle cx="40" cy="15" r="1.5" fill="#fff"></circle></svg> Australia</a>
+                        <a href="/nz/"><svg viewBox="0 0 60 30"><rect width="60" height="30" fill="#00247D"></rect><rect width="30" height="15" fill="#00247D"></rect><path d="M0,0 L30,15 M30,0 L0,15" stroke="#fff" stroke-width="3"></path><path d="M0,0 L30,15 M30,0 L0,15" stroke="#CC142B" stroke-width="2"></path><path d="M15,0v15M0,7.5h30" stroke="#fff" stroke-width="5"></path><path d="M15,0v15M0,7.5h30" stroke="#CC142B" stroke-width="3"></path><circle cx="44" cy="8" r="2" fill="#CC142B" stroke="white" stroke-width="0.5"></circle><circle cx="50" cy="13" r="2" fill="#CC142B" stroke="white" stroke-width="0.5"></circle><circle cx="44" cy="18" r="2" fill="#CC142B" stroke="white" stroke-width="0.5"></circle><circle cx="48" cy="23" r="1.5" fill="#CC142B" stroke="white" stroke-width="0.5"></circle></svg> New Zealand</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Hero -->
+        <div class="hero-wrapper">
+            <div class="hero-grid-bg"></div>
+            <div class="hero-particles">
+                <div class="hero-particle"></div><div class="hero-particle"></div><div class="hero-particle"></div><div class="hero-particle"></div>
+                <div class="hero-particle"></div><div class="hero-particle"></div><div class="hero-particle"></div><div class="hero-particle"></div>
+            </div>
+
+            <div class="hero">
+                <div class="hero-badge">
+                    <span class="hero-badge-dot"></span>
+                    30+ Data Points per Postcode
+                </div>
+                <h1>UK Mobile Signal<br><span>Checker</span></h1>
+                <p class="subtitle">Mobile coverage, broadband speed, base stations, aviation data, weather impact and more -- for any UK postcode.</p>
+
+                <!-- Search -->
+                <div class="search-section">
+                    <div class="search-form">
+                        <div class="search-input-wrapper">
+                            <label for="postcodeInput" class="sr-only">Enter a UK postcode, address or coordinates</label>
+                            <input type="text" id="postcodeInput" class="search-input" placeholder="Enter a postcode, address or coordinates..." autocomplete="off" inputmode="text" aria-label="Enter a UK postcode, address or coordinates">
+                            <div class="autocomplete-dropdown" id="autocompleteDropdown" role="listbox" aria-label="Postcode suggestions"></div>
+                        </div>
+                        <button class="search-button" id="searchBtn">
+                            <span id="btnText">Analyse</span>
+                            <span id="btnLoading" class="loading" style="display: none;"></span>
+                        </button>
+                        <button id="checkLOSBtn" style="padding:0 1.2rem;background:rgba(255,255,255,0.08);color:rgba(203,213,225,0.85);border:1px solid rgba(255,255,255,0.15);border-radius:14px;font-weight:700;font-size:0.85rem;cursor:pointer;white-space:nowrap;transition:all 0.25s;backdrop-filter:blur(8px)" onmouseover="this.style.background='rgba(167,139,250,0.2)';this.style.borderColor='rgba(167,139,250,0.4)';this.style.color='#ffffff'" onmouseout="this.style.background='rgba(255,255,255,0.08)';this.style.borderColor='rgba(255,255,255,0.15)';this.style.color='rgba(203,213,225,0.85)'">Check LOS</button>
+                    </div>
+                    <div class="example-postcodes">
+                        <span class="example-postcode" data-postcode="SW1A 1AA">SW1A 1AA</span>
+                        <span class="example-postcode" data-postcode="M1 1AE">M1 1AE</span>
+                        <span class="example-postcode" data-postcode="B1 1BB">B1 1BB</span>
+                        <span class="example-postcode" data-postcode="LS1 1UR">LS1 1UR</span>
+                        <span class="example-postcode" data-postcode="EH1 1RE">EH1 1RE</span>
+                        <span class="example-postcode" data-postcode="CF10 1EP">CF10 1EP</span>
+                    </div>
+                    <div id="errorMessage" class="error-message" role="alert" aria-live="assertive" style="display: none;"></div>
+                </div>
+
+                <!-- Feature Stats -->
+                <div class="hero-features">
+                    <div class="hero-feature">
+                        <div class="hero-feature-icon" aria-hidden="true">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"></path></svg>
+                        </div>
+                        <div class="hero-feature-label">Operators</div>
+                        <div class="hero-feature-stat">4 Networks</div>
+                    </div>
+                    <div class="hero-feature">
+                        <div class="hero-feature-icon" aria-hidden="true">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                        </div>
+                        <div class="hero-feature-label">Data Sources</div>
+                        <div class="hero-feature-stat">10+ APIs</div>
+                    </div>
+                    <div class="hero-feature">
+                        <div class="hero-feature-icon" aria-hidden="true">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        </div>
+                        <div class="hero-feature-label">Coverage</div>
+                        <div class="hero-feature-stat">All UK</div>
+                    </div>
+                    <div class="hero-feature">
+                        <div class="hero-feature-icon" aria-hidden="true">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        </div>
+                        <div class="hero-feature-label">Price</div>
+                        <div class="hero-feature-stat">100% Free</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wave Divider -->
+        <div class="hero-wave-divider">
+            <svg viewBox="0 0 1440 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0,0 C360,60 1080,60 1440,0 L1440,60 L0,60 Z" fill="var(--bg-main)"></path>
+            </svg>
+        </div>
+
+        <!-- Trust Bar -->
+        <div class="trust-bar">
+            <div class="trust-item">
+                <svg class="trust-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                Free, no signup
+            </div>
+            <div class="trust-item">
+                <svg class="trust-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                Open data sources
+            </div>
+            <div class="trust-item">
+                <svg class="trust-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                Every UK postcode
+            </div>
+            <div class="trust-item">
+                <svg class="trust-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                Works on all devices
+            </div>
+        </div>
+
+        <!-- Network Toolbox Banner -->
+        <a href="/toolbox/" style="text-decoration:none;display:block;max-width:1200px;margin:0 auto 2.5rem;padding:0 1rem">
+            <div style="background:linear-gradient(135deg,#1e1b4b 0%,#4f46e5 40%,#7c3aed 70%,#6366f1 100%);border-radius:16px;padding:2rem 2.5rem;color:white;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;box-shadow:0 8px 30px rgba(79,70,229,0.35);position:relative;overflow:hidden" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 16px 40px rgba(79,70,229,0.5)'" onmouseout="this.style.transform='';this.style.boxShadow='0 8px 30px rgba(79,70,229,0.35)'">
+                <div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;background:rgba(255,255,255,0.05);border-radius:50%"></div>
+                <div style="position:absolute;bottom:-30px;left:10%;width:180px;height:180px;background:rgba(255,255,255,0.03);border-radius:50%"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem;flex-wrap:wrap;position:relative;z-index:1">
+                    <div style="display:flex;align-items:center;gap:1.25rem;flex:1;min-width:200px">
+                        <div style="font-size:2.5rem;background:rgba(255,255,255,0.15);border-radius:12px;width:60px;height:60px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🔧</div>
+                        <div>
+                            <h2 style="font-size:1.6rem;font-weight:800;margin:0 0 0.3rem;letter-spacing:-0.02em">Network Toolbox</h2>
+                            <p style="font-size:0.95rem;opacity:0.85;margin:0;line-height:1.4">DNS, Whois, Ping, Port Scan, SSL, SPF/DMARC, Hash, JWT, Regex &amp; more</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                        <span style="padding:0.35rem 0.75rem;background:rgba(255,255,255,0.15);border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap">22 Tools</span>
+                        <span style="padding:0.35rem 0.75rem;background:rgba(255,255,255,0.15);border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap">100% Free</span>
+                        <span style="padding:0.35rem 0.75rem;background:rgba(255,255,255,0.15);border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap">No Signup</span>
+                    </div>
+                    <div style="font-size:1.8rem;opacity:0.6;flex-shrink:0">→</div>
+                </div>
+            </div>
+        </a>
+
+        <!-- Results -->
+        <div class="results-section" id="resultsSection">
+            <div class="location-info">
+                <h2 id="locationTitle">Loading...</h2>
+                <p class="location-details" id="locationDetails"></p>
+            </div>
+            <div id="addressBanner" style="display:none;background:linear-gradient(135deg,#f0f0ff 0%,#e8e8ff 100%);border:1px solid #c7c7ff;border-radius:10px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;text-align:center;font-size:0.9rem;color:var(--primary-dark)"></div>
+
+            <!-- Subscribe to Monitor -->
+            <div style="background:linear-gradient(135deg,#4f46e5 0%,#6366f1 100%);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;color:white">
+                <form id="subscribeForm" data-postcode="" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+                    <div style="flex:1;min-width:200px">
+                        <strong style="font-size:0.95rem">Monitor <span class="sub-postcode">this postcode</span></strong>
+                        <div style="font-size:0.8rem;opacity:0.85">Get email alerts when coverage, planning or infrastructure data changes. <strong>Free for 1 postcode</strong> • £2.99/month for unlimited.</div>
+                    </div>
+                    <input type="email" placeholder="Your email address" aria-label="Email address for signal monitoring" required="" style="padding:0.5rem 0.75rem;border:none;border-radius:6px;font-size:0.85rem;width:200px;outline:none">
+                    <button type="submit" style="padding:0.5rem 1.25rem;background:white;color:var(--primary);border:none;border-radius:6px;font-weight:700;font-size:0.85rem;cursor:pointer;white-space:nowrap">Subscribe</button>
+                </form>
+            </div>
+
+            <!-- OSINT Report -->
+            <div style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;color:white;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                <div style="flex:1;min-width:220px">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
+                        <strong style="font-size:0.95rem">OSINT Intelligence Report</strong>
+                        <span style="padding:0.15rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:700;background:#f59e0b;color:#0f172a">PREMIUM</span>
+                    </div>
+                    <div style="font-size:0.8rem;opacity:0.8;line-height:1.4">Comprehensive open-source intelligence report for <strong class="osint-postcode" style="opacity:1">this location</strong>. Includes infrastructure analysis, risk assessment, connectivity profiling, network vulnerability mapping, historical data trends and executive summary.</div>
+                </div>
+                <div style="text-align:center;min-width:140px">
+                    <div><span style="font-size:1rem;font-weight:700;text-decoration:line-through;opacity:0.5">£79.99</span></div>
+                    <div style="font-size:1.5rem;font-weight:800;color:#10b981">Free!</div>
+                    <button id="osintOrderBtn" onclick="orderOSINTReport()" style="padding:0.5rem 1.5rem;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:6px;font-weight:700;font-size:0.85rem;cursor:pointer;white-space:nowrap;transition:all 0.2s">Get Report</button>
+                </div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-header">
+                    <span class="summary-badge" id="overallBadge">Excellent</span>
+                    <span class="fiveg-badge" id="fiveGBadge" style="display: none;">5G Available</span>
+                </div>
+                <p class="summary-text" id="summaryText"></p>
+            </div>
+
+            <!-- ===== ZONE 1: Core Signal Data ===== -->
+
+            <!-- Network Status -->
+            <div class="summary-card">
+                <h3 class="section-title" style="margin-bottom: 0.75rem;">Live Network Status</h3>
+                <div id="networkStatus" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+                    Loading...
+                </div>
+            </div>
+
+            <!-- Operators -->
+            <h3 class="section-title">Detailed Operator Coverage</h3>
+            <div class="operators-grid" id="operatorsGrid"></div>
+
+            <!-- Map -->
+            <div class="map-section">
+                <div class="map-header">
+                    <h3 class="map-title">Nearby Base Stations</h3>
+                    <p class="map-subtitle"><span id="stationCount">0</span> base stations within 2km</p>
+                </div>
+                <div id="map"></div>
+                <div class="stations-list" id="stationsList"></div>
+            </div>
+
+            <!-- ===== ZONE 2: Signal Intelligence ===== -->
+
+            <!-- Signal Intelligence -->
+            <h3 class="section-title">Signal Intelligence</h3>
+            <div class="data-grid">
+                <div class="result-card">
+                    <div class="card-title">Broadband Speed</div>
+                    <div class="stat-value" id="broadbandSpeed">--</div>
+                    <div class="stat-sub" id="fiberStatus">Fixed-line internet</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Power Line Interference</div>
+                    <div class="stat-value" id="powerLine" style="font-size: 1.25rem;">--</div>
+                    <div class="stat-sub" id="powerLineDetail">RF environment</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">UK Ranking</div>
+                    <div class="stat-value" id="compareGrade" style="font-size: 2.5rem;">--</div>
+                    <div class="stat-sub" id="compareDetail">vs national average</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Public WiFi</div>
+                    <div class="stat-value" id="wifiCount">--</div>
+                    <div class="stat-sub" id="wifiDetail">Hotspots nearby</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Underground Coverage</div>
+                    <div class="stat-value" id="tubeStatus" style="font-size: 1.25rem;">--</div>
+                    <div class="stat-sub" id="tubeDetail">Transit mobile coverage</div>
+                </div>
+            </div>
+
+            <!-- Weather Signal Forecast -->
+            <div class="summary-card">
+                <h3 class="section-title" style="margin-bottom: 0.75rem;">Weather Signal Forecast</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                    <div style="padding: 0.875rem; background: var(--bg-main); border-radius: 8px; text-align: center;">
+                        <div class="card-title">Weather</div>
+                        <div id="weatherNow" style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;">--</div>
+                        <div id="weatherTemp" style="color: var(--text-muted); font-size: 0.85rem;">--</div>
+                    </div>
+                    <div style="padding: 0.875rem; background: var(--bg-main); border-radius: 8px; text-align: center;">
+                        <div class="card-title">Signal Impact</div>
+                        <div id="signalImpact" style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;">--</div>
+                        <div id="signalImpactDetail" style="color: var(--text-muted); font-size: 0.8rem;">--</div>
+                    </div>
+                    <div style="padding: 0.875rem; background: var(--bg-main); border-radius: 8px; text-align: center;">
+                        <div class="card-title">5G Rain Fade</div>
+                        <div id="rainFade" style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;">--</div>
+                        <div style="color: var(--text-muted); font-size: 0.8rem;">mmWave degradation</div>
+                    </div>
+                </div>
+                <div id="forecastChart" style="display: flex; gap: 2px; align-items: flex-end; height: 50px; padding: 0.25rem 0;"></div>
+                <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+                    <span>Now</span><span>+6h</span><span>+12h</span>
+                </div>
+            </div>
+
+            <!-- ===== ZONE 3: Telecoms Deep Dives ===== -->
+
+            <!-- ===== ACCORDION: Network Performance ===== -->
+            <div class="accordion-group" data-category="network">
+                <div class="accordion-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAccordion(this)}">
+                    Network Performance <span class="accordion-count">5 analyses</span>
+                    <span class="accordion-icon">▾</span>
+                </div>
+                <div class="accordion-body">
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.25rem;">Network Congestion by Hour</h3>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;" id="congestionTip">--</p>
+                        <div id="congestionChart" style="display: flex; gap: 2px; align-items: flex-end; height: 70px;"></div>
+                        <div style="font-size: 0.65rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 0.25rem;">
+                            <span>00</span><span>04</span><span>08</span><span>12</span><span>16</span><span>20</span><span>23</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Network Latency Estimates</h3>
+                        <div id="latencyData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Speed Test</h3>
+                        <div id="speedTestData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Network Congestion Risk</h3>
+                        <div id="congestionRiskData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">3G Sunset Impact Assessment</h3>
+                        <div id="threeGSunsetData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Coverage History Timeline</h3>
+                        <div id="coverageHistoryData">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ACCORDION: Connectivity & Broadband ===== -->
+            <div class="accordion-group" data-category="connectivity">
+                <div class="accordion-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAccordion(this)}">
+                    Connectivity &amp; Broadband <span class="accordion-count">6 analyses</span>
+                    <span class="accordion-icon">▾</span>
+                </div>
+                <div class="accordion-body">
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Fibre Backhaul Availability</h3>
+                        <div id="fibreBackhaulData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Satellite Broadband Alternatives</h3>
+                        <div id="satelliteBroadbandData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Nearest Data Centres</h3>
+                        <div class="data-grid" style="margin-bottom: 1rem;">
+                            <div class="result-card">
+                                <div class="card-title">Closest Data Centre</div>
+                                <div class="stat-value" id="nearestDC" style="font-size: 1rem;">--</div>
+                                <div class="stat-sub" id="nearestDCDistance">Calculating...</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="card-title">Estimated Latency</div>
+                                <div class="stat-value" id="dcLatency">--</div>
+                                <div class="stat-sub" id="dcLatencyNote">To nearest data centre</div>
+                            </div>
+                        </div>
+                        <div id="dataCentreList">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">BT/Openreach Exchange Data</h3>
+                        <div class="data-grid" style="margin-bottom: 1rem;">
+                            <div class="result-card">
+                                <div class="card-title">Nearest Exchange</div>
+                                <div class="stat-value" id="nearestExchange" style="font-size: 1rem;">--</div>
+                                <div class="stat-sub" id="nearestExchangeDist">Calculating...</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="card-title">Est. Line Length</div>
+                                <div class="stat-value" id="exchangeLineLength">--</div>
+                                <div class="stat-sub" id="exchangeLineLengthNote">Copper routing estimate</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="card-title">PSTN Status</div>
+                                <div class="stat-value" id="exchangePSTN" style="font-size: 0.9rem;">--</div>
+                                <div class="stat-sub" id="exchangePSTNDate">Checking...</div>
+                            </div>
+                        </div>
+                        <div id="btExchangeList">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Digital Deprivation Index</h3>
+                        <div id="digitalDeprivationData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Commuter Signal Corridors</h3>
+                        <div id="transportData">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ACCORDION: Planning & Infrastructure ===== -->
+            <div class="accordion-group" data-category="planning">
+                <div class="accordion-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAccordion(this)}">
+                    Planning &amp; Infrastructure <span class="accordion-count">5 analyses</span>
+                    <span class="accordion-icon">▾</span>
+                </div>
+                <div class="accordion-body">
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Mast Planning Applications</h3>
+                        <div id="planningList">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Mast Installation Cost Estimate</h3>
+                        <div id="mastCostData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Infrastructure Sharing</h3>
+                        <div id="infraSharingData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Mast Regulations &amp; Permitted Development</h3>
+                        <div id="regulationData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Listed Buildings &amp; Conservation Status</h3>
+                        <div id="listedBuildingsData">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ACCORDION: Environment & Property ===== -->
+            <div class="accordion-group" data-category="environment">
+                <div class="accordion-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAccordion(this)}">
+                    Environment &amp; Property <span class="accordion-count">5 analyses</span>
+                    <span class="accordion-icon">▾</span>
+                </div>
+                <div class="accordion-body">
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Terrain &amp; Signal Propagation</h3>
+                        <div id="terrainPropagationData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Building Age Profile &amp; Indoor Signal Loss</h3>
+                        <div id="buildingProfileData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Electromagnetic Interference Sources</h3>
+                        <div id="emInterferenceData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Solar Panel Potential</h3>
+                        <div id="solarPotentialData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Environmental Noise Levels</h3>
+                        <div id="noiseData">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ZONE 4: Supporting Context ===== -->
+
+            <!-- ===== ACCORDION: Area Context ===== -->
+            <div class="accordion-group" data-category="area">
+                <div class="accordion-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAccordion(this)}">
+                    Area Context <span class="accordion-count">7 analyses</span>
+                    <span class="accordion-icon">▾</span>
+                </div>
+                <div class="accordion-body">
+                    <h3 class="section-title">Area Intelligence</h3>
+                    <div class="data-grid">
+                <div class="result-card">
+                    <div class="card-title">Crime Rate</div>
+                    <div class="stat-value" id="crimeRate">--</div>
+                    <div class="stat-sub" id="crimeDetails">Loading...</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Population Density</div>
+                    <div class="stat-value" id="populationDensity">--</div>
+                    <div class="stat-sub">Network congestion indicator</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Elevation</div>
+                    <div class="stat-value" id="elevation">--</div>
+                    <div class="stat-sub">Affects signal propagation</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Air Quality</div>
+                    <div class="stat-value" id="airQuality">--</div>
+                    <div class="stat-sub">Environmental index</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Property Value</div>
+                    <div class="stat-value" id="propertyPrice">--</div>
+                    <div class="stat-sub" id="priceTrend">Average area price</div>
+                </div>
+                    </div>
+                    <h3 class="section-title" style="margin-top:1rem">Risk Assessment</h3>
+                    <div class="data-grid">
+                <div class="result-card">
+                    <div class="card-title">Flood Risk</div>
+                    <div class="stat-value" id="floodRisk">--</div>
+                    <div class="stat-sub" id="floodDetail">Infrastructure risk</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Conservation Area</div>
+                    <div class="stat-value" id="heritageStatus" style="font-size: 1.25rem;">--</div>
+                    <div class="stat-sub" id="heritageDetail">Planning difficulty</div>
+                </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aviation -->
+            <h3 class="section-title">Aviation &amp; Airspace</h3>
+            <div class="data-grid">
+                <div class="result-card">
+                    <div class="card-title">Nearest Airport</div>
+                    <div class="stat-value" id="nearestAirport" style="font-size: 1.25rem;">--</div>
+                    <div class="stat-sub" id="airportDistance">Calculating...</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Drone Status</div>
+                    <div class="stat-value" id="droneStatus" style="font-size: 1.25rem;">--</div>
+                    <div class="stat-sub" id="droneReason">Checking restrictions...</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Max Mast Height</div>
+                    <div class="stat-value" id="maxMastHeight">--</div>
+                    <div class="stat-sub" id="heightReason">Checking regulations...</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Tallest Building</div>
+                    <div class="stat-value" id="tallestBuilding">--</div>
+                    <div class="stat-sub">Estimated max height</div>
+                </div>
+                <div class="result-card">
+                    <div class="card-title">Airspace Classification</div>
+                    <div class="stat-value" id="airspaceClass" style="font-size: 1.25rem;">--</div>
+                    <div class="stat-sub" id="airspaceDesc">Checking...</div>
+                </div>
+            </div>
+
+            <!-- ===== ACCORDION: Local Amenities ===== -->
+            <div class="accordion-group" data-category="amenities">
+                <div class="accordion-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAccordion(this)}">
+                    Local Amenities <span class="accordion-count">5 analyses</span>
+                    <span class="accordion-icon">▾</span>
+                </div>
+                <div class="accordion-body">
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Nearest Emergency Services</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                            <div>
+                                <h4 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">Police Stations</h4>
+                                <div id="policeStationsList">Loading...</div>
+                            </div>
+                            <div>
+                                <h4 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">Fire Stations</h4>
+                                <div id="fireStationsList">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Schools, Hospitals &amp; Sensitive Sites</h3>
+                        <div id="sensitiveSitesData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">EV Charging Stations Nearby</h3>
+                        <div id="evChargingData">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Closest IT &amp; Telecoms Businesses</h3>
+                        <div id="itBusinessList">Loading...</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3 class="section-title" style="margin-bottom: 0.75rem;">Free WiFi Locations</h3>
+                        <div id="wifiLocationsList">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== Signal Solutions (always visible) ===== -->
+            <div class="summary-card" id="shopSection" style="display:none">
+                <h3 class="section-title" style="margin-bottom: 0.75rem;">Signal Solutions <span style="font-size:0.8rem;color:var(--text-muted);font-weight:400">Personalised recommendations</span></h3>
+                <div id="shopProducts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.75rem"></div>
+            </div>
+
+
+            <!-- Line of Sight Analysis Results -->
+            <div class="summary-card" id="losResults" style="display:none">
+                <h3 class="section-title" style="margin-bottom:1rem">Line of Sight Analysis</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.25rem">
+                    <div class="result-card"><div class="card-title">LOS Status</div><div class="stat-value" id="losStatus" style="font-size:1.3rem"></div><div class="stat-sub" id="losStatusSub"></div></div>
+                    <div class="result-card"><div class="card-title">Distance</div><div class="stat-value" id="losDistance" style="font-size:1.3rem"></div><div class="stat-sub" id="losBearing"></div></div>
+                    <div class="result-card"><div class="card-title">Elev. Change</div><div class="stat-value" id="losElevChange" style="font-size:1.3rem"></div><div class="stat-sub" id="losElevDetail"></div></div>
+                    <div class="result-card"><div class="card-title">Fresnel Clear.</div><div class="stat-value" id="losFresnelPct" style="font-size:1.3rem"></div><div class="stat-sub" id="losFresnelSub"></div></div>
+                </div>
+                <div style="margin-bottom:1.25rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                        <h4 style="font-size:0.95rem;font-weight:700">Elevation Profile</h4>
+                        <select id="losFreqSelect" style="padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.8rem">
+                            <option value="800">800 MHz (4G Low)</option>
+                            <option value="1800" selected="">1800 MHz (4G Mid)</option>
+                            <option value="2600">2600 MHz (4G High)</option>
+                            <option value="3500">3500 MHz (5G)</option>
+                        </select>
+                    </div>
+                    <canvas id="elevationCanvas"></canvas>
+                    <div id="losCanvasTooltip" style="display:none;position:absolute;background:rgba(15,23,42,0.9);color:white;padding:0.4rem 0.6rem;border-radius:6px;font-size:0.75rem;pointer-events:none;z-index:100;white-space:nowrap"></div>
+                </div>
+                <div style="margin-bottom:1.25rem">
+                    <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.5rem">Path Loss Estimates</h4>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.5rem">
+                        <div style="padding:0.6rem 0.75rem;background:var(--bg-main);border-radius:8px"><div style="font-size:0.7rem;color:var(--text-muted)">800 MHz (4G)</div><div style="font-size:1.1rem;font-weight:800" id="losPL800"></div></div>
+                        <div style="padding:0.6rem 0.75rem;background:var(--bg-main);border-radius:8px"><div style="font-size:0.7rem;color:var(--text-muted)">1800 MHz (4G)</div><div style="font-size:1.1rem;font-weight:800" id="losPL1800"></div></div>
+                        <div style="padding:0.6rem 0.75rem;background:var(--bg-main);border-radius:8px"><div style="font-size:0.7rem;color:var(--text-muted)">2600 MHz (4G)</div><div style="font-size:1.1rem;font-weight:800" id="losPL2600"></div></div>
+                        <div style="padding:0.6rem 0.75rem;background:var(--bg-main);border-radius:8px"><div style="font-size:0.7rem;color:var(--text-muted)">3500 MHz (5G)</div><div style="font-size:1.1rem;font-weight:800" id="losPL3500"></div></div>
+                    </div>
+                </div>
+                <details style="margin-bottom:1rem">
+                    <summary style="cursor:pointer;font-weight:600;font-size:0.85rem;padding:0.5rem;background:var(--bg-main);border-radius:6px">Technical Details</summary>
+                    <div style="margin-top:0.75rem;font-size:0.8rem;color:var(--text-muted);line-height:1.7" id="losTechDetails"></div>
+                </details>
+                <div style="display:flex;gap:0.5rem">
+                    <button onclick="enableLOSMode()" style="padding:0.5rem 1rem;background:var(--primary);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.85rem">New Analysis</button>
+                    <button onclick="closeLOS()" style="padding:0.5rem 1rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.85rem">Close</button>
+                </div>
+            </div>
+        </div>
+    
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <div class="footer-brand-name">SigInfo<span>.uk</span></div>
+                <div class="footer-brand-desc">The UK's most comprehensive mobile signal and connectivity intelligence platform. Free, open-source data for every postcode.</div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.25rem">
+                    <span style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.2);border-radius:4px;color:#a78bfa;font-weight:600">A MastData.com Collaboration</span>
+                </div>
+            </div>
+            <div>
+                <div class="footer-col-title">Tools</div>
+                <div class="footer-col-links">
+                    <a href="/">Signal Checker</a>
+                    <a href="/los.html">Line of Sight</a>
+                    <a href="/toolbox/">Network Toolbox</a>
+                    <a href="/ireland/">Ireland Coverage</a>
+                </div>
+            </div>
+            <div>
+                <div class="footer-col-title">Popular Cities</div>
+                <div class="footer-col-links">
+                    <a href="/report/SW1A-1AA/">London</a>
+                    <a href="/report/M1-1AE/">Manchester</a>
+                    <a href="/report/B1-1BB/">Birmingham</a>
+                    <a href="/report/LS1-1UR/">Leeds</a>
+                    <a href="/report/EH1-1YZ/">Edinburgh</a>
+                    <a href="/report/G1-1DU/">Glasgow</a>
+                </div>
+            </div>
+            <div>
+                <div class="footer-col-title">Company</div>
+                <div class="footer-col-links">
+                    <a href="https://rival.net.au" target="_blank" rel="noopener">Rival Networks</a>
+                    <a href="https://abeyance.uk" target="_blank" rel="noopener">Abeyance.UK</a>
+                    <a href="https://mastdata.com" target="_blank" rel="noopener">MastData.com</a>
+                    <a href="mailto:connect@siginfo.uk">Contact</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div>All data sources are public. Data from postcodes.io, Police.uk, Open-Meteo, Environment Agency &amp; other public APIs. Coverage estimates are indicative.</div>
+                <div>Built by <a href="https://rival.net.au" target="_blank" rel="noopener">Rival Networks</a>. An <a href="https://abeyance.uk" target="_blank" rel="noopener">Abeyance.UK</a> project.</div>
+            </div>
+            <details style="grid-column:1/-1;border-top:1px solid rgba(255,255,255,0.06);padding-top:0.75rem;margin-top:0.25rem">
+                <summary style="cursor:pointer;font-size:0.7rem;color:rgba(203,213,225,0.35);text-align:center;list-style:none;-webkit-appearance:none">Browse all cities</summary>
+                <nav style="margin-top:0.75rem;column-count:4;column-gap:1rem;font-size:0.7rem;line-height:2">
+                    <a href="/report/SW1A-1AA/" class="city-link">London</a>
+                    <a href="/report/M1-1AE/" class="city-link">Manchester</a>
+                    <a href="/report/B1-1BB/" class="city-link">Birmingham</a>
+                    <a href="/report/LS1-1UR/" class="city-link">Leeds</a>
+                    <a href="/report/G1-1DU/" class="city-link">Glasgow</a>
+                    <a href="/report/EH1-1YZ/" class="city-link">Edinburgh</a>
+                    <a href="/report/CF10-1EP/" class="city-link">Cardiff</a>
+                    <a href="/report/BT1-5GS/" class="city-link">Belfast</a>
+                    <a href="/report/BS1-1HT/" class="city-link">Bristol</a>
+                    <a href="/report/L1-1JQ/" class="city-link">Liverpool</a>
+                    <a href="/report/NE1-5DL/" class="city-link">Newcastle</a>
+                    <a href="/report/S1-2BJ/" class="city-link">Sheffield</a>
+                    <a href="/report/NG1-5FS/" class="city-link">Nottingham</a>
+                    <a href="/report/SO14-7DU/" class="city-link">Southampton</a>
+                    <a href="/report/CB2-1TN/" class="city-link">Cambridge</a>
+                    <a href="/report/OX1-1BX/" class="city-link">Oxford</a>
+                    <a href="/report/YO1-7HH/" class="city-link">York</a>
+                    <a href="/report/BA1-1SJ/" class="city-link">Bath</a>
+                    <a href="/report/EX1-1GF/" class="city-link">Exeter</a>
+                    <a href="/report/PL1-1EA/" class="city-link">Plymouth</a>
+                    <a href="/report/CT1-2TF/" class="city-link">Canterbury</a>
+                    <a href="/report/NR1-3NG/" class="city-link">Norwich</a>
+                    <a href="/report/CV1-1JR/" class="city-link">Coventry</a>
+                    <a href="/report/LE1-5AP/" class="city-link">Leicester</a>
+                    <a href="/report/AB10-1XG/" class="city-link">Aberdeen</a>
+                    <a href="/report/IV1-1JE/" class="city-link">Inverness</a>
+                    <a href="/report/SA1-1NX/" class="city-link">Swansea</a>
+                    <a href="/report/DE1-1QH/" class="city-link">Derby</a>
+                    <a href="/report/PE1-1XG/" class="city-link">Peterborough</a>
+                    <a href="/report/IP1-3QH/" class="city-link">Ipswich</a>
+                    <a href="/report/LL11-1AY/" class="city-link">Wrexham</a>
+                </nav>
+            </details>
+        </div>
+    </footer>
+
+    <script>document.addEventListener('click',function(e){var s=document.getElementById('countrySelector');if(s&&!s.contains(e.target))s.classList.remove('open')});window.addEventListener('scroll',function(){document.getElementById('siteHeader').classList.toggle('scrolled',window.scrollY>20)},{passive:true});</script>
+    <script src="script.js?v=20260330b"></script>
+
+
+</body></html>

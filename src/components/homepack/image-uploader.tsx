@@ -1,13 +1,9 @@
-'use client';
-
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import Image from 'next/image';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { generateConditionReportAction } from '@/app/actions';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 type ImageUploaderProps = {
   onReportGenerated: (report: string) => void;
@@ -19,7 +15,6 @@ type FileWithPreview = File & { preview: string };
 export function ImageUploader({ onReportGenerated, setIsLoading }: ImageUploaderProps) {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const { toast } = useToast();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map((file) =>
@@ -43,7 +38,7 @@ export function ImageUploader({ onReportGenerated, setIsLoading }: ImageUploader
   
   const handleGenerateReport = async () => {
     if (files.length === 0) {
-      toast({ title: "No images", description: "Please upload at least one image.", variant: "destructive" });
+      toast.error("No images", { description: "Please upload at least one image." });
       return;
     }
     setIsLoading(true);
@@ -58,13 +53,15 @@ export function ImageUploader({ onReportGenerated, setIsLoading }: ImageUploader
 
     try {
         const dataUris = await Promise.all(files.map(fileToDataUri));
-        const result = await generateConditionReportAction(dataUris);
-        onReportGenerated(result.report);
-        if (result.error) {
-           toast({ title: "Report Generation Warning", description: result.report, variant: "destructive" });
-        }
-    } catch(e) {
-        toast({ title: "Report Generation Failed", description: "Could not generate the condition report.", variant: "destructive" });
+        
+        // Generate AI condition report on the frontend as per instructions
+        const { generateAiConditionReport } = await import('@/services/geminiService');
+        const report = await generateAiConditionReport(dataUris);
+        
+        onReportGenerated(report);
+    } catch (e) {
+        console.error("Report Generation Error:", e);
+        toast.error("Report Generation Failed", { description: "Could not generate the condition report." });
     } finally {
         setIsLoading(false);
         setIsGenerating(false);
@@ -110,12 +107,11 @@ export function ImageUploader({ onReportGenerated, setIsLoading }: ImageUploader
           <div className="grid grid-cols-3 gap-2">
             {files.map((file) => (
               <div key={file.name} className="relative group">
-                <Image
+                <img
                   src={file.preview}
                   alt={file.name}
-                  width={100}
-                  height={100}
                   className="rounded-md object-cover w-full aspect-square"
+                  referrerPolicy="no-referrer"
                 />
                 <button
                   onClick={() => removeFile(file)}

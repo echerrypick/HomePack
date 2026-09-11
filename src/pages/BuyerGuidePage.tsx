@@ -1,0 +1,170 @@
+import React from 'react';
+import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle2, ExternalLink, FileText, Info, Lightbulb, ListChecks } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+
+export default function BuyerGuidePage() {
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header />
+
+      <main className="container mx-auto px-4 py-12 max-w-4xl flex-grow">
+        <div className="mb-12 text-center">
+          <h1 className="text-4xl font-extrabold tracking-tight mb-4">The Ultimate Buyer's Guide</h1>
+          <p className="text-xl text-muted-foreground">Everything you need to know to navigate the UK property market with confidence.</p>
+        </div>
+
+        {/* TA6 Form Section */}
+        <Card className="mb-12 border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <FileText className="h-6 w-6" />
+              TA6 Property Information Form (6th Edition, 2025)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm leading-relaxed">
+              The <strong>TA6 Property Information Form</strong> is a critical document for any prospective buyer. It is completed by the seller to provide detailed information about the property, covering everything from boundaries and disputes to planning permissions and environmental matters.
+            </p>
+            <div className="bg-background/80 p-4 rounded-lg border border-primary/10">
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary" />
+                Key Update for 2026
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                The latest 6th edition (2025) of the TA6 form is mandatory for all sales handled by solicitors after <strong>30 March 2026</strong>. This version includes more detailed disclosures to help prevent "transaction failure" and ensure buyers have all material information upfront.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-4 pt-2">
+              <Button asChild variant="default">
+                <a 
+                  href="https://tls-sc104-prd-glo-fde-01-duatf0eka4hpcxe6.a03.azurefd.net/-/media/files/topics/property/ta6-6th-edition---law-society-explanatory-notes-2025.pdf?rev=a3f28e96e65c46dab1a04707df10e892&hash=88831BF28B3D5F02DCDA02208764B850" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2"
+                >
+                  Download TA6 Guidance Notes (PDF)
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          {/* Buyer Checklist */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ListChecks className="h-5 w-5 text-primary" />
+                Buyer's Checklist
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {[
+                  "Get a Mortgage in Principle (MIP)",
+                  "Research local areas and schools",
+                  "Arrange property viewings",
+                  "Review the HomePack report (EPC, Flood, Planning)",
+                  "Request the TA6 form from the seller's solicitor",
+                  "Instruct a surveyor for a structural survey",
+                  "Appoint a conveyancing solicitor",
+                  "Check the property's boundary on Land Registry",
+                  "Verify broadband speeds and mobile coverage",
+                  "Review local planning applications nearby"
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Top Tips */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="h-5 w-5 text-yellow-500" />
+                Top Tips for Buyers
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-4">
+                <li className="space-y-1">
+                  <p className="font-semibold text-sm">Visit at different times</p>
+                  <p className="text-xs text-muted-foreground">Check the neighborhood during rush hour, at night, and on weekends to understand noise and traffic levels.</p>
+                </li>
+                <li className="space-y-1">
+                  <p className="font-semibold text-sm">Don't just look at the decor</p>
+                  <p className="text-xs text-muted-foreground">Look for signs of damp, cracks in walls, and the condition of the roof. Decor can be changed; structure is expensive.</p>
+                </li>
+                <li className="space-y-1">
+                  <p className="font-semibold text-sm">Ask about the 'Chain'</p>
+                  <p className="text-xs text-muted-foreground">Understand how many people are involved in the transaction. A short or non-existent chain is less likely to collapse.</p>
+                </li>
+                <li className="space-y-1">
+                  <p className="font-semibold text-sm">Check the EPC Report</p>
+                  <p className="text-xs text-muted-foreground">Energy costs are a major monthly expense. Look for properties with higher ratings or clear potential for improvement.</p>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator className="my-12" />
+
+        {/* Useful Resources */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold">Useful Resources</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <ResourceLink 
+              title="MoneyHelper: Buying a Home" 
+              url="https://www.moneyhelper.org.uk/en/homes/buying-a-home"
+              description="Free, impartial advice on the costs and process of buying."
+            />
+            <ResourceLink 
+              title="GOV.UK: How to Buy a Home" 
+              url="https://www.gov.uk/government/publications/how-to-buy-a-home"
+              description="The official government guide to the home buying process."
+            />
+            <ResourceLink 
+              title="Land Registry Public Records" 
+              url="https://www.gov.uk/search-property-information-land-registry"
+              description="Check property boundaries and ownership details."
+            />
+            <ResourceLink 
+              title="Check Flood Risk" 
+              url="https://www.gov.uk/check-long-term-flood-risk"
+              description="Detailed long-term flood risk assessments by postcode."
+            />
+          </div>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
+
+function ResourceLink({ title, url, description }: { title: string, url: string, description: string }) {
+  return (
+    <a 
+      href={url} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="block p-4 rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-md transition-all group"
+    >
+      <div className="flex justify-between items-start mb-1">
+        <h3 className="font-semibold text-sm group-hover:text-primary transition-colors">{title}</h3>
+        <ExternalLink className="h-3 w-3 text-muted-foreground" />
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+    </a>
+  );
+}

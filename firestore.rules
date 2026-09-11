@@ -1,0 +1,133 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users
+// Document ID: {uid}
+// Fields:
+//   - uid: string (required) - Firebase Auth UID
+//   - email: string (required) - User email
+//   - displayName: string (optional) - User display name
+//   - role: string (required, enum: ['admin', 'free', 'subscription', 'agency']) - User tier/role
+//   - searchCount: number (optional) - Number of searches performed
+//   - lastSearchReset: string (optional, ISO 8601) - Last time search count was reset
+//   - searchedAddresses: list (optional) - List of addresses searched
+//   - searchHistory: list (optional) - List of objects {address, timestamp}
+//   - createdAt: string (optional, ISO 8601) - Profile creation timestamp
+//
+// Collection: searchLogs
+// Document ID: {logId}
+// Fields:
+//   - uid: string (required) - User UID
+//   - postcode: string (optional)
+//   - address: string (optional)
+//   - timestamp: timestamp (required)
+//   - success: bool (optional)
+//   - logs: list (optional)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "echerrypick@btinternet.com"));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidRole(role) {
+      return role in ['admin', 'free', 'subscription', 'agency'];
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
+             isValidRole(data.role) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 30)) &&
+             (!('company' in data) || (data.company is string && data.company.size() <= 120)) &&
+             (!('jobTitle' in data) || (data.jobTitle is string && data.jobTitle.size() <= 100)) &&
+             (!('preferredRegion' in data) || (data.preferredRegion is string && data.preferredRegion.size() <= 50)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() <= 1000)) &&
+             (!('notifications' in data) || data.notifications is map) &&
+             (!('updatedAt' in data) || data.updatedAt is string) &&
+             (!('searchCount' in data) || data.searchCount is number) &&
+             (!('searchedAddresses' in data) || data.searchedAddresses is list) &&
+             (!('searchHistory' in data) || data.searchHistory is list);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Users can read their own profile. Admins can read all profiles.
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Users can create their own profile with 'free' role. Admins can create any profile.
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && request.resource.data.role == 'free') ||
+        isAdmin()
+      );
+
+      // Users can update their own profile permitted fields, but NOT protected fields (role, uid, email).
+      // Admins can update anything.
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && 
+         request.resource.data.role == resource.data.role &&
+         request.resource.data.uid == resource.data.uid &&
+         request.resource.data.email == resource.data.email) ||
+        isAdmin()
+      );
+
+      // Only admins can delete users.
+      allow delete: if isAdmin();
+    }
+
+    match /searchLogs/{logId} {
+      // Only admins can read search logs.
+      allow read: if isAdmin();
+
+      // Any authenticated user can create a search log for themselves.
+      allow create: if isAuthenticated() && 
+                    request.resource.data.uid == request.auth.uid &&
+                    request.resource.data.timestamp is timestamp;
+
+      // Search logs are immutable.
+      allow update, delete: if false;
+    }
+  }
+}
