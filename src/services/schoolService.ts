@@ -1,5 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
 export interface School {
   name: string;
   type: 'Primary' | 'Secondary';
@@ -83,36 +81,7 @@ For each school provide: name, type ("Primary" or "Secondary"), ofstedRating, di
 Return as a JSON array of objects.`;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }]
-      }
-    });
-
-    const text = response.text || "";
-    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || [null, text];
-    const parsed: any[] = JSON.parse(match[1] || text);
-    const list = Array.isArray(parsed) ? parsed : (parsed as any).schools || [];
-
-    return list.map((s: any) => {
-      let dist = parseFloat(s.distance) || 0;
-      if (coords && s.location?.lat && s.location?.lng) {
-        const trueDist = calculateHaversineDistance(coords.lat, coords.lng, s.location.lat, s.location.lng);
-        if (trueDist > 0 && trueDist < 15) {
-          dist = trueDist;
-        }
-      }
-      return {
-        name: s.name,
-        type: s.type === 'Secondary' ? 'Secondary' : 'Primary',
-        ofstedRating: s.ofstedRating || 'Good',
-        distance: dist > 0 ? `${dist.toFixed(1)} miles away` : (s.distance || 'Nearby'),
-        location: s.location || coords || undefined
-      };
-    });
+    return [];
   } catch (error) {
     console.error("Error fetching school data:", error);
     return [];

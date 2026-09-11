@@ -1,11 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
-// Initialize the Gemini API client
-// In AI Studio Build, GEMINI_API_KEY is automatically provided via process.env
-const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || 
-               ((import.meta as any).env?.VITE_GEMINI_API_KEY) || 
-               "";
-
 export async function generateAiSummary(propertyData: any) {
   try {
     const response = await fetch('/api/generate-summary', {

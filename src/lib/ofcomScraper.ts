@@ -1,14 +1,17 @@
 import { chromium, Page, Browser, BrowserContext } from 'playwright';
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execPromise = promisify(exec);
 
 let isInstallingChromium = false;
 export async function ensurePlaywrightChromium(): Promise<void> {
   if (isInstallingChromium) return;
   isInstallingChromium = true;
   try {
-    console.log('[Playwright] Auto-installing Playwright Chromium binary...');
-    execSync('npx playwright install chromium', { stdio: 'inherit' });
+    console.log('[Playwright] Auto-installing Playwright Chromium binary in background...');
+    await execPromise('npx playwright install chromium');
     console.log('[Playwright] Chromium installation completed.');
   } catch (err: any) {
     console.error('[Playwright] Error installing chromium:', err.message);
