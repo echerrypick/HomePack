@@ -53,15 +53,21 @@ export function LoginDialog({ trigger }: LoginDialogProps) {
       }
       setIsOpen(false);
     } catch (error: any) {
-      console.error("Auth error:", error);
+      console.warn("Auth notice:", error?.code || error?.message);
       let message = 'Authentication failed';
       if (error.code === 'auth/user-not-found') message = 'No account found with this email';
       if (error.code === 'auth/wrong-password') message = 'Incorrect password';
       if (error.code === 'auth/invalid-email') message = 'Invalid email address';
+      if (error.code === 'auth/email-already-in-use') message = 'An account already exists with this email address';
+      if (error.code === 'auth/weak-password') message = 'Password must be at least 6 characters';
       if (error.code === 'auth/network-request-failed') message = 'Network error. Please check your connection';
       if (error.code === 'auth/too-many-requests') message = 'Too many failed attempts. Please try again later';
+      if (error.code === 'auth/invalid-credential') message = 'Invalid email or password';
+      if (error.message?.toLowerCase().includes('recaptcha') || error.code?.includes('captcha')) {
+        message = 'Please use "Continue with Google" to sign in.';
+      }
       
-      toast.error(message || error.message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

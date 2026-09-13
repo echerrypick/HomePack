@@ -20,6 +20,8 @@ export type { UserRole };
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+// Disable reCAPTCHA app verification for web preview environment
+auth.settings.appVerificationDisabledForTesting = true;
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 

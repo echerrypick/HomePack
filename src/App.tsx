@@ -23,6 +23,9 @@ import ContactPage from './pages/ContactPage';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { AuthProvider } from './contexts/AuthContext';
+import { HomePackJobProvider } from './contexts/HomePackJobContext';
+import { HomePackChecklistModal } from './components/homepack/homepack-checklist-modal';
+import { HomePackFloatingPill } from './components/homepack/homepack-job-pill';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function LandingPage() {
@@ -118,7 +121,6 @@ function LandingPage() {
       </main>
 
       <Footer />
-      <Toaster />
     </div>
   );
 }
@@ -145,25 +147,30 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Router>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/tool" element={<ToolPage />} />
-            <Route path="/council-tax" element={<CouncilTaxPage />} />
-            <Route path="/broadband" element={<BroadbandPage />} />
-            <Route path="/mobile" element={<MobilePage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/sample" element={<SampleReportPage />} />
-            <Route path="/sample-report" element={<SampleReportPage />} />
-            <Route path="/features" element={<FeaturesPage />} />
-            <Route path="/pricing" element={<PricingPage />} />
-            <Route path="/buyer-guide" element={<BuyerGuidePage />} />
-            <Route path="/seller-guide" element={<SellerGuidePage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/terms" element={<TermsPage />} />
-            <Route path="/contact" element={<ContactPage />} />
-          </Routes>
+          <HomePackJobProvider>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/tool" element={<ToolPage />} />
+              <Route path="/council-tax" element={<CouncilTaxPage />} />
+              <Route path="/broadband" element={<BroadbandPage />} />
+              <Route path="/mobile" element={<MobilePage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/sample" element={<SampleReportPage />} />
+              <Route path="/sample-report" element={<SampleReportPage />} />
+              <Route path="/features" element={<FeaturesPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/buyer-guide" element={<BuyerGuidePage />} />
+              <Route path="/seller-guide" element={<SellerGuidePage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+            </Routes>
+            <HomePackChecklistModal />
+            <HomePackFloatingPill />
+            <Toaster position="bottom-right" />
+          </HomePackJobProvider>
         </Router>
       </AuthProvider>
     </ErrorBoundary>

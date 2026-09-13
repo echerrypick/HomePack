@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { HomePackJobHeaderPill } from '@/components/homepack/homepack-job-pill';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -239,6 +240,7 @@ export function Header() {
 
           {/* User Profile / Auth Actions */}
           <div className="hidden md:flex items-center gap-3">
+            <HomePackJobHeaderPill />
             {user ? (
               <div className="flex items-center gap-3">
                 {/* Account Menu */}
@@ -328,14 +330,17 @@ export function Header() {
             )}
           </div>
 
-          {/* Mobile Menu Toggle */}
-          <button 
-            className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            aria-label="Toggle Navigation Menu"
-          >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+          {/* Mobile Right Controls */}
+          <div className="flex items-center gap-2 md:hidden">
+            <HomePackJobHeaderPill />
+            <button 
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Toggle Navigation Menu"
+            >
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
       </div>
 

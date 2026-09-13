@@ -261,3 +261,26 @@ export type ReportResult = {
   logs: string[];
   error?: string;
 };
+
+export type HomePackJobStepStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+
+export interface HomePackJobStep {
+  id: string;
+  label: string;
+  status: HomePackJobStepStatus;
+  detail?: string;
+}
+
+export interface HomePackJob {
+  id: string;
+  address: Address;
+  status: 'processing' | 'completed' | 'failed';
+  progress: number;
+  currentStep: string;
+  steps: HomePackJobStep[];
+  result?: ReportResult | null;
+  error?: string | null;
+  createdAt: number;
+  updatedAt?: number;
+  completedAt?: number;
+}

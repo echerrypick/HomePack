@@ -153,6 +153,7 @@ export interface BroadbandResult {
 export interface BroadbandLookupResult {
   success: boolean;
   error?: string;
+  isRecaptcha?: boolean;
   address?: string;
   postcode?: string;
   broadband: BroadbandResult[];
@@ -162,6 +163,7 @@ export interface BroadbandLookupResult {
 export interface MobileLookupResult {
   success: boolean;
   error?: string;
+  isRecaptcha?: boolean;
   postcode?: string;
   house_number?: string;
   street?: string;
@@ -298,12 +300,24 @@ export async function lookupOfcomMobile(
     console.log("[OfcomScraper] Waiting for address selection UI...");
     let targetFrame: any = page;
     try {
+      // Check if reCAPTCHA or error alert is already present
+      const alertEl = page.locator(".alert.alert-danger, .message-container .alert, [role='alert']").first();
+      if (await alertEl.isVisible({ timeout: 1500 }).catch(() => false)) {
+        const alertText = await alertEl.innerText().catch(() => "");
+        if (alertText.toLowerCase().includes("recaptcha") || alertText.toLowerCase().includes("failed")) {
+          console.log(`[OfcomScraper] Ofcom reCAPTCHA challenge active. Switching to fallback.`);
+          return { success: false, error: "Ofcom verification challenge active", isRecaptcha: true, mobile: [] };
+        }
+      }
+
       // Wait for either a select, a list, or a message saying no addresses in any frame
       await page.waitForFunction(() => {
         const check = (doc: Document) => {
           const text = doc.body.innerText;
           return text.includes("Select your address") || 
                  text.includes("No addresses found") || 
+                 text.includes("reCaptcha") ||
+                 text.includes("assessment has failed") ||
                  doc.querySelector('select') !== null ||
                  doc.querySelector('li') !== null ||
                  doc.querySelector("[role='option']") !== null;
@@ -316,7 +330,14 @@ export async function lookupOfcomMobile(
           } catch (e) {}
         }
         return false;
-      }, { timeout: 25000 });
+      }, { timeout: 10000 });
+
+      // Check if reCAPTCHA was the trigger
+      const bodySnippet = await page.innerText("body").catch(() => "");
+      if (bodySnippet.includes("The reCaptcha assessment has failed") || bodySnippet.toLowerCase().includes("recaptcha")) {
+        console.log(`[OfcomScraper] Ofcom reCAPTCHA challenge active. Switching to fallback.`);
+        return { success: false, error: "Ofcom verification challenge active", isRecaptcha: true, mobile: [] };
+      }
 
       // Identify which frame has the UI
       const frames = page.frames();
@@ -332,8 +353,8 @@ export async function lookupOfcomMobile(
         } catch (e) {}
       }
     } catch (e) {
-      console.warn("[OfcomScraper] Timeout waiting for address selection UI");
-      return { success: false, error: "Postcode not found or timed out waiting for addresses" };
+      console.warn("[OfcomScraper] Address selection UI not detected, using grounded fallback");
+      return { success: false, error: "Address selection unavailable", mobile: [] };
     }
 
     // Check if "No addresses found" is visible in target frame
@@ -554,39 +575,44 @@ export async function lookupOfcomBroadband(
         if (btn) btn.click();
       });
     }
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(1500);
 
-    // 3. wait for address list to appear
+    // 3. Check immediately for Ofcom reCAPTCHA challenge or error alert
+    try {
+      const alertEl = page.locator(".alert.alert-danger, .message-container .alert, [role='alert']").first();
+      if (await alertEl.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const alertText = await alertEl.innerText().catch(() => "");
+        if (alertText.toLowerCase().includes("recaptcha") || alertText.toLowerCase().includes("failed")) {
+          console.log("[OfcomScraper] Ofcom reCAPTCHA challenge active. Switching to grounded broadband fallback.");
+          return { success: false, error: "Ofcom verification challenge active", isRecaptcha: true, broadband: [], networks: [] };
+        }
+      }
+    } catch {}
+
+    // 4. wait for address list to appear
     console.log("[OfcomScraper] Waiting for address selection UI...");
     const targetFrame = page;
     
     try {
-      // Wait for "Loading..." to appear then disappear
-      try {
-        await page.waitForSelector("text=Loading...", { timeout: 5000 });
-        console.log("[OfcomScraper] Loading indicator detected, waiting for it to disappear...");
-        await page.waitForSelector("text=Loading...", { state: 'hidden', timeout: 30000 });
-      } catch (e) {}
-
-      // Wait for the address select to appear in the main page
-      await page.waitForSelector('#postcode_address', { timeout: 30000 });
-      console.log("[OfcomScraper] Address selection UI detected.");
-      
-      // Wait for options to be populated
+      // Wait for either the address select or an alert or timeout in 6s
       await page.waitForFunction(() => {
         const select = document.querySelector('#postcode_address') as HTMLSelectElement;
-        return select && select.options.length > 1;
-      }, { timeout: 30000 });
-      console.log("[OfcomScraper] Address options populated.");
+        if (select && select.options.length > 1) return true;
+        const text = document.body.innerText;
+        if (text.includes("The reCaptcha assessment has failed") || text.includes("reCaptcha")) return true;
+        return false;
+      }, { timeout: 8000 });
+
+      const bodyText = await page.innerText("body").catch(() => "");
+      if (bodyText.includes("The reCaptcha assessment has failed") || bodyText.toLowerCase().includes("recaptcha")) {
+        console.log("[OfcomScraper] Ofcom reCAPTCHA challenge active. Switching to grounded broadband fallback.");
+        return { success: false, error: "Ofcom verification challenge active", isRecaptcha: true, broadband: [], networks: [] };
+      }
+
+      console.log("[OfcomScraper] Address selection UI detected.");
     } catch (e) {
-      console.warn("[OfcomScraper] Timeout waiting for address selection UI");
-      
-      // Capture more debugging info
-      const bodyText = await page.innerText("body");
-      console.log("[OfcomScraper] Page text snippet (first 2000 chars):", bodyText.slice(0, 2000));
-      
-      fs.writeFileSync('ofcom_broadband_address_timeout.html', await page.content());
-      return { success: false, error: "Postcode not found or timed out waiting for addresses", broadband: [], networks: [] };
+      console.warn("[OfcomScraper] Address selection UI not detected, switching to grounded fallback");
+      return { success: false, error: "Address selection unavailable", isRecaptcha: true, broadband: [], networks: [] };
     }
 
     // 4. select the address from the pull down list that becomes available

@@ -20,7 +20,6 @@ import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import html2pdf from 'html2pdf.js';
-import { GenerationSpotlightModal } from './generation-spotlight-modal';
 
 type ReportDisplayProps = {
   address: Address;
@@ -846,7 +845,15 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
   };
 
   if (isLoading) {
-    return <GenerationSpotlightModal address={address} onCancel={onReset} />;
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <div className="space-y-1">
+          <p className="text-lg font-semibold">Compiling HomePack...</p>
+          <p className="text-sm text-muted-foreground">Gathering official HM Land Registry, EPC, and environmental registers</p>
+        </div>
+      </div>
+    );
   }
 
   if (!reportData) return null;

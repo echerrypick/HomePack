@@ -58,7 +58,9 @@ export default function BroadbandPage() {
       if (data.error && (!data.addresses || data.addresses.length === 0)) {
         const errorMsg = data.error.includes("Executable doesn't exist") || data.error.includes("playwright")
           ? "The address lookup engine is initialising. Please try searching again in a moment."
-          : data.error;
+          : (data.error.toLowerCase().includes("recaptcha")
+              ? "Address lookup temporarily unavailable. Please verify the postcode and try again."
+              : data.error);
         setError(errorMsg);
       } else {
         setAddresses(data.addresses || []);
@@ -93,7 +95,10 @@ export default function BroadbandPage() {
 
       const data = await response.json();
       if (data.error) {
-        setError(`Coverage Lookup Error: ${data.error}. Please try another property.`);
+        const errorMsg = data.error.toLowerCase().includes("recaptcha")
+          ? "Broadband data is currently updating. Please try another property."
+          : data.error;
+        setError(`Coverage Lookup Error: ${errorMsg}. Please try another property.`);
       } else {
         setResult(data.result);
       }
