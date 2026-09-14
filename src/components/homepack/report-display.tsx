@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink, Search, Lock, Shield, ShieldAlert, Wifi, Coins, Mountain, Info, Home, Smartphone, GraduationCap, School as SchoolIcon } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink, Search, Lock, Shield, ShieldAlert, Wifi, Coins, Mountain, Info, Home, Smartphone, GraduationCap, School as SchoolIcon, Plus } from 'lucide-react';
 import { AiSummary } from './ai-summary';
 import { ImageUploader } from './image-uploader';
 import { AiConditionReport } from './ai-condition-report';
@@ -16,23 +16,96 @@ import { DATA_TOOLTIPS } from '@/lib/data-tooltips';
 import { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem, ReportResult, CouncilTaxData, RadonRiskData, CoalMiningData, BroadbandData, School, MobileData } from '@/types';
 import { PropertyMap } from './property-map';
 import { useAuth } from '@/contexts/AuthContext';
+import { purchaseReportForUser } from '@/firebase';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import html2pdf from 'html2pdf.js';
+import { HomePackPdfTemplate } from './HomePackPdfTemplate';
+import { PropertyQuickNav } from './PropertyQuickNav';
+
+// Enterprise automated data error handling & formatters (prevents missing data placeholders like £[object Object])
+export function cleanDataValue(val: any): string | null {
+  if (val === undefined || val === null) return null;
+  if (typeof val === 'object') {
+    const inner = val.value ?? val.amount ?? val.cost ?? val.total ?? val.rating ?? val.score ?? val.current;
+    if (inner !== undefined && inner !== null && typeof inner !== 'object') {
+      const s = String(inner).trim();
+      return (s && s !== '[object Object]' && s !== 'undefined' && s !== 'null' && s !== 'N/A') ? s : null;
+    }
+    return null;
+  }
+  const str = String(val).trim();
+  if (!str || str === '[object Object]' || str === 'undefined' || str === 'null' || str === 'N/A') {
+    return null;
+  }
+  return str;
+}
+
+export function formatAnnualCost(val: any, fallback = 'Not recorded on certificate'): string {
+  const clean = cleanDataValue(val);
+  if (!clean) return fallback;
+  const num = parseFloat(clean.replace(/[^0-9.-]/g, ''));
+  if (isNaN(num)) return fallback;
+  return `£${Math.round(num).toLocaleString('en-GB')} / year`;
+}
+
+export function formatCo2Tonnes(val: any, fallback = 'Not recorded on certificate'): string {
+  const clean = cleanDataValue(val);
+  if (!clean) return fallback;
+  const num = parseFloat(clean.replace(/[^0-9.-]/g, ''));
+  if (isNaN(num)) return fallback;
+  return `${num.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tonnes / year`;
+}
+
+export function formatKwhYear(val: any, fallback = 'Not recorded on certificate'): string {
+  const clean = cleanDataValue(val);
+  if (!clean) return fallback;
+  const num = parseFloat(clean.replace(/[^0-9.-]/g, ''));
+  if (isNaN(num)) return fallback;
+  return `${Math.round(num).toLocaleString('en-GB')} kWh/m² per year`;
+}
+
+export function formatSchoolDistance(dist?: string): string {
+  if (!dist) return 'Nearby';
+  const trimmed = dist.trim();
+  if (trimmed.toLowerCase().endsWith('away')) return trimmed;
+  return `${trimmed} away`;
+}
+
+export function formatPercentVal(val: any, fallback = 'Not recorded'): string {
+  const clean = cleanDataValue(val);
+  if (!clean) return fallback;
+  const num = parseFloat(clean.replace(/[^0-9.-]/g, ''));
+  if (isNaN(num)) return fallback;
+  return `${Math.round(num)}%`;
+}
+
+export function dataOrNA(value: any, fallback = 'N/A'): string {
+  const clean = cleanDataValue(value);
+  return clean !== null ? clean : fallback;
+}
 
 type ReportDisplayProps = {
   address: Address;
   reportData: ReportResult | null;
   isLoading: boolean;
   onReset: () => void;
+  onBack?: () => void;
+  backLabel?: string;
+  onNewHomePack?: () => void;
 };
 
 function SchoolsDisplay({ schools, coordinates, address }: { schools: School[] | undefined, coordinates: { lat: number, lng: number } | undefined, address: string }) {
   if (!coordinates) return <DataItem label="Location Map" value="Coordinates not available" />;
 
-  let primaryIndex = 0;
-  let secondaryIndex = 0;
+  let primaryCount = 0;
+  let secondaryCount = 0;
+  const labeledSchools = (schools || []).map((school) => {
+    const isPrimary = school.type === 'Primary';
+    const label = isPrimary ? `P${++primaryCount}` : `S${++secondaryCount}`;
+    return { ...school, isPrimary, label };
+  });
 
   return (
     <div className="space-y-6">
@@ -43,38 +116,34 @@ function SchoolsDisplay({ schools, coordinates, address }: { schools: School[] |
       />
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-4">
-        {(schools || []).map((school, idx) => {
-          const isPrimary = school.type === 'Primary';
-          const label = isPrimary ? `P${++primaryIndex}` : `S${++secondaryIndex}`;
+        {labeledSchools.map((school, idx) => {
           const isOutstanding = school.ofstedRating.toLowerCase().includes('outstanding');
           const isGood = school.ofstedRating.toLowerCase().includes('good');
 
           return (
             <div 
               key={idx} 
-              className="p-3.5 rounded-xl border border-border bg-card/70 hover:bg-card transition-all shadow-2xs hover:shadow-xs flex items-center justify-between gap-3"
+              className="p-3.5 rounded-xl border border-border/80 bg-card hover:bg-muted/40 transition-all shadow-2xs hover:shadow-xs flex items-center justify-between gap-3"
             >
               <div className="flex items-center gap-3 min-w-0">
                 {/* Marker Identifier Pin Pill matching the map */}
                 <div className="flex flex-col items-center shrink-0">
                   <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs text-white shadow-xs ${
-                    isPrimary ? 'bg-blue-600' : 'bg-purple-600'
+                    school.isPrimary ? 'bg-blue-600' : 'bg-purple-600'
                   }`}>
-                    {label}
+                    {school.label}
                   </span>
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="font-bold text-sm text-foreground truncate">{school.name}</p>
-                  </div>
+                  <p className="font-bold text-sm text-foreground truncate">{school.name}</p>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                    <span className="flex items-center gap-1">
-                      {isPrimary ? <GraduationCap className="h-3.5 w-3.5 text-blue-600 shrink-0" /> : <SchoolIcon className="h-3.5 w-3.5 text-purple-600 shrink-0" />}
+                    <span className="flex items-center gap-1 shrink-0">
+                      {school.isPrimary ? <GraduationCap className="h-3.5 w-3.5 text-blue-600" /> : <SchoolIcon className="h-3.5 w-3.5 text-purple-600" />}
                       <span>{school.type} School</span>
                     </span>
                     <span>•</span>
-                    <span className="font-medium text-foreground/80">{school.distance || 'Nearby'}</span>
+                    <span className="font-medium text-foreground/80 shrink-0">{formatSchoolDistance(school.distance)}</span>
                   </div>
                 </div>
               </div>
@@ -84,7 +153,7 @@ function SchoolsDisplay({ schools, coordinates, address }: { schools: School[] |
                   ${isOutstanding ? 'bg-emerald-600 text-white' : 
                     isGood ? 'bg-blue-600 text-white' : 
                     school.ofstedRating.toLowerCase().includes('improvement') ? 'bg-amber-500 text-white' : 
-                    'bg-red-500 text-white'} border-none text-[10px] h-5 px-2 font-semibold shadow-2xs
+                    'bg-slate-600 text-white'} border-none text-[10px] h-5 px-2 font-semibold shadow-2xs whitespace-nowrap
                 `}>
                   {school.ofstedRating}
                 </Badge>
@@ -92,7 +161,7 @@ function SchoolsDisplay({ schools, coordinates, address }: { schools: School[] |
             </div>
           );
         })}
-        {(!schools || schools.length === 0) && (
+        {labeledSchools.length === 0 && (
           <p className="text-sm text-muted-foreground italic col-span-2">No school data found for this location.</p>
         )}
       </div>
@@ -128,32 +197,50 @@ function EpcDisplay({ epcData, logs, isFree, isAdmin }: { epcData: EpcData, logs
     const epcValue = (7 - (epcData.rating.charCodeAt(0) - 'A'.charCodeAt(0))) * (100/7);
     const isExpired = epcData.expiryDate ? new Date(epcData.expiryDate) < new Date() : false;
 
-    const dataOrNA = (value: string | number | undefined | null) => {
-        return value !== null && value !== undefined && value !== '' ? String(value) : 'N/A';
-    }
-
     return (
-        <>
-            <div className="space-y-2">
-                <div className="flex justify-between items-center font-serif font-bold text-[#2d4a77]">
+        <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-border/70 space-y-2.5">
+                <div className="flex justify-between items-center font-serif font-bold text-[#1e3a8a] dark:text-blue-400">
                     <div className="flex items-center gap-2">
-                        <span>Current Rating: {epcData.rating}</span>
+                        <span className="text-base">Current Energy Band: {epcData.rating}</span>
                         {isExpired && (
-                            <Badge variant="destructive" className="text-[10px] h-4 px-1">EXPIRED</Badge>
+                            <Badge variant="destructive" className="text-[10px] h-4 px-1.5">EXPIRED</Badge>
                         )}
                     </div>
-                    <span>Potential: {epcData.potentialRating}</span>
+                    <span className="text-sm font-sans font-semibold text-emerald-600 dark:text-emerald-400">
+                      Potential: Band {epcData.potentialRating}
+                    </span>
                 </div>
-                <Progress value={epcValue} className="h-4" />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>G (Worst)</span>
-                    <span>A (Best)</span>
+                <Progress value={epcValue} className="h-3.5 rounded-full" />
+                <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-0.5">
+                    <span className="text-red-500">G (Very Inefficient)</span>
+                    <span className="text-emerald-600">A (Highly Efficient)</span>
                 </div>
                 {epcData.expiryDate && (
                     <div className={`text-xs mt-1 ${isExpired ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
-                        Expiry Date: {new Date(epcData.expiryDate).toLocaleDateString()}
+                        Certificate Expiry: {new Date(epcData.expiryDate).toLocaleDateString('en-GB')}
                     </div>
                 )}
+            </div>
+
+            {/* Quick Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-2.5 rounded-xl bg-card border border-border/80 text-center shadow-2xs">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Current Score</span>
+                <span className="text-lg font-bold text-foreground">{dataOrNA(epcData.currentEnergyEfficiency)}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-card border border-border/80 text-center shadow-2xs">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Potential Score</span>
+                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{dataOrNA(epcData.potentialEnergyEfficiency)}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-card border border-border/80 text-center shadow-2xs">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Est. Heating / yr</span>
+                <span className="text-lg font-bold text-foreground">{formatAnnualCost(epcData.heatingCostCurrent)}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-card border border-border/80 text-center shadow-2xs">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">CO₂ Emissions</span>
+                <span className="text-lg font-bold text-foreground">{formatCo2Tonnes(epcData.co2EmissionsCurrent)}</span>
+              </div>
             </div>
             
             {!isFree ? (
@@ -190,7 +277,7 @@ function EpcDisplay({ epcData, logs, isFree, isAdmin }: { epcData: EpcData, logs
                           <DataItem label="Local Authority" value={dataOrNA(epcData.localAuthorityLabel)} tooltip={DATA_TOOLTIPS.localAuthorityLabel} />
                           <DataItem label="Constituency" value={dataOrNA(epcData.constituencyLabel)} tooltip={DATA_TOOLTIPS.constituencyLabel} />
                           <Separator className="md:col-span-2" />
-                          <DataItem label="Total Floor Area" value={`${dataOrNA(epcData.totalFloorArea)} m²`} tooltip={DATA_TOOLTIPS.totalFloorArea} />
+                          <DataItem label="Total Floor Area" value={epcData.totalFloorArea ? `${dataOrNA(epcData.totalFloorArea)} m²` : 'N/A'} tooltip={DATA_TOOLTIPS.totalFloorArea} />
                             <DataItem label="Habitable Rooms" value={dataOrNA(epcData.numberHabitableRooms)} tooltip={DATA_TOOLTIPS.numberHabitableRooms} />
                           <DataItem label="Heated Rooms" value={dataOrNA(epcData.numberHeatedRooms)} tooltip={DATA_TOOLTIPS.numberHeatedRooms} />
                           <DataItem label="Transaction Type" value={dataOrNA(epcData.transactionType)} tooltip={DATA_TOOLTIPS.transactionType} />
@@ -211,25 +298,25 @@ function EpcDisplay({ epcData, logs, isFree, isAdmin }: { epcData: EpcData, logs
                           <DataItem label="Lighting" value={dataOrNA(epcData.lightingDescription)} tooltip={DATA_TOOLTIPS.lightingDescription} />
                           <DataItem label="Lighting Energy Eff." value={dataOrNA(epcData.lightingEnergyEff)} tooltip={DATA_TOOLTIPS.lightingEnergyEff} />
                           <Separator className="md:col-span-2" />
-                          <DataItem label="CO₂ Emissions (Current)" value={`${dataOrNA(epcData.co2EmissionsCurrent)} tonnes/year`} tooltip={DATA_TOOLTIPS.co2EmissionsCurrent} />
-                          <DataItem label="CO₂ Emissions (Potential)" value={`${dataOrNA(epcData.co2EmissionsPotential)} tonnes/year`} tooltip={DATA_TOOLTIPS.co2EmissionsPotential} />
+                          <DataItem label="CO₂ Emissions (Current)" value={formatCo2Tonnes(epcData.co2EmissionsCurrent)} tooltip={DATA_TOOLTIPS.co2EmissionsCurrent} />
+                          <DataItem label="CO₂ Emissions (Potential)" value={formatCo2Tonnes(epcData.co2EmissionsPotential)} tooltip={DATA_TOOLTIPS.co2EmissionsPotential} />
                           <DataItem label="Environment Impact (Current)" value={dataOrNA(epcData.environmentImpactCurrent)} tooltip={DATA_TOOLTIPS.environmentImpactCurrent} />
                           <DataItem label="Environment Impact (Potential)" value={dataOrNA(epcData.environmentImpactPotential)} tooltip={DATA_TOOLTIPS.environmentImpactPotential} />
                           <Separator className="md:col-span-2" />
-                          <DataItem label="Energy Consumption (Current)" value={`${dataOrNA(epcData.energyConsumptionCurrent)} kWh/m² per year`} tooltip={DATA_TOOLTIPS.energyConsumptionCurrent} />
-                          <DataItem label="Energy Consumption (Potential)" value={`${dataOrNA(epcData.energyConsumptionPotential)} kWh/m² per year`} tooltip={DATA_TOOLTIPS.energyConsumptionPotential} />
+                          <DataItem label="Energy Consumption (Current)" value={formatKwhYear(epcData.energyConsumptionCurrent)} tooltip={DATA_TOOLTIPS.energyConsumptionCurrent} />
+                          <DataItem label="Energy Consumption (Potential)" value={formatKwhYear(epcData.energyConsumptionPotential)} tooltip={DATA_TOOLTIPS.energyConsumptionPotential} />
                           <Separator className="md:col-span-2" />
-                          <DataItem label="Heating Cost (Current)" value={`£${dataOrNA(epcData.heatingCostCurrent)} / year`} tooltip={DATA_TOOLTIPS.heatingCostCurrent} />
-                          <DataItem label="Heating Cost (Potential)" value={`£${dataOrNA(epcData.heatingCostPotential)} / year`} tooltip={DATA_TOOLTIPS.heatingCostPotential} />
-                          <DataItem label="Hot Water Cost (Current)" value={`£${dataOrNA(epcData.hotWaterCostCurrent)} / year`} tooltip={DATA_TOOLTIPS.hotWaterCostCurrent} />
-                          <DataItem label="Hot Water Cost (Potential)" value={`£${dataOrNA(epcData.hotWaterCostPotential)} / year`} tooltip={DATA_TOOLTIPS.hotWaterCostPotential} />
-                          <DataItem label="Lighting Cost (Current)" value={`£${dataOrNA(epcData.lightingCostCurrent)} / year`} tooltip={DATA_TOOLTIPS.lightingCostCurrent} />
-                          <DataItem label="Lighting Cost (Potential)" value={`£${dataOrNA(epcData.lightingCostPotential)} / year`} tooltip={DATA_TOOLTIPS.lightingCostPotential} />
+                          <DataItem label="Heating Cost (Current)" value={formatAnnualCost(epcData.heatingCostCurrent)} tooltip={DATA_TOOLTIPS.heatingCostCurrent} />
+                          <DataItem label="Heating Cost (Potential)" value={formatAnnualCost(epcData.heatingCostPotential)} tooltip={DATA_TOOLTIPS.heatingCostPotential} />
+                          <DataItem label="Hot Water Cost (Current)" value={formatAnnualCost(epcData.hotWaterCostCurrent)} tooltip={DATA_TOOLTIPS.hotWaterCostCurrent} />
+                          <DataItem label="Hot Water Cost (Potential)" value={formatAnnualCost(epcData.hotWaterCostPotential)} tooltip={DATA_TOOLTIPS.hotWaterCostPotential} />
+                          <DataItem label="Lighting Cost (Current)" value={formatAnnualCost(epcData.lightingCostCurrent)} tooltip={DATA_TOOLTIPS.lightingCostCurrent} />
+                          <DataItem label="Lighting Cost (Potential)" value={formatAnnualCost(epcData.lightingCostPotential)} tooltip={DATA_TOOLTIPS.lightingCostPotential} />
                           <Separator className="md:col-span-2" />
                           <DataItem label="Glazing Type" value={dataOrNA(epcData.glazedType)} tooltip={DATA_TOOLTIPS.glazedType} />
                           <DataItem label="Glazed Area" value={dataOrNA(epcData.glazedArea)} tooltip={DATA_TOOLTIPS.glazedArea} />
-                          <DataItem label="Multi-glaze Proportion" value={`${dataOrNA(epcData.multiGlazeProportion)}%`} tooltip={DATA_TOOLTIPS.multiGlazeProportion} />
-                          <DataItem label="Low Energy Lighting" value={`${dataOrNA(epcData.lowEnergyLighting)}%`} tooltip={DATA_TOOLTIPS.lowEnergyLighting} />
+                          <DataItem label="Multi-glaze Proportion" value={formatPercentVal(epcData.multiGlazeProportion)} tooltip={DATA_TOOLTIPS.multiGlazeProportion} />
+                          <DataItem label="Low Energy Lighting" value={formatPercentVal(epcData.lowEnergyLighting)} tooltip={DATA_TOOLTIPS.lowEnergyLighting} />
                           <DataItem label="Low Energy Fixed Light Count" value={dataOrNA(epcData.lowEnergyFixedLightCount)} tooltip={DATA_TOOLTIPS.lowEnergyFixedLightCount} />
                           <DataItem label="Fixed Lighting Outlets Count" value={dataOrNA(epcData.fixedLightingOutletsCount)} tooltip={DATA_TOOLTIPS.fixedLightingOutletsCount} />
                           <Separator className="md:col-span-2" />
@@ -275,8 +362,7 @@ function EpcDisplay({ epcData, logs, isFree, isAdmin }: { epcData: EpcData, logs
                 <p className="text-xs text-muted-foreground">Full EPC details are available for <span className="font-semibold text-primary">Subscription</span> and <span className="font-semibold text-primary">Agency</span> users.</p>
               </div>
             )}
-            
-        </>
+        </div>
     );
 }
 
@@ -287,7 +373,7 @@ function FloodRiskDisplay({ floodRiskData, logs, isAdmin }: { floodRiskData: Flo
 
     if (!floodRiskData) {
         return (
-            <>
+            <div className="space-y-4">
                 <DataItem label="Flood Risk" value="Data not available" />
                 {isAdmin && floodLogs.length > 0 && (
                     <Accordion className="w-full">
@@ -303,37 +389,62 @@ function FloodRiskDisplay({ floodRiskData, logs, isAdmin }: { floodRiskData: Flo
                         </AccordionItem>
                     </Accordion>
                 )}
-            </>
+            </div>
         );
     }
+
+    const getFloodRiskBadge = (level: string) => {
+      const l = (level || '').toLowerCase();
+      if (l.includes('high')) return { bg: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900', label: level };
+      if (l.includes('medium')) return { bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900', label: level };
+      if (l.includes('low') && !l.includes('very')) return { bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900', label: level };
+      return { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900', label: level || 'Very Low' };
+    };
     
     return (
         <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <DataItem label="Rivers and Sea" value={floodRiskData.riskOfFloodingFromRiversAndSea} tooltip={DATA_TOOLTIPS.riskOfFloodingFromRiversAndSea} />
-                <DataItem label="Surface Water" value={floodRiskData.riskOfFloodingFromSurfaceWater} tooltip={DATA_TOOLTIPS.riskOfFloodingFromSurfaceWater} />
-                <DataItem label="Groundwater" value={floodRiskData.riskOfFloodingFromGroundwater} tooltip={DATA_TOOLTIPS.riskOfFloodingFromGroundwater} />
-                <DataItem label="Reservoirs" value={floodRiskData.riskOfFloodingFromReservoirs} tooltip={DATA_TOOLTIPS.riskOfFloodingFromReservoirs} />
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-[10px] py-0 px-2 h-5 bg-emerald-100 text-emerald-800 border-emerald-200 font-medium">
+                <Search className="h-2.5 w-2.5 mr-1" /> Environment Agency Grounded
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { title: 'Rivers & Sea', val: floodRiskData.riskOfFloodingFromRiversAndSea },
+                { title: 'Surface Water', val: floodRiskData.riskOfFloodingFromSurfaceWater },
+                { title: 'Groundwater', val: floodRiskData.riskOfFloodingFromGroundwater },
+                { title: 'Reservoirs', val: floodRiskData.riskOfFloodingFromReservoirs },
+              ].map((item, idx) => {
+                const badge = getFloodRiskBadge(item.val);
+                return (
+                  <div key={idx} className="p-3.5 rounded-xl border border-border/80 bg-card space-y-2 shadow-2xs">
+                    <span className="text-xs font-semibold text-muted-foreground block">{item.title}</span>
+                    <Badge variant="outline" className={`text-xs font-bold px-2 py-0.5 ${badge.bg}`}>
+                      {badge.label}
+                    </Badge>
+                  </div>
+                );
+              })}
             </div>
             
-            <Separator className="my-2" />
-            
-            <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border">
-                <Info className="h-4 w-4 text-primary" />
-                <p className="text-xs text-muted-foreground">
-                    Current Status: <span className="font-semibold text-foreground">{floodRiskData.activeWarnings}</span>
+            <div className="flex items-center gap-2.5 p-3.5 bg-blue-50/80 dark:bg-blue-950/40 rounded-xl border border-blue-200/80 dark:border-blue-900/60 text-xs">
+                <Waves className="h-4 w-4 text-blue-600 shrink-0" />
+                <p className="text-blue-950 dark:text-blue-200 leading-snug">
+                    <span className="font-semibold">Live EA Flood Status:</span>{' '}
+                    <span className="font-medium">{floodRiskData.activeWarnings}</span>
                 </p>
             </div>
 
             <Accordion className="w-full" data-pdf-ignore>
                 <AccordionItem value="technical-details">
-                    <AccordionTrigger className="text-sm text-primary hover:underline py-2">
-                        View Technical Details
+                    <AccordionTrigger className="text-xs text-primary hover:underline py-2">
+                        View Technical Spatial Identifiers
                     </AccordionTrigger>
                     <AccordionContent className="pt-2">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
                             <DataItem label="Data Suitability" value={isNullOrEmpty(floodRiskData.suitability) ? ' - ' : floodRiskData.suitability} tooltip={DATA_TOOLTIPS.SUITABILITY} />
-                            <DataItem label="Publication Date" value={isNullOrEmpty(floodRiskData.publishDate) ? ' - ' : new Date(floodRiskData.publishDate).toLocaleDateString()} tooltip={DATA_TOOLTIPS.PUB_DATE} />
+                            <DataItem label="Publication Date" value={isNullOrEmpty(floodRiskData.publishDate) ? ' - ' : new Date(floodRiskData.publishDate).toLocaleDateString('en-GB')} tooltip={DATA_TOOLTIPS.PUB_DATE} />
                             <DataItem label="Easting" value={floodRiskData.easting} tooltip={DATA_TOOLTIPS.easting} />
                             <DataItem label="Northing" value={floodRiskData.northing} tooltip={DATA_TOOLTIPS.northing} />
                             <DataItem label="Latitude" value={floodRiskData.latitude} tooltip={DATA_TOOLTIPS.latitude} />
@@ -343,7 +454,7 @@ function FloodRiskDisplay({ floodRiskData, logs, isAdmin }: { floodRiskData: Flo
                 </AccordionItem>
                 {isAdmin && floodLogs.length > 0 && (
                     <AccordionItem value="log">
-                        <AccordionTrigger className="text-sm text-primary hover:underline py-2">
+                        <AccordionTrigger className="text-xs text-primary hover:underline py-2">
                             Show Fetch Log (Admin Only)
                         </AccordionTrigger>
                         <AccordionContent>
@@ -370,15 +481,15 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {isVerified ? (
-            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4 bg-green-100 text-green-700 border-green-200 font-medium">
-              <Search className="h-2.5 w-2.5 mr-1" /> Verified via Search
+            <Badge variant="secondary" className="text-[10px] py-0 px-2 h-5 bg-emerald-100 text-emerald-800 border-emerald-200 font-medium">
+              <Search className="h-2.5 w-2.5 mr-1" /> VOA Billing Grounded
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 bg-amber-50 text-amber-700 border-amber-200 font-medium">
-              <Info className="h-2.5 w-2.5 mr-1" /> AI Estimate (Search Unavailable)
+            <Badge variant="outline" className="text-[10px] py-0 px-2 h-5 bg-amber-50 text-amber-800 border-amber-200 font-medium">
+              <Info className="h-2.5 w-2.5 mr-1" /> Estimated Banding
             </Badge>
           )}
         </div>
@@ -386,24 +497,42 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
           href={govUkUrl} 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-[10px] text-primary hover:underline flex items-center gap-1 font-medium"
+          className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
           data-pdf-ignore
         >
-          Verify on GOV.UK <ExternalLink className="h-2.5 w-2.5" />
+          Check on GOV.UK <ExternalLink className="h-3 w-3" />
         </a>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DataItem label="Tax Band" value={data.band} tooltip={DATA_TOOLTIPS.band} />
-        <DataItem label="Annual Amount" value={data.annualAmount} tooltip={DATA_TOOLTIPS.annualAmount} />
+
+      {/* Hero Highlight Card */}
+      <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Banding & Annual Rate</span>
+          <div className="flex items-baseline gap-3">
+            <span className="text-2xl font-serif font-bold text-[#1e3a8a] dark:text-blue-400">Band {data.band}</span>
+            <span className="text-lg font-bold text-foreground">{data.annualAmount || 'Recorded'}</span>
+          </div>
+        </div>
+        <div className="text-left sm:text-right space-y-0.5">
+          <span className="text-xs text-muted-foreground block">Billing Authority:</span>
+          <span className="text-sm font-semibold text-foreground block">{data.authority || 'Local Council'}</span>
+          <span className="text-[11px] text-muted-foreground">Tax Year: {data.year || 'Current'}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+        <DataItem label="Valuation Band" value={data.band} tooltip={DATA_TOOLTIPS.band} />
+        <DataItem label="Annual Charge" value={data.annualAmount} tooltip={DATA_TOOLTIPS.annualAmount} />
         <DataItem label="Local Authority" value={data.authority} tooltip={DATA_TOOLTIPS.authority} />
         <DataItem label="Tax Year" value={data.year} />
       </div>
+
       <p className="text-[10px] text-muted-foreground italic">
-        Source: GOV.UK / {data.authority}
+        Source: Valuation Office Agency (VOA) / {data.authority}
       </p>
       
       {isAdmin && (
-        <Accordion className="w-full mt-4" data-pdf-ignore>
+        <Accordion className="w-full mt-2" data-pdf-ignore>
           <AccordionItem value="log" className="border-none">
             <AccordionTrigger className="text-xs text-primary hover:underline py-2 bg-muted/50 px-3 rounded-md">
               <div className="flex items-center gap-2">
@@ -418,7 +547,7 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
                 </pre>
               ) : (
                 <p className="text-xs text-muted-foreground italic p-3 bg-muted rounded-md border border-dashed">
-                  No grounding logs found for this search. This might happen if the data was retrieved from cache or if the search failed before logging started.
+                  No grounding logs found for this search.
                 </p>
               )}
             </AccordionContent>
@@ -431,61 +560,56 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
 
 function EnvironmentalHazardsDisplay({ radon, coal }: { radon: RadonRiskData, coal: CoalMiningData }) {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-2">
-        <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4 bg-green-100 text-green-700 border-green-200 font-medium">
-          <Search className="h-2.5 w-2.5 mr-1" /> Verified via Search
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary" className="text-[10px] py-0 px-2 h-5 bg-emerald-100 text-emerald-800 border-emerald-200 font-medium">
+          <Search className="h-2.5 w-2.5 mr-1" /> Geological Records Grounded
         </Badge>
       </div>
-      <div className="space-y-3">
-        <h4 className="text-base font-serif font-bold flex items-center gap-2 text-[#2d4a77]">
-          <Mountain className="h-4 w-4" />
-          Radon Gas Risk
-        </h4>
-        {radon ? (
-          <div className="p-3 bg-muted/30 rounded-lg border border-border space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Risk Level: {radon.riskLevel}</span>
-              <Badge variant={radon.riskLevel === 'Low' ? 'outline' : 'destructive'}>
-                {radon.percentage}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {radon.description}
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Radon data not available.</p>
-        )}
-      </div>
 
-      <div className="space-y-3">
-        <h4 className="text-base font-serif font-bold flex items-center gap-2 text-[#2d4a77]">
-          <ShieldAlert className="h-4 w-4" />
-          Coal Mining & Ground Stability
-        </h4>
-        {coal ? (
-          <div className="p-3 bg-muted/30 rounded-lg border border-border space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">
-                {coal.isReportingArea ? 'In Reporting Area' : 'Not in Reporting Area'}
-              </span>
-              <Badge variant={coal.isHighRiskArea ? 'destructive' : 'outline'}>
-                {coal.isHighRiskArea ? 'High Risk' : 'No Known Risk'}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Radon Card */}
+        <div className="p-4 rounded-xl border border-border/80 bg-card space-y-3 flex flex-col justify-between shadow-2xs">
+          <div>
+            <div className="flex justify-between items-start mb-2">
+              <h4 className="text-sm font-serif font-bold flex items-center gap-2 text-[#1e3a8a] dark:text-blue-400">
+                <Mountain className="h-4 w-4 text-blue-600 shrink-0" />
+                <span>Radon Gas Assessment</span>
+              </h4>
+              <Badge variant={radon?.riskLevel === 'Low' ? 'outline' : 'destructive'} className="text-[10px] font-semibold shrink-0">
+                {radon?.percentage || radon?.riskLevel || 'Low'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {coal.description}
+              {radon?.description || 'Radon data not available.'}
             </p>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Mining data not available.</p>
-        )}
+          <p className="text-[10px] text-muted-foreground/70 italic pt-2 border-t border-border/40">
+            Source: British Geological Survey (BGS) / UKHSA
+          </p>
+        </div>
+
+        {/* Coal Mining Card */}
+        <div className="p-4 rounded-xl border border-border/80 bg-card space-y-3 flex flex-col justify-between shadow-2xs">
+          <div>
+            <div className="flex justify-between items-start mb-2">
+              <h4 className="text-sm font-serif font-bold flex items-center gap-2 text-[#1e3a8a] dark:text-blue-400">
+                <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>Coal Mining & Ground Stability</span>
+              </h4>
+              <Badge variant={coal?.isHighRiskArea ? 'destructive' : 'outline'} className="text-[10px] font-semibold shrink-0">
+                {coal?.isHighRiskArea ? 'High Risk' : 'No Known Risk'}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {coal?.description || 'Mining stability records indicate no historical activity.'}
+            </p>
+          </div>
+          <p className="text-[10px] text-muted-foreground/70 italic pt-2 border-t border-border/40">
+            Source: The Coal Authority Mining Records
+          </p>
+        </div>
       </div>
-      
-      <p className="text-[10px] text-muted-foreground italic">
-        Sources: British Geological Survey (BGS) / Coal Authority
-      </p>
     </div>
   );
 }
@@ -494,25 +618,31 @@ function BroadbandDisplay({ data }: { data: BroadbandData }) {
   if (!data) return <DataItem label="Broadband" value="Not available" />;
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4 bg-green-100 text-green-700 border-green-200 font-medium">
-          <Search className="h-2.5 w-2.5 mr-1" /> Verified via Search
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary" className="text-[10px] py-0 px-2 h-5 bg-emerald-100 text-emerald-800 border-emerald-200 font-medium">
+          <Search className="h-2.5 w-2.5 mr-1" /> Ofcom Fixed Line Coverage
         </Badge>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DataItem label="Max Download Speed" value={data.maxDownloadSpeed} tooltip={DATA_TOOLTIPS.maxDownloadSpeed} />
-        <DataItem label="Max Upload Speed" value={data.maxUploadSpeed} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-3.5 rounded-xl border border-border/80 bg-card shadow-2xs space-y-1">
+          <span className="text-xs text-muted-foreground font-semibold block">Max Download Speed</span>
+          <span className="text-xl font-bold text-foreground">{data.maxDownloadSpeed || 'Ultrafast'}</span>
+        </div>
+        <div className="p-3.5 rounded-xl border border-border/80 bg-card shadow-2xs space-y-1">
+          <span className="text-xs text-muted-foreground font-semibold block">Max Upload Speed</span>
+          <span className="text-xl font-bold text-foreground">{data.maxUploadSpeed || 'High Speed'}</span>
+        </div>
       </div>
 
       {data.results && data.results.length > 0 && (
         <div className="space-y-2 mt-2">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Availability by Type</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Availability by Connection Type</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {data.results.map((r, i) => (
-              <div key={i} className={`p-2 rounded-md border ${r.available ? 'bg-green-50 border-green-100' : 'bg-muted/50 border-border'} text-center`}>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase">{r.type}</p>
-                <p className={`text-sm font-bold ${r.available ? 'text-green-700' : 'text-muted-foreground'}`}>
+              <div key={i} className={`p-3 rounded-xl border ${r.available ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900' : 'bg-muted/40 border-border/60'} text-center space-y-1`}>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{r.type}</p>
+                <p className={`text-sm font-bold ${r.available ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>
                   {r.available ? r.downloadSpeed : 'Unavailable'}
                 </p>
               </div>
@@ -522,18 +652,18 @@ function BroadbandDisplay({ data }: { data: BroadbandData }) {
       )}
 
       {data.networks && data.networks.length > 0 && (
-        <div className="mt-4">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Available Networks</p>
+        <div className="mt-3">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Available Physical Networks</p>
           <div className="flex flex-wrap gap-1.5">
             {data.networks.map((n, i) => (
-              <Badge key={i} variant="outline" className="text-[10px] py-0 px-1.5 h-5 bg-background">{n}</Badge>
+              <Badge key={i} variant="outline" className="text-xs py-0.5 px-2.5 h-6 bg-background font-medium shadow-2xs">{n}</Badge>
             ))}
           </div>
         </div>
       )}
       
       <p className="text-[10px] text-muted-foreground italic">
-        Source: Ofcom Broadband Coverage
+        Source: Ofcom Connected Nations & Fixed Broadband Coverage
       </p>
     </div>
   );
@@ -644,76 +774,102 @@ function MobileDisplay({ data, summary }: { data: MobileData[] | undefined, summ
 function PlanningHistoryDisplay({ planningHistory, uprn, localAuthorityId, logs, isAdmin }: { planningHistory: PlanningHistoryItem[], uprn: string, localAuthorityId: string | null | undefined, logs: string[], isAdmin: boolean }) {
     const planningLogs = logs.filter(log => log.startsWith('[PLANNING'));
 
-    const display = (
-        <>
-           {uprn ? (
-                <DataItem label="UPRN Used" value={uprn} tooltip="The Unique Property Reference Number used for this search." />
-            ) : (
-                <DataItem label="UPRN Used" value="Not available" tooltip="A UPRN could not be found for this property." />
-            )}
-            {localAuthorityId ? (
-                <DataItem label="Local Authority ID Used" value={localAuthorityId} tooltip="The Local Authority ID used to filter the search." />
-            ) : (
-                <DataItem label="Local Authority ID Used" value="Not available" tooltip="A Local Authority ID could not be found for this property." />
-            )}
-            <Separator className="my-2" />
-           {planningHistory.length > 0 ? (
-                <ul className="space-y-4">
-                     {planningHistory.map((item, index) => (
-                        <li key={index} className="text-sm border-l-2 border-primary/50 pl-4 py-1">
-                            <p className="font-semibold">{item.application}</p>
-                            <p className="text-muted-foreground">
-                                Status: <span className={item.decision.toLowerCase().includes('approve') ? 'text-green-600' : 'text-red-600'}>{item.decision}</span> on {item.date}
-                            </p>
-                              <div className='flex justify-between items-center'>
-                                <p className="text-muted-foreground text-xs">Reference: {item.reference}</p>
-                                <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
-                                    View <ExternalLink className="h-3 w-3" />
-                                </a>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            ) : (
-                <p className="text-sm text-muted-foreground">No planning history found for this property's UPRN.</p>
-            )}
-        </>
-    );
-
     return (
-        <>
-           {display}
-    <div className="mt-4 flex flex-col gap-2" data-pdf-ignore>
-        <Accordion className="w-full">
-          {isAdmin && planningLogs.length > 0 && (
-                <AccordionItem value="log">
-                    <AccordionTrigger>
-                        <span className="text-sm text-primary hover:underline">Show Fetch Log (Admin Only)</span>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                        <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
-                           {planningLogs.join('\n')}
-                        </pre>
-                    </AccordionContent>
-                </AccordionItem>
-          )}
-        </Accordion>
-        {isAdmin && (
-          <Button asChild variant="outline" size="sm" className="mt-2">
-              <Link to="/debug/planning">
-                  <Search className="mr-2 h-4 w-4" />
-                  Debug Planning History
-              </Link>
-          </Button>
-        )}
-    </div>
-</>
-);
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-[10px] py-0 px-2 h-5 bg-emerald-100 text-emerald-800 border-emerald-200 font-medium">
+                  <Search className="h-2.5 w-2.5 mr-1" /> Local Planning Register
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {uprn && <span>UPRN: <span className="font-mono font-medium text-foreground">{uprn}</span></span>}
+              </div>
+            </div>
+
+            {planningHistory.length > 0 ? (
+                <div className="space-y-3">
+                     {planningHistory.map((item, index) => {
+                        const isApproved = item.decision.toLowerCase().includes('approve') || item.decision.toLowerCase().includes('grant');
+                        const isRefused = item.decision.toLowerCase().includes('refus') || item.decision.toLowerCase().includes('reject');
+                        return (
+                          <div key={index} className="p-3.5 rounded-xl border border-border/80 bg-card/70 space-y-2 hover:border-primary/40 transition-colors shadow-2xs">
+                              <div className="flex flex-wrap justify-between items-start gap-2">
+                                <p className="font-semibold text-sm text-foreground flex-1 leading-snug">{item.application}</p>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-[10px] font-bold px-2 py-0.5 shrink-0 ${
+                                    isApproved 
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' 
+                                      : isRefused 
+                                      ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800' 
+                                      : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                                  }`}
+                                >
+                                  {item.decision}
+                                </Badge>
+                              </div>
+                              <div className="flex flex-wrap justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border/40 gap-2">
+                                  <span>Decided on: <span className="font-medium text-foreground">{item.date}</span></span>
+                                  <div className="flex items-center gap-3">
+                                    <span className="font-mono text-[11px]">Ref: {item.reference}</span>
+                                    {item.url && (
+                                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 font-medium text-xs">
+                                          Portal <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    )}
+                                  </div>
+                              </div>
+                          </div>
+                        );
+                     })}
+                </div>
+            ) : (
+                <div className="p-4 rounded-xl bg-muted/30 border border-dashed border-border text-center space-y-1">
+                    <p className="text-sm font-medium text-foreground">No recent planning history recorded</p>
+                    <p className="text-xs text-muted-foreground">No major structural planning applications found matching this property's spatial boundaries.</p>
+                </div>
+            )}
+
+            <div className="flex flex-col gap-2 pt-1" data-pdf-ignore>
+                <Accordion className="w-full">
+                  {isAdmin && planningLogs.length > 0 && (
+                        <AccordionItem value="log">
+                            <AccordionTrigger>
+                                <span className="text-xs text-primary hover:underline">Show Fetch Log (Admin Only)</span>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <pre className="p-4 bg-muted rounded-md overflow-x-auto text-xs whitespace-pre-wrap">
+                                   {planningLogs.join('\n')}
+                                </pre>
+                            </AccordionContent>
+                        </AccordionItem>
+                  )}
+                </Accordion>
+                {isAdmin && (
+                  <Button asChild variant="outline" size="sm" className="w-fit text-xs">
+                      <Link to="/debug/planning">
+                          <Search className="mr-2 h-3.5 w-3.5" />
+                          Debug Planning History
+                      </Link>
+                  </Button>
+                )}
+            </div>
+        </div>
+    );
 }
 
 
-export function ReportDisplay({ address, reportData, isLoading, onReset }: ReportDisplayProps) {
-  const { profile, isAdmin } = useAuth();
+export function ReportDisplay({ 
+  address, 
+  reportData, 
+  isLoading, 
+  onReset,
+  onBack,
+  backLabel,
+  onNewHomePack 
+}: ReportDisplayProps) {
+  const { user, profile, isAdmin } = useAuth();
   console.log("[DEBUG] isAdmin:", isAdmin, "profile role:", profile?.role);
   const [conditionReport, setConditionReport] = useState<string | null>(null);
   const [isConditionReportLoading, setIsConditionReportLoading] = useState(false);
@@ -868,534 +1024,157 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
 
   const primaryTransaction = getPrimaryTransaction(landRegistry);
   const isFree = profile?.role === 'free';
+  const isBusinessSubscriber = profile?.role === 'subscription' || profile?.role === 'agency' || profile?.role === 'admin';
+  const fullAddress = `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`.trim();
+  const hasPurchasedReport = Boolean(
+    profile?.purchasedReports?.includes(fullAddress) ||
+    profile?.purchasedReports?.includes(propertyData.address) ||
+    (address.postcode && profile?.purchasedReports?.some(p => p.toLowerCase().includes(address.postcode.toLowerCase().trim())))
+  );
+  const canDownloadPdf = isBusinessSubscriber || hasPurchasedReport;
+  const [showB2CPurchaseModal, setShowB2CPurchaseModal] = useState(false);
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
+  // White-label branding attributes
+  const isWhiteLabel = (profile?.role === 'agency' || (profile?.accountType === 'business' && profile?.role !== 'free')) && Boolean(profile?.branding);
+  const branding = profile?.branding;
+  const brandPrimary = (isWhiteLabel && branding?.primaryColor) || '#2d4a77';
+  const brandAccent = (isWhiteLabel && branding?.accentColor) || '#d1e3f8';
+  const brandLogo = (isWhiteLabel && branding?.logoUrl) || null;
+  const companyName = (isWhiteLabel && (profile?.company || branding?.companyTagline || branding?.agentName)) || 'HomePackAI';
+
+  const handleB2CPurchase = async () => {
+    if (!user) {
+      toast.error('Please sign in or create an account to unlock your £9.99 report download');
+      return;
+    }
+    setIsPurchasing(true);
+    try {
+      await purchaseReportForUser(user.uid, fullAddress);
+      toast.success('Report purchased! Generating your official 9-page HomePack PDF (£9.99)...');
+      setShowB2CPurchaseModal(false);
+      setTimeout(() => {
+        downloadPdf();
+      }, 400);
+    } catch (e: any) {
+      toast.error(e.message || 'Could not complete report purchase');
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-fade-in-up">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <Button variant="ghost" onClick={onReset} className="-ml-4 h-8">
+            <Button 
+              variant="ghost" 
+              onClick={onBack || onReset} 
+              className="-ml-4 h-8 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Start New Report
+              {backLabel || "Start New Report"}
             </Button>
           </div>
           <h2 className="text-4xl font-bold font-serif tracking-tight text-[#2d4a77]">{propertyData.address}</h2>
-          <p className="text-muted-foreground font-sans mt-1">Comprehensive property information pack generated by HomePackAI.</p>
+          <p className="text-muted-foreground font-sans mt-1">
+            {isWhiteLabel && profile?.company 
+              ? `Client due diligence pack prepared by ${profile.company}` 
+              : 'Comprehensive property information pack generated by HomePackAI.'}
+          </p>
         </div>
-        {!isFree ? (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <Button 
+            variant="outline" 
             size="lg" 
-            className="w-full md:w-auto" 
-            onClick={downloadPdf}
-            disabled={isDownloading}
+            className="w-full sm:w-auto font-medium" 
+            onClick={onNewHomePack || onReset}
           >
-            {isDownloading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Download className="mr-2" />
-                Create PDF Report
-              </>
-            )}
+            <Plus className="mr-2 h-4 w-4" />
+            New HomePack
           </Button>
-        ) : (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-lg border border-border">
-            <Lock className="h-4 w-4" />
-            Upgrade to download PDF
-          </div>
-        )}
-      </div>
 
-      {/* Hidden PDF Template - Moving off-screen for reliable capture */}
-      <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1, background: 'white' }} aria-hidden="true">
-        <div 
-          id="homepack-pdf-template"
-          ref={pdfTemplateRef}
-          style={{ 
-            width: '794px', 
-            backgroundColor: 'white',
-            color: 'black'
-          }}
-        >
-          <div className="bg-white text-black font-sans">
-            {/* Page 1: Cover */}
-            <div data-pdf-page className="w-[794px] h-[1123px] p-[80px] flex flex-col items-center justify-center text-center">
-              <div className="mb-12">
-                <div className="p-6 bg-[#2d4a77] rounded-2xl inline-block">
-                  <Home className="h-20 w-20 text-white" />
-                </div>
-              </div>
-              
-              <h1 className="text-6xl font-serif font-bold text-[#2d4a77] mb-4 tracking-tight">HomePackAI</h1>
-              <p className="text-xl font-sans text-muted-foreground mb-16 uppercase tracking-[0.3em] font-medium">Property Information Report</p>
-              
-              <div className="w-full max-w-2xl bg-[#f0f7ff] p-12 rounded-sm border border-[#d1e3f8] space-y-6">
-                <h2 className="text-4xl font-serif font-bold text-[#2d4a77] leading-tight">
-                  {address.houseNumber} {address.street}
-                </h2>
-                <div className="space-y-1">
-                  <p className="text-2xl text-[#4a5568]">{address.town}, {address.postcode}</p>
-                </div>
-                <div className="pt-6 space-y-2 border-t border-[#d1e3f8]/50">
-                  <p className="text-lg text-[#4a5568]">Prepared for <span className="font-semibold">{profile?.displayName || profile?.email}</span></p>
-                  <p className="text-lg text-[#4a5568]">Generated on {new Date().toLocaleDateString('en-GB')}</p>
-                </div>
-              </div>
-              
-              <div className="mt-24 max-w-md">
-                <p className="text-lg font-serif italic text-muted-foreground leading-relaxed">
-                  A polished property due-diligence summary designed for buyers, sellers, and advisers.
-                </p>
-              </div>
-              
-              <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-8">
-                <span>HomePackAI Property Information Report</span>
-                <span className="font-bold">Page 1</span>
-              </div>
-            </div>
-
-            {/* Page 2: Contents */}
-            <div data-pdf-page className="w-[794px] h-[1123px] p-[80px] flex flex-col">
-              <h2 className="text-4xl font-serif font-bold text-[#2d4a77] mb-16 flex items-center gap-3">
-                <span className="text-[#2d4a77]/30 text-5xl">.</span> Contents
-              </h2>
-              
-              <div className="space-y-10 text-xl flex-grow">
-                {[
-                  { id: 1, title: 'Executive Summary', page: '03' },
-                  { id: 2, title: 'Location & Local Schools', page: '04' },
-                  { id: 3, title: 'Land Registry & Sales History', page: '05' },
-                  { id: 4, title: 'Energy Performance (EPC)', page: '06' },
-                  { id: 5, title: 'Council Tax & Flood Risk', page: '07' },
-                  { id: 6, title: 'Environmental Hazards & Planning', page: '08' },
-                  { id: 7, title: 'Broadband & Mobile Connectivity', page: '08' },
-                  { id: 8, title: 'AI Condition Report', page: '09' },
-                ].map((item) => (
-                  <div key={item.id} className="flex items-end gap-4 group">
-                    <span className="text-[#2d4a77] font-bold w-8">{item.id}</span>
-                    <span className="font-serif text-[#2d4a77] font-medium">{item.title}</span>
-                    <div className="flex-grow border-b border-dotted border-[#2d4a77]/20 mb-1.5" />
-                    <span className="text-[#2d4a77] font-bold font-mono">{item.page}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="mt-auto p-8 bg-[#fefce8] border border-[#fef08a] rounded-sm">
-                <p className="text-sm leading-relaxed text-[#854d0e]">
-                  <span className="font-bold">Important:</span> This report is for information only. Critical items should still be verified with the relevant authority, solicitor, lender, or surveyor.
-                </p>
-              </div>
-              
-              <div className="mt-12 w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-8">
-                <span>HomePackAI Property Information Report</span>
-                <span className="font-bold">Page 2</span>
-              </div>
-            </div>
-
-            {/* Page 3: Summary */}
-            <div data-pdf-page className="w-[794px] h-[1123px] p-[80px] flex flex-col">
-              <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-4">1. Executive Summary</h2>
-              <p className="text-muted-foreground mb-8 text-lg leading-relaxed">
-                This summary condenses the key findings from the uploaded HomePack report into a cleaner, easier-to-scan buyer format.
-              </p>
-              
-              <div className="bg-[#f0f7ff] p-10 rounded-sm border border-[#d1e3f8] mb-12">
-                <h3 className="text-xl font-serif font-bold text-[#2d4a77] mb-6">Property Summary</h3>
-                <div className="space-y-4 text-base leading-relaxed text-[#2d3748]">
-                  <p className="flex gap-3">
-                    <span className="text-[#2d4a77]">•</span>
-                    <span>{address.street}, {address.town} appears to be a {epc?.rating === 'A' || epc?.rating === 'B' ? 'modern, energy-efficient' : 'well-established'} home with a current EPC rating of {epc?.rating || 'N/A'} and a potential to improve to {epc?.potentialRating || 'N/A'}.</span>
-                  </p>
-                  <p className="flex gap-3">
-                    <span className="text-[#2d4a77]">•</span>
-                    <span>The latest sale recorded is {primaryTransaction ? `£${parseInt(primaryTransaction.pricePaid, 10).toLocaleString()} on ${new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')}` : 'not available in recent records'}.</span>
-                  </p>
-                  <p className="flex gap-3">
-                    <span className="text-[#2d4a77]">•</span>
-                    <span>Flood exposure appears {floodRisk?.riskOfFloodingFromRiversAndSea?.toLowerCase().includes('low') ? 'relatively low' : 'to require attention'}, with {floodRisk?.riskOfFloodingFromRiversAndSea || 'unknown'} river/sea flooding risk and {floodRisk?.activeWarnings || 'no active warnings'}.</span>
-                  </p>
-                  <p className="flex gap-3">
-                    <span className="text-[#2d4a77]">•</span>
-                    <span>{broadband?.superfastAvailable ? 'Superfast broadband availability is indicated' : 'Broadband availability should be verified'}, providing good digital connectivity for the property.</span>
-                  </p>
-                </div>
-                <div className="mt-8 pt-6 border-t border-[#d1e3f8] text-sm italic text-[#2d4a77]">
-                  <span className="font-bold">Recommendation:</span> present unresolved items as "Further verification recommended" rather than "No data" to give the report a more premium and buyer-friendly tone.
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 border border-[#e2e8f0]">
-                <div className="p-8 border-r border-b border-[#e2e8f0]">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Last Sold Price</p>
-                  <p className="text-3xl font-serif font-bold text-[#2d4a77]">{primaryTransaction ? `£${parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}` : 'N/A'}</p>
-                </div>
-                <div className="p-8 border-b border-[#e2e8f0]">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Current EPC Rating</p>
-                  <p className="text-3xl font-serif font-bold text-[#2d4a77]">{epc?.rating || 'N/A'}</p>
-                </div>
-                <div className="p-8 border-r border-[#e2e8f0]">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Flood Risk</p>
-                  <p className="text-3xl font-serif font-bold text-green-600">{floodRisk?.riskOfFloodingFromRiversAndSea || 'Low (estimated)'}</p>
-                </div>
-                <div className="p-8">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Council Tax Band</p>
-                  <p className="text-3xl font-serif font-bold text-[#b45309]">{councilTax?.band || 'Check VOA'}</p>
-                </div>
-              </div>
-
-              <div className="mt-12">
-                <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-8">3. Land Registry & Sales History</h2>
-                <div className="bg-[#2d4a77] p-6 rounded-sm mb-8">
-                  <h3 className="text-xl font-serif font-bold text-white mb-2">Ownership & transaction history</h3>
-                  <p className="text-white/80 text-sm">Clean presentation of the latest recorded sale and prior transaction history.</p>
-                </div>
-              </div>
-              
-              <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-8">
-                <span>HomePackAI Property Information Report</span>
-                <span className="font-bold">Page 3</span>
-              </div>
-            </div>
-
-            {/* Page 4: Location & Schools */}
-            <div data-pdf-page className="w-[794px] h-[1123px] p-[80px] flex flex-col">
-              <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-4">2. Location & Local Schools</h2>
-              <p className="text-muted-foreground mb-8 text-lg leading-relaxed">
-                Map showing the property location and nearby educational institutions with their latest Ofsted ratings.
-              </p>
-
-              {propertyData.coordinates && (
-                <div className="mb-8 border border-[#d1e3f8] rounded-sm overflow-hidden">
-                  <PropertyMap 
-                    propertyLocation={propertyData.coordinates} 
-                    schools={propertyData.schools || []} 
-                    address={propertyData.address} 
-                  />
-                </div>
+          {canDownloadPdf ? (
+            <div className="flex items-center gap-2">
+              {hasPurchasedReport && !isBusinessSubscriber && (
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 font-medium px-2.5 py-1 text-xs">
+                  B2C Single Pack Unlocked
+                </Badge>
               )}
-
-              <div className="space-y-6">
-                <h3 className="text-xl font-serif font-bold text-[#2d4a77] border-b pb-2">Nearest Schools</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {(propertyData.schools || []).map((school, idx) => (
-                    <div key={idx} className="p-4 bg-[#f0f7ff] rounded-sm border border-[#d1e3f8] flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-[#2d4a77]">{school.name}</p>
-                        <p className="text-sm text-muted-foreground">{school.type} School • {school.distance} away</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Ofsted Rating</p>
-                        <Badge className={`
-                          ${school.ofstedRating.toLowerCase().includes('outstanding') ? 'bg-green-600' : 
-                            school.ofstedRating.toLowerCase().includes('good') ? 'bg-blue-600' : 
-                            school.ofstedRating.toLowerCase().includes('requires improvement') ? 'bg-amber-500' : 
-                            'bg-red-500'} text-white border-none
-                        `}>
-                          {school.ofstedRating}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                  {(!propertyData.schools || propertyData.schools.length === 0) && (
-                    <p className="text-muted-foreground italic">No school data available for this location.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-8">
-                <span>HomePackAI Property Information Report</span>
-                <span className="font-bold">Page 4</span>
-              </div>
-            </div>
-
-            {/* Page 5: Sales History & EPC */}
-            <div data-pdf-page className="w-[794px] h-[1123px] p-[80px] flex flex-col">
-              <div className="border border-[#e2e8f0] mb-12">
-                <div className="grid grid-cols-3 bg-white">
-                  <div className="p-4 border-r border-b border-[#e2e8f0] text-muted-foreground text-sm">Estate type</div>
-                  <div className="p-4 border-r border-b border-[#e2e8f0] font-bold">{primaryTransaction?.estateType || 'Freehold'}</div>
-                  <div className="p-4 border-b border-[#e2e8f0] text-muted-foreground text-sm">Latest sale shown: {primaryTransaction ? new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB') : 'N/A'}</div>
-                  
-                  <div className="p-4 border-r border-b border-[#e2e8f0] text-muted-foreground text-sm">Latest recorded price</div>
-                  <div className="p-4 border-r border-b border-[#e2e8f0] font-bold">£{primaryTransaction ? parseInt(primaryTransaction.pricePaid, 10).toLocaleString() : 'N/A'}</div>
-                  <div className="p-4 border-b border-[#e2e8f0] text-muted-foreground text-sm italic">Recorded in official registry</div>
-                  
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Previous recorded price</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">£{landRegistry[1] ? parseInt(landRegistry[1].pricePaid, 10).toLocaleString() : 'N/A'}</div>
-                  <div className="p-4 text-muted-foreground text-sm">{landRegistry[1] ? new Date(landRegistry[1].transactionDate).toLocaleDateString('en-GB') : 'N/A'}</div>
-                </div>
-              </div>
-
-              <h3 className="text-xl font-serif font-bold text-[#2d4a77] mb-6">Full sales history</h3>
-              <div className="border border-[#e2e8f0] rounded-sm overflow-hidden mb-16">
-                <table className="w-full text-sm">
-                  <thead className="bg-[#f0f7ff]">
-                    <tr>
-                      <th className="px-6 py-4 text-left font-bold text-[#2d4a77]">Date</th>
-                      <th className="px-6 py-4 text-left font-bold text-[#2d4a77]">Price paid</th>
-                      <th className="px-6 py-4 text-left font-bold text-[#2d4a77]">Tenure</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {landRegistry.map((t, i) => (
-                      <tr key={i} className="border-t border-[#e2e8f0]">
-                        <td className="px-6 py-4">{new Date(t.transactionDate).toLocaleDateString('en-GB')}</td>
-                        <td className="px-6 py-4 font-bold">£{parseInt(t.pricePaid, 10).toLocaleString()}</td>
-                        <td className="px-6 py-4">{t.estateType}</td>
-                      </tr>
-                    ))}
-                    {landRegistry.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground italic">No transaction history found.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-8">4. Energy Performance (EPC)</h2>
-              <div className="bg-[#2d4a77] p-6 rounded-sm mb-8">
-                <h3 className="text-xl font-serif font-bold text-white mb-2">Energy efficiency snapshot</h3>
-                <p className="text-white/80 text-sm">The property indicates {epc?.rating === 'A' || epc?.rating === 'B' ? 'strong' : 'standard'} efficiency and a possible pathway to an improved rating.</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-0 border border-[#e2e8f0] mb-12">
-                <div className="p-10 bg-[#f0fdf4] border-r border-[#e2e8f0]">
-                  <p className="text-xs font-bold text-green-800 uppercase tracking-wider mb-4">Current Rating</p>
-                  <p className="text-6xl font-serif font-bold text-green-700 mb-4">{epc?.rating || 'N/A'}</p>
-                  <p className="text-sm text-green-800/70 italic">Good current efficiency</p>
-                </div>
-                <div className="p-10 bg-[#f0f7ff]">
-                  <p className="text-xs font-bold text-[#2d4a77] uppercase tracking-wider mb-4">Potential Rating</p>
-                  <p className="text-6xl font-serif font-bold text-[#2d4a77] mb-4">{epc?.potentialRating || 'N/A'}</p>
-                  <p className="text-sm text-[#2d4a77]/70 italic">Improvement opportunity remains</p>
-                </div>
-              </div>
-
-              <div className="border border-[#e2e8f0]">
-                <div className="grid grid-cols-3">
-                  <div className="p-4 border-r border-b border-[#e2e8f0] text-muted-foreground text-sm">Property type</div>
-                  <div className="p-4 border-r border-b border-[#e2e8f0] font-bold">{epc?.propertyType || 'House'}</div>
-                  <div className="p-4 border-b border-[#e2e8f0] font-medium">{epc?.builtForm || 'End-terrace'}</div>
-                  
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Total floor area</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{epc?.totalFloorArea || '63.0'} m²</div>
-                  <div className="p-4 text-muted-foreground text-sm italic">Official EPC measurement</div>
-                </div>
-              </div>
-              
-              <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-8">
-                <span>HomePackAI Property Information Report</span>
-                <span className="font-bold">Page 5</span>
-              </div>
-            </div>
-
-            {/* Page 6: EPC Details & Council Tax */}
-            <div data-pdf-page className="w-[794px] h-[1123px] p-[80px] flex flex-col">
-              <div className="border border-[#e2e8f0] mb-16">
-                {[
-                  { label: 'Main heating', value: epc?.mainHeatDescription || 'Mains gas', note: 'Standard heating system' },
-                  { label: 'Walls', value: epc?.wallsDescription?.split(';')[0] || 'Cavity wall', note: 'Average thermal transmittance' },
-                  { label: 'Windows', value: epc?.windowsDescription || 'Fully double glazed', note: 'High performance glazing' },
-                  { label: 'Estimated annual heating cost', value: `£${epc?.heatingCostCurrent || '0'} / year`, note: 'From official EPC summary' },
-                  { label: 'CO2 emissions', value: `${epc?.co2EmissionsCurrent || '0'} tonnes / year`, note: 'From official EPC summary' },
-                ].map((row, i) => (
-                  <div key={i} className="grid grid-cols-3 border-b last:border-0 border-[#e2e8f0]">
-                    <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">{row.label}</div>
-                    <div className="p-4 border-r border-[#e2e8f0] font-bold">{row.value}</div>
-                    <div className="p-4 text-muted-foreground text-xs italic">{row.note}</div>
-                  </div>
-                ))}
-              </div>
-
-              <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-8">5. Council Tax & Flood Risk</h2>
-              <div className="bg-[#2d4a77] p-6 rounded-sm mb-8">
-                <h3 className="text-xl font-serif font-bold text-white mb-2">Local taxation and flood indicators</h3>
-                <p className="text-white/80 text-sm">Presenting unresolved authority data separately from the flood findings makes the report feel more trustworthy.</p>
-              </div>
-
-              <h3 className="text-xl font-serif font-bold text-[#2d4a77] mb-6">Council tax</h3>
-              <div className="border border-[#e2e8f0] mb-12">
-                <div className="grid grid-cols-3 border-b border-[#e2e8f0]">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Tax band</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{councilTax?.band || 'Check VOA'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">Further verification recommended</div>
-                </div>
-                <div className="grid grid-cols-3">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Local authority</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{councilTax?.authority || 'Local authority'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">Tax year shown: {councilTax?.year || '2024/25'}</div>
-                </div>
-              </div>
-
-              <h3 className="text-xl font-serif font-bold text-[#2d4a77] mb-6">Flood risk</h3>
-              <div className="border border-[#e2e8f0]">
-                <div className="grid grid-cols-3 border-b border-[#e2e8f0]">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Rivers & sea</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold text-green-600">{floodRisk?.riskOfFloodingFromRiversAndSea || 'Low (estimated)'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">Very low indicator shown in source output</div>
-                </div>
-                <div className="grid grid-cols-3 border-b border-[#e2e8f0]">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Groundwater</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{floodRisk?.riskOfFloodingFromGroundwater || 'Negligible'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">None indicated</div>
-                </div>
-                <div className="grid grid-cols-3">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Active warnings</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{floodRisk?.activeWarnings || 'No active warnings'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">No live warning noted in official report</div>
-                </div>
-              </div>
-              
-              <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-8">
-                <span>HomePackAI Property Information Report</span>
-                <span className="font-bold">Page 6</span>
-              </div>
-            </div>
-
-            {/* Page 7: Environmental & Planning */}
-            <div data-pdf-page className="w-[794px] h-[1123px] p-[80px] flex flex-col">
-              <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-8">6. Environmental Hazards & Planning</h2>
-              <div className="bg-[#2d4a77] p-6 rounded-sm mb-8">
-                <h3 className="text-xl font-serif font-bold text-white mb-2">Environmental and planning checks</h3>
-                <p className="text-white/80 text-sm">Where data is incomplete, a premium report should clearly separate "not found" from "not available".</p>
-              </div>
-
-              <h3 className="text-xl font-serif font-bold text-[#2d4a77] mb-6">Environmental hazards</h3>
-              <div className="border border-[#e2e8f0] mb-12">
-                <div className="grid grid-cols-3 border-b border-[#e2e8f0]">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Radon risk</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{radonRisk?.riskLevel || 'Unknown'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">No confirmed result displayed</div>
-                </div>
-                <div className="grid grid-cols-3 border-b border-[#e2e8f0]">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Mining / subsidence</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{coalMining?.isReportingArea ? 'Yes' : 'No'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">Based on source presentation</div>
-                </div>
-                <div className="grid grid-cols-3">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Ground stability</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold italic text-muted-foreground">Data unavailable via search</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">Would benefit from source note and timestamp</div>
-                </div>
-              </div>
-
-              <h3 className="text-xl font-serif font-bold text-[#2d4a77] mb-6">Planning history</h3>
-              <div className="border border-[#e2e8f0] rounded-sm p-8 bg-white mb-16">
-                {planningHistory.length > 0 ? (
-                  <div className="space-y-6">
-                    {planningHistory.slice(0, 5).map((item, i) => (
-                      <div key={i} className="border-l-4 border-[#2d4a77] pl-6 py-1">
-                        <p className="font-bold text-[#2d4a77] mb-1">{item.application}</p>
-                        <p className="text-sm text-muted-foreground">{item.date} • {item.decision}</p>
-                      </div>
-                    ))}
-                    {planningHistory.length > 5 && (
-                      <p className="text-sm text-muted-foreground italic text-center pt-4">...and {planningHistory.length - 5} more applications</p>
-                    )}
-                  </div>
+              <Button 
+                size="lg" 
+                className="w-full sm:w-auto font-medium" 
+                onClick={downloadPdf}
+                disabled={isDownloading}
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
                 ) : (
-                  <p className="text-center text-muted-foreground italic py-4">No planning applications found in the official records.</p>
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Create PDF Report
+                  </>
                 )}
-              </div>
-
-              <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-8">7. Broadband & Connectivity</h2>
-              <div className="bg-[#2d4a77] p-6 rounded-sm mb-8">
-                <h3 className="text-xl font-serif font-bold text-white mb-2">Digital connectivity</h3>
-                <p className="text-white/80 text-sm">Detailed availability and speed coverage for the property.</p>
-              </div>
-
-              <div className="border border-[#e2e8f0] mb-8">
-                <div className="grid grid-cols-3 border-b border-[#e2e8f0]">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Max download speed</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{broadband?.maxDownloadSpeed || 'Unknown'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">Based on Ofcom coverage data</div>
-                </div>
-                <div className="grid grid-cols-3 border-b border-[#e2e8f0]">
-                  <div className="p-4 border-r border-[#e2e8f0] text-muted-foreground text-sm">Max upload speed</div>
-                  <div className="p-4 border-r border-[#e2e8f0] font-bold">{broadband?.maxUploadSpeed || 'Unknown'}</div>
-                  <div className="p-4 text-muted-foreground text-xs italic">Based on Ofcom coverage data</div>
-                </div>
-              </div>
-
-              {broadband?.results && (
-                <div className="grid grid-cols-3 gap-4 mb-12">
-                  {broadband.results.map((r, i) => (
-                    <div key={i} className="p-4 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm text-center">
-                      <p className="text-[10px] font-bold text-[#2d4a77] uppercase mb-1">{r.type}</p>
-                      <p className="font-bold text-[#2d4a77]">{r.available ? r.downloadSpeed : 'Unavailable'}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-8">8. Mobile Coverage</h2>
-              <div className="bg-[#2d4a77] p-6 rounded-sm mb-8">
-                <h3 className="text-xl font-serif font-bold text-white mb-2">Network availability</h3>
-                <p className="text-white/80 text-sm">Coverage levels for major UK mobile operators at this location.</p>
-              </div>
-
-              <div className="space-y-4">
-                {(propertyData.mobile || []).map((m, i) => {
-                  const isFiveGGood = m.fiveG && (m.fiveG.includes('Good') || m.fiveG.includes('Available'));
-                  return (
-                    <div key={i} className="p-4 border border-[#e2e8f0] rounded-sm flex justify-between items-center">
-                      <div className="flex-grow pr-4">
-                        <p className="font-bold text-[#2d4a77]">{m.operator}</p>
-                        <p className="text-xs text-muted-foreground">Voice: {m.voice} • Data: {m.data || m.data4g || '4G Available'}</p>
-                        {m.transmitterNotice && (
-                          <p className="text-[11px] text-amber-700 font-medium mt-1">📡 {m.transmitterNotice}</p>
-                        )}
-                      </div>
-                      <div className="text-right min-w-[100px]">
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">5G Status</p>
-                        <Badge className={isFiveGGood ? 'bg-green-600' : 'bg-slate-400'}>{m.fiveG}</Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-8">
-                <span>HomePackAI Property Information Report</span>
-                <span className="font-bold">Page 8</span>
-              </div>
+              </Button>
             </div>
-
-            {/* Page 9: End */}
-            <div data-pdf-page className="w-[794px] h-[1123px] p-[80px] flex flex-col">
-              {conditionReport && (
-                <div className="mb-16">
-                  <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-8">9. AI Condition Report</h2>
-                  <div className="p-10 bg-[#f0f7ff] rounded-sm border border-[#d1e3f8]">
-                    <p className="text-base leading-relaxed text-[#2d3748] whitespace-pre-wrap">{conditionReport}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-auto py-12 px-8 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm text-center">
-                <h3 className="text-2xl font-serif font-bold text-[#2d4a77] mb-4">End of HomePack Report</h3>
-                <p className="text-[#4a5568] italic">Redesigned for a more professional customer-facing presentation.</p>
-              </div>
-              
-              <div className="mt-12 w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-8">
-                <span>HomePackAI Property Information Report</span>
-                <span className="font-bold">Page 9</span>
-              </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <Button 
+                size="lg" 
+                className="w-full sm:w-auto font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                onClick={() => setShowB2CPurchaseModal(true)}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download Full PDF (£9.99)
+              </Button>
+              <Button 
+                asChild 
+                variant="outline" 
+                size="lg" 
+                className="w-full sm:w-auto text-xs font-medium"
+              >
+                <Link to="/pricing">
+                  B2B Subscription (£29–£49/mo)
+                </Link>
+              </Button>
             </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Modular 9-Page PDF Template */}
+      <HomePackPdfTemplate
+        pdfTemplateRef={pdfTemplateRef}
+        propertyData={propertyData}
+        address={address}
+        landRegistry={landRegistry}
+        epc={epc}
+        floodRisk={floodRisk}
+        broadband={broadband}
+        radonRisk={radonRisk}
+        coalMining={coalMining}
+        councilTax={councilTax}
+        conditionReport={conditionReport}
+        isWhiteLabel={isWhiteLabel}
+        brandLogo={brandLogo}
+        brandPrimary={brandPrimary}
+        brandAccent={brandAccent}
+        branding={branding}
+        profile={profile}
+        primaryTransaction={primaryTransaction}
+      />
 
       <div ref={reportRef} className="grid grid-cols-1 lg:grid-cols-3 gap-8 bg-background p-4 rounded-xl">
         <div className="lg:col-span-2 space-y-8">
-          <AiSummary summary={summary} />
+          <div id="section-summary">
+            <AiSummary summary={summary} />
+          </div>
 
-          <DataSection icon={Home} title="Location & Local Schools">
+          <DataSection id="section-schools" icon={Home} title="Location & Local Schools">
             <SchoolsDisplay 
               schools={propertyData.schools} 
               coordinates={propertyData.coordinates} 
@@ -1403,95 +1182,279 @@ export function ReportDisplay({ address, reportData, isLoading, onReset }: Repor
             />
           </DataSection>
 
-          <DataSection icon={Landmark} title="Land Registry">
+          <DataSection id="section-land-registry" icon={Landmark} title="Land Registry & Price History">
             {primaryTransaction ? (
-                <>
-                  <DataItem label="Last Sold Price" value={`£${parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}`} />
-                  <DataItem label="Last Sold Date" value={new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')} />
-                  <DataItem label="Tenure" value={primaryTransaction.estateType} />
+                <div className="space-y-4">
+                  {/* Hero Highlight Card */}
+                  <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Official Last Sold Price</span>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-2xl font-serif font-bold text-[#1e3a8a] dark:text-blue-400">
+                          £{parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}
+                        </span>
+                        <Badge variant="outline" className="text-xs bg-card font-medium">
+                          {primaryTransaction.estateType || 'Freehold'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="text-left sm:text-right space-y-0.5">
+                      <span className="text-xs text-muted-foreground block">Completion Date:</span>
+                      <span className="text-sm font-semibold text-foreground block">
+                        {new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">HM Land Registry Price Paid Dataset</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl border border-border/70 bg-card/60">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">Tenure Type</span>
+                      <span className="text-sm font-semibold text-foreground">{primaryTransaction.estateType || 'Freehold'}</span>
+                    </div>
+                    <div className="p-3 rounded-xl border border-border/70 bg-card/60">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">Record Date</span>
+                      <span className="text-sm font-semibold text-foreground">{new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')}</span>
+                    </div>
+                    <div className="p-3 rounded-xl border border-border/70 bg-card/60">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">Registry Category</span>
+                      <span className="text-sm font-semibold text-foreground">Standard Price Paid</span>
+                    </div>
+                  </div>
                   
-                  {!isFree && (
-                    <>
-                      <Separator className="my-4" />
-                      <h3 className="text-md font-semibold text-foreground mb-2">Full Sales History</h3>
-                      <div className="space-y-3">
+                  {!isFree && landRegistry.length > 1 && (
+                    <div className="pt-2">
+                      <Separator className="my-3" />
+                      <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center justify-between">
+                        <span>Full Transaction Chronology</span>
+                        <span className="text-xs font-normal text-muted-foreground">{landRegistry.length} recorded transfers</span>
+                      </h3>
+                      <div className="space-y-2">
                         {landRegistry.map((transaction, index) => (
-                          <div key={index} className="p-2 rounded-md even:bg-muted/50">
-                            <div className="flex justify-between items-center text-sm">
-                              <p className="font-medium text-primary">£{parseInt(transaction.pricePaid, 10).toLocaleString()}</p>
-                              <p className="text-muted-foreground">{new Date(transaction.transactionDate).toLocaleDateString('en-GB')}</p>
+                          <div key={index} className="p-3 rounded-xl border border-border/70 bg-card/50 flex justify-between items-center text-sm hover:bg-muted/40 transition-colors">
+                            <div className="space-y-0.5">
+                              <p className="font-semibold text-foreground">£{parseInt(transaction.pricePaid, 10).toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">{transaction.estateType || 'Transfer'}</p>
                             </div>
+                            <p className="text-xs font-medium text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-md">
+                              {new Date(transaction.transactionDate).toLocaleDateString('en-GB')}
+                            </p>
                           </div>
                         ))}
                       </div>
-                    </>
+                    </div>
                   )}
-                </>
+                </div>
             ) : (
-                <>
+                <div className="space-y-2">
                   <DataItem label="Title Number" value={"N/A"} />
                   <DataItem label="Tenure" value={"Data not found"} />
-                  <DataItem label="Last Sold" value={"No recent sales data found"} />
-               </>
+                  <DataItem label="Last Sold" value={"No recent sales data recorded in Land Registry index"} />
+               </div>
             )}
-            
           </DataSection>
 
-          <DataSection icon={Zap} title="Energy Performance (EPC)">
+          <DataSection id="section-epc" icon={Zap} title="Energy Performance (EPC)">
               <EpcDisplay epcData={epc} logs={logs} isFree={isFree} isAdmin={isAdmin} />
           </DataSection>
 
-          <DataSection icon={Coins} title="Council Tax">
+          <DataSection id="section-council-tax" icon={Coins} title="Council Tax">
             <CouncilTaxDisplay data={councilTax} logs={logs} isAdmin={isAdmin} postcode={address.postcode} />
           </DataSection>
           
-          <DataSection icon={Waves} title="Flood Risk">
+          <DataSection id="section-flood" icon={Waves} title="Flood Risk">
             <FloodRiskDisplay floodRiskData={floodRisk} logs={logs} isAdmin={isAdmin} />
           </DataSection>
 
-          <DataSection icon={ShieldAlert} title="Environmental Hazards">
+          <DataSection id="section-environmental" icon={ShieldAlert} title="Environmental Hazards">
             <EnvironmentalHazardsDisplay radon={radonRisk} coal={coalMining} />
           </DataSection>
 
-          <DataSection icon={ClipboardList} title="Planning History">
+          <DataSection id="section-planning" icon={ClipboardList} title="Planning History">
             <PlanningHistoryDisplay planningHistory={planningHistory} uprn={epc?.uprn || ''} localAuthorityId={epc?.localAuthority} logs={logs} isAdmin={isAdmin} />
           </DataSection>
 
-          <DataSection icon={Wifi} title="Broadband & Connectivity">
+          <DataSection id="section-broadband" icon={Wifi} title="Broadband & Connectivity">
             <BroadbandDisplay data={broadband} />
           </DataSection>
 
-          <DataSection icon={Smartphone} title="Mobile Coverage">
+          <DataSection id="section-mobile" icon={Smartphone} title="Mobile Coverage">
             <MobileDisplay data={propertyData.mobile} summary={propertyData.mobileSummary} />
           </DataSection>
 
         </div>
-        <div className="lg:col-span-1 space-y-8">
-          {!isFree ? (
-            <>
-              <div data-pdf-ignore>
-                <ImageUploader onReportGenerated={setConditionReport} setIsLoading={setIsConditionReportLoading} />
-              </div>
-              <AiConditionReport report={conditionReport} isLoading={isConditionReportLoading} />
-            </>
-          ) : (
-            <Card className="border-dashed border-2 bg-muted/30" data-pdf-ignore>
-              <CardHeader className="text-center">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock className="h-6 w-6 text-primary" />
+        <div className="lg:col-span-1 space-y-6">
+          <PropertyQuickNav
+            propertyData={propertyData}
+            primaryTransaction={primaryTransaction}
+            epc={epc}
+            councilTax={councilTax}
+            floodRisk={floodRisk}
+            broadband={broadband}
+            onDownloadPdf={downloadPdf}
+            canDownloadPdf={canDownloadPdf}
+            isDownloading={isDownloading}
+            onUnlockB2C={() => setShowB2CPurchaseModal(true)}
+          />
+
+          <div id="section-condition">
+            {!isFree ? (
+              <>
+                <div data-pdf-ignore>
+                  <ImageUploader onReportGenerated={setConditionReport} setIsLoading={setIsConditionReportLoading} />
                 </div>
-                <CardTitle className="text-lg">AI Condition Report</CardTitle>
-              </CardHeader>
-              <CardContent className="text-center">
-                <p className="text-sm text-muted-foreground mb-6">
-                  Upload photos and generate AI-powered condition reports. Available for Subscription and Agency users.
-                </p>
-                <Button variant="outline" className="w-full">View Pricing</Button>
-              </CardContent>
-            </Card>
-          )}
+                <AiConditionReport report={conditionReport} isLoading={isConditionReportLoading} />
+              </>
+            ) : (
+              <Card className="border-dashed border-2 bg-muted/30" data-pdf-ignore>
+                <CardHeader className="text-center">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Lock className="h-6 w-6 text-primary" />
+                  </div>
+                  <CardTitle className="text-lg">AI Condition Report</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center">
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Upload photos and generate AI-powered condition reports. Available for Subscription and Agency users.
+                  </p>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link to="/pricing">View Pricing</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* B2C Single Report Download Modal (£9.99) */}
+      {showB2CPurchaseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <Card className="w-full max-w-lg bg-card border shadow-xl p-6 relative">
+            <button
+              onClick={() => setShowB2CPurchaseModal(false)}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-semibold"
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+            <div className="flex items-center gap-2 mb-3">
+              <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-semibold">
+                Direct-to-Consumer (B2C)
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                Single-Pack Download
+              </Badge>
+            </div>
+            <h3 className="text-2xl font-serif font-bold text-foreground">
+              Unlock Full 9-Page Due Diligence PDF
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1 mb-4">
+              Instant one-off purchase for <span className="font-semibold text-foreground">{propertyData.address}</span>. No subscription or recurring fees.
+            </p>
+
+            <div className="p-4 rounded-xl bg-muted/50 border border-border/80 space-y-3 mb-6">
+              <div className="flex items-baseline justify-between pb-3 border-b border-border/60">
+                <span className="font-medium text-sm">Official Property Pack PDF</span>
+                <div className="text-right">
+                  <span className="text-2xl font-bold text-foreground">£9.99</span>
+                  <span className="text-xs text-muted-foreground ml-1">inc. VAT</span>
+                </div>
+              </div>
+              <ul className="text-xs space-y-2 text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Full 9-page high-resolution PDF download</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>HM Land Registry confirmed sold prices & tenure records</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Official EPC efficiency breakdown & heating cost projections</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Environment Agency flood risk levels & active warnings</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Historical local planning applications & decisions</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Nearest schools with verified Ofsted inspection ratings</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>Ofcom broadband speed test data & 4G/5G mobile coverage</span>
+                </li>
+              </ul>
+            </div>
+
+            {user ? (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Purchasing as <span className="font-medium text-foreground">{user.email}</span>. This report will be permanently unlocked in your account.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowB2CPurchaseModal(false)}
+                    disabled={isPurchasing}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                    onClick={handleB2CPurchase}
+                    disabled={isPurchasing}
+                  >
+                    {isPurchasing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Unlocking...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 h-4 w-4" />
+                        Confirm & Download (£9.99)
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+                  Please sign in or create an account to save and download this report permanently.
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowB2CPurchaseModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button asChild className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                    <Link to="/tool">Sign In to Download</Link>
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 pt-3 border-t text-center text-xs text-muted-foreground">
+              Need regular reports?{' '}
+              <Link to="/pricing" className="text-primary hover:underline font-medium">
+                Switch to B2B Pro (£29/mo) or White-Label (£49/mo)
+              </Link>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

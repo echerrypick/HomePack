@@ -46,8 +46,7 @@ export function Footer() {
               <span className="text-xl font-bold tracking-tight">HomePack</span>
             </Link>
             <p className="text-muted-foreground max-w-sm leading-relaxed">
-              Empowering UK property buyers and sellers with instant, AI-driven property intelligence. 
-              Get the full picture before you commit.
+              Empowering UK property buyers and sellers with instant, deep property insights. Get the full picture before you commit.
             </p>
             <div className="flex items-center gap-4">
               <a href="#" className="p-2 rounded-full bg-muted hover:bg-primary/10 hover:text-primary transition-colors">

@@ -76,6 +76,7 @@ interface PropertyMapProps {
   propertyLocation: { lat: number; lng: number };
   schools: School[];
   address: string;
+  heightClassName?: string;
 }
 
 // Dynamically auto-fits map bounds so Property AND all nearby schools are visible simultaneously
@@ -109,7 +110,7 @@ function AutoFitBounds({ propertyLocation, schools }: { propertyLocation: { lat:
   return null;
 }
 
-export function PropertyMap({ propertyLocation, schools, address }: PropertyMapProps) {
+export function PropertyMap({ propertyLocation, schools, address, heightClassName = "h-[360px]" }: PropertyMapProps) {
   const center: [number, number] = [propertyLocation.lat, propertyLocation.lng];
 
   // Resolve schools with coordinates (using real location or calculating accurate geographic offsets based on distance)
@@ -164,7 +165,7 @@ export function PropertyMap({ propertyLocation, schools, address }: PropertyMapP
   const propertyPin = useMemo(() => createPropertyPin(), []);
 
   return (
-    <div className="relative h-[360px] w-full rounded-xl overflow-hidden border border-border shadow-xs z-0">
+    <div className={`relative ${heightClassName} w-full rounded-xl overflow-hidden border border-border shadow-xs z-0`}>
       <MapContainer 
         center={center} 
         zoom={14} 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { History, Calendar, Lock, Unlock, MapPin, Loader2, CheckCircle2, ArrowRight, Eye } from 'lucide-react';
+import { History, Calendar, Lock, Unlock, MapPin, Loader2, Eye } from 'lucide-react';
 import { SearchedAddress } from '../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -80,49 +80,6 @@ export default function HistoryPage() {
           </Card>
         )}
 
-        {/* Recently Compiled Packs with Instant View */}
-        {recentReports.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              Ready-to-View Completed HomePacks
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recentReports.map((saved) => (
-                <Card 
-                  key={saved.id} 
-                  className="hover:border-primary/50 transition-all hover:shadow-md cursor-pointer group"
-                  onClick={() => loadReport(saved.result, saved.address)}
-                >
-                  <CardHeader className="p-4 pb-2">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
-                        Complete
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(saved.completedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <CardTitle className="text-base truncate group-hover:text-primary transition-colors">
-                      {saved.address.houseNumber} {saved.address.street}
-                    </CardTitle>
-                    <CardDescription className="text-xs truncate">
-                      {saved.address.town}, {saved.address.postcode}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-2 flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground font-medium">Full Dossier & PDF</span>
-                    <div className="flex items-center text-xs font-semibold text-primary gap-1 group-hover:translate-x-1 transition-transform">
-                      <span>Open Pack</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
         <Card>
           <CardHeader>
             <CardTitle>All Property Search Log</CardTitle>
@@ -191,7 +148,7 @@ export default function HistoryPage() {
                               size="sm" 
                               variant="outline" 
                               className="h-8 text-xs gap-1.5"
-                              onClick={() => loadReport(matchingSaved.result, matchingSaved.address)}
+                              onClick={() => loadReport(matchingSaved.result, matchingSaved.address, true)}
                             >
                               <Eye className="h-3.5 w-3.5" />
                               View Pack

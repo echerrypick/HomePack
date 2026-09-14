@@ -412,17 +412,39 @@ app.use(express.json({ limit: '50mb' }));
 // EPC Data Helper: Extracts a field from certificate or candidate matching various casing conventions
 function getEpcField(obj: any, ...keys: string[]): string | null {
   if (!obj || typeof obj !== 'object') return null;
+
+  const extractScalar = (val: any): string | null => {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'object') {
+      // Check common nested property names in UK Open Data APIs
+      const inner = val.value ?? val.amount ?? val.cost ?? val.total ?? val.text ?? val.rating ?? val.score ?? val.current;
+      if (inner !== undefined && inner !== null && typeof inner !== 'object') {
+        const str = String(inner).trim();
+        return (str && str !== '[object Object]') ? str : null;
+      }
+      return null;
+    }
+    const str = String(val).trim();
+    if (!str || str === '[object Object]' || str === 'undefined' || str === 'null') {
+      return null;
+    }
+    return str;
+  };
+
   for (const k of keys) {
     if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
-      return String(obj[k]);
+      const scalar = extractScalar(obj[k]);
+      if (scalar !== null) return scalar;
     }
   }
+
   const nestedCandidates = [obj.data, obj.certificate, obj.attributes, obj.properties];
   for (const nested of nestedCandidates) {
     if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
       for (const k of keys) {
         if (nested[k] !== undefined && nested[k] !== null && nested[k] !== '') {
-          return String(nested[k]);
+          const scalar = extractScalar(nested[k]);
+          if (scalar !== null) return scalar;
         }
       }
     }

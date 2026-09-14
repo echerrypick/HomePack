@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Shield, Lock, FileText, Info, Loader2, CheckCircle2, ArrowRight, Clock } from 'lucide-react';
 import { LoginDialog } from '@/components/auth/LoginDialog';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 type Step = 'address' | 'report';
 
@@ -21,12 +21,14 @@ export default function ToolPage() {
   const { user, profile, loading } = useAuth();
   const { activeJob, openModal, startJob, recentReports, loadReport } = useHomePackJob();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>('address');
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [reportData, setReportData] = useState<ReportResult | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFromHistory, setIsFromHistory] = useState(false);
 
   // Check if routed from a notification or history with preloaded report
   useEffect(() => {
@@ -34,6 +36,7 @@ export default function ToolPage() {
       setReportData(location.state.report);
       setSelectedAddress(location.state.address);
       setStep('report');
+      setIsFromHistory(Boolean(location.state.fromHistory));
       // Clear location state to avoid sticky reload
       window.history.replaceState({}, document.title);
     }
@@ -45,6 +48,7 @@ export default function ToolPage() {
       setReportData(activeJob.result);
       setSelectedAddress(activeJob.address);
       setStep('report');
+      setIsFromHistory(false);
     } else if (activeJob?.status === 'failed') {
       setError(activeJob.error || 'HomePack generation encountered an issue. Please try again.');
     }
@@ -104,6 +108,23 @@ export default function ToolPage() {
   };
 
   const handleReset = () => {
+    setIsFromHistory(false);
+    setStep('address');
+    setSelectedAddress(null);
+    setReportData(null);
+    setError(null);
+  };
+
+  const handleBack = () => {
+    if (isFromHistory) {
+      navigate('/history');
+    } else {
+      handleReset();
+    }
+  };
+
+  const handleNewHomePack = () => {
+    setIsFromHistory(false);
     setStep('address');
     setSelectedAddress(null);
     setReportData(null);
@@ -200,6 +221,7 @@ export default function ToolPage() {
                           setSelectedAddress(item.address);
                           setReportData(item.result);
                           setStep('report');
+                          setIsFromHistory(false);
                         }}
                         className="group flex items-center justify-between p-3.5 rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-md cursor-pointer transition-all"
                       >
@@ -263,6 +285,9 @@ export default function ToolPage() {
               reportData={reportData}
               isLoading={isStarting && !reportData}
               onReset={handleReset}
+              onBack={handleBack}
+              backLabel={isFromHistory ? "Back to History" : "Back to Search"}
+              onNewHomePack={handleNewHomePack}
             />
           )}
         </div>

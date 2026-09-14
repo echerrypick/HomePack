@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { resetPassword, updateUserProfile, PermittedProfileUpdates } from '../firebase';
+import { resetPassword, updateUserProfile, updateUserSubscriptionPlan, PermittedProfileUpdates } from '../firebase';
 import { toast } from 'sonner';
 import { 
   User, 
@@ -31,7 +31,14 @@ import {
   Sparkles,
   Calendar,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Palette,
+  Download,
+  CheckCircle2,
+  Globe,
+  FileText,
+  CreditCard,
+  Home
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -42,19 +49,19 @@ const ROLE_DISPLAY_NAMES: Record<string, { label: string; color: string; desc: s
     desc: 'Unrestricted administrative access across all system tools and user accounts.'
   },
   agency: {
-    label: 'Agency Multi-Seat',
+    label: 'Agency White-Label (£49/mo)',
     color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-900/50',
-    desc: 'Full enterprise tier with unlimited searches, batch lookups, and team access.'
+    desc: 'Full enterprise tier with unlimited searches, custom agency logo & brand colors, and agent bio on all reports.'
   },
   subscription: {
-    label: 'Pro Subscriber',
+    label: 'B2B Pro Subscriber (£29/mo)',
     color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50',
-    desc: 'Professional tier with higher monthly search allowances and priority reporting.'
+    desc: 'Professional tier with unlimited property searches, token-free PDF exports, and complete Land Registry/planning.'
   },
   free: {
     label: 'Standard Free Account',
     color: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800',
-    desc: 'Basic tier with complimentary single-property preview lookups.'
+    desc: 'Basic tier with complimentary single-property preview lookups and pay-as-you-go PDF download option.'
   }
 };
 
@@ -74,6 +81,7 @@ export default function ProfilePage() {
   const [isResetting, setIsResetting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSwitchingTier, setIsSwitchingTier] = useState(false);
   const [copiedUid, setCopiedUid] = useState(false);
 
   // Form state for permitted editable items
@@ -84,6 +92,18 @@ export default function ProfilePage() {
     jobTitle: '',
     preferredRegion: '',
     bio: '',
+    accountType: 'consumer',
+    branding: {
+      logoUrl: '',
+      primaryColor: '#2d4a77',
+      accentColor: '#d1e3f8',
+      companyTagline: '',
+      agentName: '',
+      agentBio: '',
+      agencyPhone: '',
+      agencyEmail: '',
+      website: ''
+    },
     notifications: {
       emailAlerts: true,
       propertyUpdates: true,
@@ -101,6 +121,18 @@ export default function ProfilePage() {
         jobTitle: profile?.jobTitle || '',
         preferredRegion: profile?.preferredRegion || '',
         bio: profile?.bio || '',
+        accountType: profile?.accountType || (profile?.role === 'agency' || profile?.role === 'subscription' ? 'business' : 'consumer'),
+        branding: {
+          logoUrl: profile?.branding?.logoUrl || '',
+          primaryColor: profile?.branding?.primaryColor || '#2d4a77',
+          accentColor: profile?.branding?.accentColor || '#d1e3f8',
+          companyTagline: profile?.branding?.companyTagline || '',
+          agentName: profile?.branding?.agentName || profile?.displayName || '',
+          agentBio: profile?.branding?.agentBio || '',
+          agencyPhone: profile?.branding?.agencyPhone || profile?.phoneNumber || '',
+          agencyEmail: profile?.branding?.agencyEmail || profile?.email || '',
+          website: profile?.branding?.website || ''
+        },
         notifications: {
           emailAlerts: profile?.notifications?.emailAlerts ?? true,
           propertyUpdates: profile?.notifications?.propertyUpdates ?? true,
@@ -143,12 +175,36 @@ export default function ProfilePage() {
     setIsSaving(true);
     try {
       await updateUserProfile(user.uid, formData);
-      toast.success('Profile updated successfully');
+      toast.success('Profile and account attributes updated successfully');
       setIsEditing(false);
     } catch (error: any) {
       toast.error(error.message || 'Failed to update profile');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAccountTypeToggle = async (type: 'consumer' | 'business') => {
+    if (!user) return;
+    try {
+      await updateUserProfile(user.uid, { accountType: type });
+      setFormData(prev => ({ ...prev, accountType: type }));
+      toast.success(`Account switched to ${type === 'business' ? 'Business / Professional (B2B)' : 'Regular Customer (B2C)'}`);
+    } catch (e: any) {
+      toast.error('Failed to change account type');
+    }
+  };
+
+  const handleSwitchSubscriptionPlan = async (role: 'free' | 'subscription' | 'agency') => {
+    if (!user) return;
+    setIsSwitchingTier(true);
+    try {
+      await updateUserSubscriptionPlan(user.uid, role, 'business');
+      toast.success(`Subscription plan successfully updated to ${role === 'agency' ? 'B2B White-Label (£49/mo)' : role === 'subscription' ? 'B2B Pro (£29/mo)' : 'Free Trial'}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update subscription tier');
+    } finally {
+      setIsSwitchingTier(false);
     }
   };
 
@@ -161,6 +217,18 @@ export default function ProfilePage() {
       jobTitle: profile?.jobTitle || '',
       preferredRegion: profile?.preferredRegion || '',
       bio: profile?.bio || '',
+      accountType: profile?.accountType || 'consumer',
+      branding: {
+        logoUrl: profile?.branding?.logoUrl || '',
+        primaryColor: profile?.branding?.primaryColor || '#2d4a77',
+        accentColor: profile?.branding?.accentColor || '#d1e3f8',
+        companyTagline: profile?.branding?.companyTagline || '',
+        agentName: profile?.branding?.agentName || '',
+        agentBio: profile?.branding?.agentBio || '',
+        agencyPhone: profile?.branding?.agencyPhone || '',
+        agencyEmail: profile?.branding?.agencyEmail || '',
+        website: profile?.branding?.website || ''
+      },
       notifications: {
         emailAlerts: profile?.notifications?.emailAlerts ?? true,
         propertyUpdates: profile?.notifications?.propertyUpdates ?? true,
@@ -191,6 +259,7 @@ export default function ProfilePage() {
     );
   }
 
+  const currentAccountType = profile?.accountType || formData.accountType || 'consumer';
   const roleInfo = ROLE_DISPLAY_NAMES[profile?.role || 'free'] || ROLE_DISPLAY_NAMES.free;
   const memberSince = profile?.createdAt 
     ? new Date(profile.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -199,22 +268,25 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-4 py-10 max-w-3xl flex-grow">
+      <main className="container mx-auto px-4 py-10 max-w-4xl flex-grow">
         {/* Page Title & Profile Header Banner */}
         <div id="profile-header" className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-lg shadow-sm">
+            <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xl shadow-sm">
               {(profile?.displayName || user.displayName || user.email || 'U')[0].toUpperCase()}
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Your Profile</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Your Profile & Account</h1>
+                <Badge variant="outline" className={currentAccountType === 'business' ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-emerald-50 text-emerald-700 border-emerald-300'}>
+                  {currentAccountType === 'business' ? 'Business / B2B' : 'Regular Customer / B2C'}
+                </Badge>
                 <Badge variant="outline" className={roleInfo.color}>
                   {roleInfo.label}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Manage your personal details, contact preferences, and account security
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Manage your account type, professional branding, and property due diligence history
               </p>
             </div>
           </div>
@@ -255,7 +327,216 @@ export default function ProfilePage() {
         </div>
 
         <div className="grid gap-8">
-          {/* SECTION 1: PERMITTED EDITABLE ITEMS */}
+          {/* SECTION 1: ACCOUNT CLASSIFICATION & TIER ATTRIBUTES */}
+          <Card id="account-classification-card" className="border-border shadow-xs overflow-hidden">
+            <CardHeader className="bg-muted/30 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <Layers className="h-5 w-5 text-primary" />
+                    Account Classification & Features
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Configure whether you use HomePackAI as an individual buyer/seller or as a property business
+                  </CardDescription>
+                </div>
+
+                {/* Account Type Switcher */}
+                <div className="flex items-center bg-background p-1 rounded-xl border shadow-2xs self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => handleAccountTypeToggle('consumer')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      currentAccountType === 'consumer' 
+                        ? 'bg-emerald-600 text-white shadow-xs' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Regular Customer (B2C)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAccountTypeToggle('business')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      currentAccountType === 'business' 
+                        ? 'bg-blue-600 text-white shadow-xs' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Business / Professional (B2B)
+                  </button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-5 space-y-6">
+              {currentAccountType === 'consumer' ? (
+                /* CONSUMER / B2C ATTRIBUTES */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-emerald-600 text-white font-semibold text-xs">Direct-to-Consumer (B2C)</Badge>
+                          <span className="text-xs text-muted-foreground font-medium">Pay-as-you-go (£9.99/report)</span>
+                        </div>
+                        <h4 className="font-semibold text-foreground text-base">Individual Homebuyer & Seller Account</h4>
+                        <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
+                          Download official 9-page due diligence dossiers on any UK property for £9.99 per report with zero subscription obligations. All your purchased packs remain permanently saved in your profile.
+                        </p>
+                      </div>
+                      <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
+                        <Link to="/tool">
+                          <Download className="mr-1.5 h-3.5 w-3.5" />
+                          New Search
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Purchased Reports List */}
+                  <div className="p-4 rounded-xl border border-border bg-background">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-emerald-600" />
+                        <h4 className="font-semibold text-sm">Unlocked B2C Report Downloads ({profile?.purchasedReports?.length || 0})</h4>
+                      </div>
+                      <span className="text-xs text-muted-foreground">Permanent Cloud Access</span>
+                    </div>
+
+                    {(profile?.purchasedReports || []).length > 0 ? (
+                      <div className="space-y-2">
+                        {profile?.purchasedReports?.map((addr, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border text-sm">
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                              <span className="font-medium text-foreground truncate">{addr}</span>
+                            </div>
+                            <Button asChild variant="outline" size="sm" className="h-8 text-xs shrink-0">
+                              <Link to="/tool">View Pack</Link>
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground text-xs">
+                        <p>No individual reports purchased yet.</p>
+                        <p className="mt-1">When you generate a property report, you can unlock the full 9-page official PDF for £9.99.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* BUSINESS / B2B ATTRIBUTES */
+                <div className="space-y-6">
+                  <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-blue-600 text-white font-semibold text-xs">B2B Professional Tier</Badge>
+                          <Badge variant="outline" className="text-xs">{roleInfo.label}</Badge>
+                        </div>
+                        <h4 className="font-semibold text-foreground text-base">Estate Agent, Broker & Surveyor SaaS</h4>
+                        <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
+                          Package unlimited due diligence searches into your firm's daily operations. Upgrade to Enterprise White-Label (£49/mo) to stamp your custom agency logo, branding, and agent bio on all client reports.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <Button 
+                          size="sm" 
+                          variant={profile?.role === 'subscription' ? 'default' : 'outline'}
+                          onClick={() => handleSwitchSubscriptionPlan('subscription')}
+                          disabled={isSwitchingTier || profile?.role === 'subscription'}
+                          className="text-xs h-8"
+                        >
+                          {profile?.role === 'subscription' ? '✓ Pro Active' : 'B2B Pro (£29/mo)'}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-8"
+                          onClick={() => handleSwitchSubscriptionPlan('agency')}
+                          disabled={isSwitchingTier || profile?.role === 'agency'}
+                        >
+                          {profile?.role === 'agency' ? '✓ White-Label Active' : 'White-Label (£49/mo)'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* White-Label Customization Suite */}
+                  <div className="p-5 rounded-xl border border-purple-200 dark:border-purple-900/40 bg-purple-50/20 dark:bg-purple-950/10 space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Palette className="h-5 w-5 text-purple-600" />
+                        <div>
+                          <h4 className="font-semibold text-foreground text-sm">Agency White-Label Branding Suite</h4>
+                          <p className="text-xs text-muted-foreground">Customise client-facing reports with your logo, colors, and direct contact details</p>
+                        </div>
+                      </div>
+                      {profile?.role === 'agency' ? (
+                        <Badge className="bg-purple-600 text-white text-xs">Active on Reports</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">
+                          Included in White-Label (£49/mo)
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Read-Only White-Label Display & Live Mini Preview */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="p-2.5 rounded-lg bg-background border">
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Agency Firm</span>
+                          <span className="font-semibold text-foreground truncate block">{profile?.company || 'Not set'}</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-background border">
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Brand Primary</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: profile?.branding?.primaryColor || '#2d4a77' }} />
+                            <span className="font-mono text-xs">{profile?.branding?.primaryColor || '#2d4a77'}</span>
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-background border">
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Lead Agent</span>
+                          <span className="font-semibold text-foreground truncate block">{profile?.branding?.agentName || profile?.displayName || 'Not set'}</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-background border">
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Logo Status</span>
+                          <span className="font-semibold text-foreground truncate block">{profile?.branding?.logoUrl ? '✓ Configured' : 'Standard Icon'}</span>
+                        </div>
+                      </div>
+
+                      {/* Interactive Report Cover Mini-Preview */}
+                      <div className="p-4 rounded-xl border bg-white text-black shadow-xs">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">
+                          Live PDF Cover Preview
+                        </div>
+                        <div className="border p-4 rounded-lg text-center" style={{ borderColor: profile?.branding?.accentColor || '#d1e3f8', borderTop: `4px solid ${profile?.branding?.primaryColor || '#2d4a77'}` }}>
+                          {profile?.branding?.logoUrl ? (
+                            <img src={profile.branding.logoUrl} alt="Logo" className="max-h-12 max-w-[160px] mx-auto mb-2 object-contain" />
+                          ) : (
+                            <div className="inline-block p-2 rounded-lg text-white mb-2" style={{ backgroundColor: profile?.branding?.primaryColor || '#2d4a77' }}>
+                              <Home className="h-5 w-5" />
+                            </div>
+                          )}
+                          <h5 className="font-serif font-bold text-base" style={{ color: profile?.branding?.primaryColor || '#2d4a77' }}>
+                            {profile?.company || profile?.branding?.companyTagline || 'HomePackAI Enterprise'}
+                          </h5>
+                          <p className="text-[11px] text-muted-foreground">Property Information Report</p>
+                          <div className="mt-3 pt-2 border-t text-[11px] text-muted-foreground flex justify-between items-center">
+                            <span>Prepared by {profile?.branding?.agentName || profile?.displayName || 'Certified Agent'}</span>
+                            <span>{profile?.branding?.agencyPhone || 'Official Due Diligence'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* SECTION 2: PERMITTED EDITABLE ITEMS */}
           <Card id="permitted-details-card" className="border-primary/20 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-primary/40" />
             <CardHeader className="pb-4">
@@ -406,6 +687,144 @@ export default function ProfilePage() {
                       {(formData.bio || '').length} / 1000 characters
                     </div>
                   </div>
+
+                  {/* Business White-Label Branding Fields */}
+                  {formData.accountType === 'business' && (
+                    <div className="pt-3 border-t border-purple-200 dark:border-purple-900/40 space-y-4 bg-purple-50/20 dark:bg-purple-950/10 p-4 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <Palette className="h-4 w-4 text-purple-600" />
+                        <span className="font-semibold text-sm text-foreground">B2B White-Label Report Customization</span>
+                        <Badge className="bg-purple-600 text-white text-[10px]">Client PDF Branding</Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="logoUrl" className="text-xs font-semibold">Agency Logo URL</Label>
+                          <Input
+                            id="logoUrl"
+                            value={formData.branding?.logoUrl || ''}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              branding: { ...prev.branding, logoUrl: e.target.value }
+                            }))}
+                            placeholder="https://example.com/logo.png"
+                            className="text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="companyTagline" className="text-xs font-semibold">Tagline / Subtitle</Label>
+                          <Input
+                            id="companyTagline"
+                            value={formData.branding?.companyTagline || ''}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              branding: { ...prev.branding, companyTagline: e.target.value }
+                            }))}
+                            placeholder="e.g. Chartered Surveyors & Agents"
+                            className="text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="primaryColor" className="text-xs font-semibold flex items-center justify-between">
+                            <span>Primary Brand Color</span>
+                            <span className="font-mono text-[11px]">{formData.branding?.primaryColor || '#2d4a77'}</span>
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              id="primaryColor"
+                              value={formData.branding?.primaryColor || '#2d4a77'}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                branding: { ...prev.branding, primaryColor: e.target.value }
+                              }))}
+                              className="h-9 w-12 rounded cursor-pointer border p-0.5"
+                            />
+                            <Input
+                              value={formData.branding?.primaryColor || '#2d4a77'}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                branding: { ...prev.branding, primaryColor: e.target.value }
+                              }))}
+                              className="text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="accentColor" className="text-xs font-semibold flex items-center justify-between">
+                            <span>Accent Color</span>
+                            <span className="font-mono text-[11px]">{formData.branding?.accentColor || '#d1e3f8'}</span>
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              id="accentColor"
+                              value={formData.branding?.accentColor || '#d1e3f8'}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                branding: { ...prev.branding, accentColor: e.target.value }
+                              }))}
+                              className="h-9 w-12 rounded cursor-pointer border p-0.5"
+                            />
+                            <Input
+                              value={formData.branding?.accentColor || '#d1e3f8'}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                branding: { ...prev.branding, accentColor: e.target.value }
+                              }))}
+                              className="text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="agentName" className="text-xs font-semibold">Lead Agent / Sign-off Name</Label>
+                          <Input
+                            id="agentName"
+                            value={formData.branding?.agentName || ''}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              branding: { ...prev.branding, agentName: e.target.value }
+                            }))}
+                            placeholder="e.g. Sarah Jenkins MNAEA"
+                            className="text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="website" className="text-xs font-semibold">Agency Website</Label>
+                          <Input
+                            id="website"
+                            value={formData.branding?.website || ''}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              branding: { ...prev.branding, website: e.target.value }
+                            }))}
+                            placeholder="www.jenkinsestates.co.uk"
+                            className="text-xs"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2 space-y-1.5">
+                          <Label htmlFor="agentBio" className="text-xs font-semibold">Client Sign-off / Advisory Note (PDF Page 9)</Label>
+                          <Textarea
+                            id="agentBio"
+                            value={formData.branding?.agentBio || ''}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              branding: { ...prev.branding, agentBio: e.target.value }
+                            }))}
+                            placeholder="Add your bespoke agency sign-off, advisory disclaimer, or specialist qualifications."
+                            rows={2}
+                            className="text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Communication & Notification Preferences */}
                   <div className="pt-2 border-t border-border/60 space-y-3">

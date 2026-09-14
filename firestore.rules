@@ -76,6 +76,7 @@ service cloud.firestore {
              data.uid is string && data.uid.size() > 0 &&
              data.email is string && isValidEmail(data.email) &&
              isValidRole(data.role) &&
+             (!('accountType' in data) || data.accountType in ['consumer', 'business']) &&
              (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
              (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 30)) &&
              (!('company' in data) || (data.company is string && data.company.size() <= 120)) &&
@@ -83,6 +84,9 @@ service cloud.firestore {
              (!('preferredRegion' in data) || (data.preferredRegion is string && data.preferredRegion.size() <= 50)) &&
              (!('bio' in data) || (data.bio is string && data.bio.size() <= 1000)) &&
              (!('notifications' in data) || data.notifications is map) &&
+             (!('branding' in data) || data.branding is map) &&
+             (!('purchasedReports' in data) || data.purchasedReports is list) &&
+             (!('reportCredits' in data) || data.reportCredits is number) &&
              (!('updatedAt' in data) || data.updatedAt is string) &&
              (!('searchCount' in data) || data.searchCount is number) &&
              (!('searchedAddresses' in data) || data.searchedAddresses is list) &&

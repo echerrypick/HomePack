@@ -14,6 +14,23 @@
         "preferredRegion": { "type": "string", "description": "Default search postcode or region" },
         "bio": { "type": "string", "description": "Short bio or property search notes" },
         "notifications": { "type": "object", "description": "Notification and alert preferences" },
+        "accountType": { 
+          "type": "string", 
+          "enum": ["consumer", "business"],
+          "description": "Account classification: B2C consumer or B2B business" 
+        },
+        "branding": { 
+          "type": "object", 
+          "description": "White-label custom branding configuration (logo, colors, bio, contact)" 
+        },
+        "purchasedReports": {
+          "type": "array",
+          "description": "List of individual property report addresses unlocked for B2C £9.99 download"
+        },
+        "reportCredits": {
+          "type": "integer",
+          "description": "Number of prepaid report download tokens"
+        },
         "role": { 
           "type": "string", 
           "enum": ["admin", "free", "subscription", "agency"],

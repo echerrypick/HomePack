@@ -22,7 +22,7 @@ interface HomePackJobContextType {
   openModal: () => void;
   closeModal: () => void;
   dismissActiveJob: () => void;
-  loadReport: (report: ReportResult, address: Address) => void;
+  loadReport: (report: ReportResult, address: Address, fromHistory?: boolean) => void;
 }
 
 const HomePackJobContext = createContext<HomePackJobContextType | null>(null);
@@ -188,8 +188,8 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
     setIsModalOpen(false);
   };
 
-  const loadReport = (report: ReportResult, address: Address) => {
-    navigate('/tool', { state: { report, address } });
+  const loadReport = (report: ReportResult, address: Address, fromHistory: boolean = false) => {
+    navigate('/tool', { state: { report, address, fromHistory } });
   };
 
   return (

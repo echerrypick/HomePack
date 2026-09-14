@@ -11,11 +11,11 @@ import {
   updateProfile,
   sendPasswordResetEmail as firebaseSendPasswordResetEmail
 } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocFromServer, arrayUnion } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
-import { UserProfile, UserRole, SearchedAddress } from './types';
+import { UserProfile, UserRole, SearchedAddress, AccountType, WhiteLabelBranding } from './types';
 
-export type { UserRole };
+export type { UserRole, AccountType, WhiteLabelBranding };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -201,11 +201,13 @@ export type PermittedProfileUpdates = {
   jobTitle?: string;
   preferredRegion?: string;
   bio?: string;
+  accountType?: AccountType;
   notifications?: {
     emailAlerts?: boolean;
     propertyUpdates?: boolean;
     marketingEmails?: boolean;
   };
+  branding?: WhiteLabelBranding;
 };
 
 export const updateUserProfile = async (uid: string, updates: PermittedProfileUpdates): Promise<void> => {
@@ -223,7 +225,21 @@ export const updateUserProfile = async (uid: string, updates: PermittedProfileUp
     if (updates.jobTitle !== undefined) payload.jobTitle = updates.jobTitle.trim();
     if (updates.preferredRegion !== undefined) payload.preferredRegion = updates.preferredRegion.trim().toUpperCase();
     if (updates.bio !== undefined) payload.bio = updates.bio.trim();
+    if (updates.accountType !== undefined) payload.accountType = updates.accountType;
     if (updates.notifications !== undefined) payload.notifications = updates.notifications;
+    if (updates.branding !== undefined) {
+      payload.branding = {
+        logoUrl: updates.branding.logoUrl ? updates.branding.logoUrl.trim() : '',
+        primaryColor: updates.branding.primaryColor ? updates.branding.primaryColor.trim() : '',
+        accentColor: updates.branding.accentColor ? updates.branding.accentColor.trim() : '',
+        agentBio: updates.branding.agentBio ? updates.branding.agentBio.trim() : '',
+        agentName: updates.branding.agentName ? updates.branding.agentName.trim() : '',
+        agencyPhone: updates.branding.agencyPhone ? updates.branding.agencyPhone.trim() : '',
+        agencyEmail: updates.branding.agencyEmail ? updates.branding.agencyEmail.trim() : '',
+        website: updates.branding.website ? updates.branding.website.trim() : '',
+        companyTagline: updates.branding.companyTagline ? updates.branding.companyTagline.trim() : '',
+      };
+    }
 
     await updateDoc(userDocRef, payload);
 
@@ -236,4 +252,39 @@ export const updateUserProfile = async (uid: string, updates: PermittedProfileUp
     throw error;
   }
 };
+
+/**
+ * Unlocks an individual £9.99 B2C HomePack PDF report download for a user
+ */
+export const purchaseReportForUser = async (uid: string, address: string): Promise<void> => {
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    await updateDoc(userDocRef, {
+      purchasedReports: arrayUnion(address),
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+    throw error;
+  }
+};
+
+/**
+ * Updates a user's subscription tier (e.g. B2B Pro or White-Label Agency)
+ */
+export const upgradeUserPlan = async (uid: string, role: UserRole, accountType: AccountType = 'business'): Promise<void> => {
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    await updateDoc(userDocRef, {
+      role,
+      accountType,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+    throw error;
+  }
+};
+
+export const updateUserSubscriptionPlan = upgradeUserPlan;
 

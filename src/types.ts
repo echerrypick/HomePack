@@ -1,5 +1,19 @@
 export type UserRole = 'admin' | 'free' | 'subscription' | 'agency';
 
+export type AccountType = 'consumer' | 'business';
+
+export type WhiteLabelBranding = {
+  logoUrl?: string;
+  primaryColor?: string;
+  accentColor?: string;
+  agentBio?: string;
+  agentName?: string;
+  agencyPhone?: string;
+  agencyEmail?: string;
+  website?: string;
+  companyTagline?: string;
+};
+
 export type SearchedAddress = {
   address: string;
   timestamp: string;
@@ -20,8 +34,12 @@ export type UserProfile = {
   jobTitle?: string;
   preferredRegion?: string;
   bio?: string;
+  accountType?: AccountType;
   notifications?: UserNotifications;
   role: UserRole;
+  branding?: WhiteLabelBranding;
+  purchasedReports?: string[];
+  reportCredits?: number;
   searchCount: number;
   lastSearchReset: string;
   searchedAddresses: string[];
