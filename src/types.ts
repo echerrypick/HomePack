@@ -257,6 +257,55 @@ export type School = {
   };
 };
 
+export type GpSurgery = {
+  name: string;
+  odsCode?: string;
+  cqcLocationId?: string;
+  address: string;
+  postcode: string;
+  distance: string;
+  isAcceptingNewPatients: boolean | null;
+  cqcRating?: 'Outstanding' | 'Good' | 'Requires improvement' | 'Inadequate' | 'Not Rated' | string;
+  cqcPublicationDate?: string;
+  cqcReportUrl?: string;
+  phone?: string;
+  website?: string;
+};
+
+export type DentistPractice = {
+  name: string;
+  odsCode?: string;
+  cqcLocationId?: string;
+  address: string;
+  postcode: string;
+  distance: string;
+  isAcceptingNhsPatients: boolean | null;
+  cqcRating?: string;
+  phone?: string;
+  website?: string;
+};
+
+export type Pharmacy = {
+  name: string;
+  odsCode?: string;
+  address: string;
+  postcode: string;
+  distance: string;
+  openingHours?: string;
+  phone?: string;
+  services?: string[];
+};
+
+export type HealthcareAccessData = {
+  postcode?: string;
+  gpSurgeries: GpSurgery[];
+  dentists: DentistPractice[];
+  pharmacies: Pharmacy[];
+  summary?: string;
+  source?: string;
+  lastUpdated?: string;
+};
+
 export type PropertyData = {
   address: string;
   landRegistry: LandRegistryResult[];
@@ -270,6 +319,7 @@ export type PropertyData = {
   mobile?: MobileData[];
   mobileSummary?: string;
   schools?: School[];
+  healthcare?: HealthcareAccessData;
   coordinates?: { lat: number; lng: number };
 };
 

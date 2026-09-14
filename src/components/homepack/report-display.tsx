@@ -1,11 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink, Search, Lock, Shield, ShieldAlert, Wifi, Coins, Mountain, Info, Home, Smartphone, GraduationCap, School as SchoolIcon, Plus } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink, Search, Lock, Shield, ShieldAlert, Wifi, Coins, Mountain, Info, Home, Smartphone, GraduationCap, School as SchoolIcon, Plus, Stethoscope } from 'lucide-react';
 import { AiSummary } from './ai-summary';
 import { ImageUploader } from './image-uploader';
 import { AiConditionReport } from './ai-condition-report';
 import { DataSection, DataItem } from './data-section';
+import { HealthcareDisplay } from './healthcare-display';
 import { Badge } from "@/components/ui/badge";
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -13,7 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DATA_TOOLTIPS } from '@/lib/data-tooltips';
-import { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem, ReportResult, CouncilTaxData, RadonRiskData, CoalMiningData, BroadbandData, School, MobileData } from '@/types';
+import { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem, ReportResult, CouncilTaxData, RadonRiskData, CoalMiningData, BroadbandData, School, MobileData, HealthcareAccessData } from '@/types';
 import { PropertyMap } from './property-map';
 import { useAuth } from '@/contexts/AuthContext';
 import { purchaseReportForUser } from '@/firebase';
@@ -898,65 +899,6 @@ export function ReportDisplay({
 
       const safeStreet = `${address.houseNumber}-${address.street}`.replace(/[^a-z0-9]/gi, '-');
       const filename = `HomePack-${safeStreet}.pdf`;
-      
-      const opt = {
-        margin:       0,
-        filename:     filename,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { 
-          scale: 2, 
-          useCORS: true, 
-          logging: false,
-          letterRendering: true,
-          onclone: (clonedDoc) => {
-            // Aggressive fix for "oklab" / "oklch" unsupported color functions in html2canvas
-            // 1. Remove all oklch/oklab from style tags
-            const styleTags = clonedDoc.getElementsByTagName('style');
-            for (let i = 0; i < styleTags.length; i++) {
-              let css = styleTags[i].innerHTML;
-              if (css.includes('oklch') || css.includes('oklab')) {
-                // Replace with a safe fallback (slate-500)
-                css = css.replace(/oklch\([^)]+\)/g, '#64748b');
-                css = css.replace(/oklab\([^)]+\)/g, '#64748b');
-                styleTags[i].innerHTML = css;
-              }
-            }
-
-            // 2. Iterate through all elements and fix styles
-            const allElements = clonedDoc.getElementsByTagName('*');
-            for (let i = 0; i < allElements.length; i++) {
-              const el = allElements[i] as HTMLElement;
-              
-              // Check common color properties
-              const props = ['color', 'backgroundColor', 'borderColor', 'outlineColor', 'fill', 'stroke'];
-              
-              props.forEach(prop => {
-                try {
-                  const style = el.style as any;
-                  const val = style[prop];
-                  if (val && (val.includes('oklch') || val.includes('oklab'))) {
-                    style[prop] = '#64748b';
-                  }
-
-                  // Force standard colors for any element that might have these colors from external CSS
-                  const computed = clonedDoc.defaultView?.getComputedStyle(el);
-                  if (computed) {
-                    const cssProp = prop.replace(/[A-Z]/g, m => "-" + m.toLowerCase());
-                    const computedVal = computed.getPropertyValue(cssProp);
-                    if (computedVal && (computedVal.includes('oklch') || computedVal.includes('oklab'))) {
-                      style[prop] = '#64748b';
-                    }
-                  }
-                } catch (e) {
-                  // Ignore errors
-                }
-              });
-            }
-          }
-        },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-      };
 
       // Ensure the template is visible during capture
       const originalStyle = template.parentElement?.style.cssText || "";
@@ -968,22 +910,71 @@ export function ReportDisplay({
         template.parentElement.style.overflow = 'visible';
       }
 
+      // Small delay to allow any pending layout or images to settle
+      await new Promise(resolve => setTimeout(resolve, 350));
+
       try {
-        // Use the worker approach for more control
-        const worker = html2pdf().set(opt).from(template).toPdf().get('pdf');
-        const pdf = await worker;
-        const blobUrl = pdf.output('bloburl');
-        
-        if (blobUrl) {
-          window.open(blobUrl, '_blank');
-          toast.success('Report generated! Check the new tab.', { id: toastId });
-        } else {
-          throw new Error('Failed to generate PDF blob URL');
+        const pageElements = Array.from(template.querySelectorAll<HTMLElement>('[data-pdf-page]'));
+        if (pageElements.length === 0) {
+          throw new Error('No pages found in report template');
         }
-      } catch (pdfErr: any) {
-        throw pdfErr;
+
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+          compress: true,
+        });
+
+        for (let i = 0; i < pageElements.length; i++) {
+          const pageEl = pageElements[i];
+          toast.loading(`Rendering page ${i + 1} of ${pageElements.length}...`, { id: toastId });
+
+          const canvas = await html2canvas(pageEl, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            onclone: (clonedDoc) => {
+              // Aggressive fix for "oklab" / "oklch" unsupported color functions in html2canvas
+              const styleTags = clonedDoc.getElementsByTagName('style');
+              for (let s = 0; s < styleTags.length; s++) {
+                let css = styleTags[s].innerHTML;
+                if (css.includes('oklch') || css.includes('oklab')) {
+                  css = css.replace(/oklch\([^)]+\)/g, '#64748b');
+                  css = css.replace(/oklab\([^)]+\)/g, '#64748b');
+                  styleTags[s].innerHTML = css;
+                }
+              }
+
+              const allElements = clonedDoc.getElementsByTagName('*');
+              for (let j = 0; j < allElements.length; j++) {
+                const el = allElements[j] as HTMLElement;
+                const props = ['color', 'backgroundColor', 'borderColor', 'outlineColor', 'fill', 'stroke'];
+                props.forEach(prop => {
+                  try {
+                    const style = el.style as any;
+                    const val = style?.[prop];
+                    if (val && (val.includes('oklch') || val.includes('oklab'))) {
+                      style[prop] = '#64748b';
+                    }
+                  } catch (e) {}
+                });
+              }
+            },
+          });
+
+          const imgData = canvas.toDataURL('image/jpeg', 0.95);
+          if (i > 0) {
+            pdf.addPage('a4', 'portrait');
+          }
+          // A4 is 210mm x 297mm
+          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+        }
+
+        pdf.save(filename);
+        toast.success('HomePack PDF downloaded successfully (9 pages)!', { id: toastId });
       } finally {
-        // Restore original style
         if (template.parentElement) {
           template.parentElement.style.cssText = originalStyle;
         }
@@ -1016,6 +1007,31 @@ export function ReportDisplay({
 
   const { propertyData, summary, logs } = reportData;
   const { landRegistry, epc, floodRisk, planningHistory, councilTax, radonRisk, coalMining, broadband } = propertyData;
+
+  // Real-time resilience: if report was cached without healthcare data, asynchronously load it
+  const [liveHealthcare, setLiveHealthcare] = useState<HealthcareAccessData | undefined>(propertyData.healthcare);
+
+  useEffect(() => {
+    if (propertyData.healthcare) {
+      setLiveHealthcare(propertyData.healthcare);
+    } else if (address.postcode) {
+      fetch(`/api/healthcare/${encodeURIComponent(address.postcode)}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          const fetched = data?.healthcare || data?.result;
+          if (fetched) {
+            setLiveHealthcare(fetched);
+          }
+        })
+        .catch(err => console.warn('Healthcare lookup notice:', err));
+    }
+  }, [propertyData.healthcare, address.postcode]);
+
+  const activeHealthcare = liveHealthcare || propertyData.healthcare;
+  const mergedPropertyData = {
+    ...propertyData,
+    healthcare: activeHealthcare
+  };
   
   const getPrimaryTransaction = (results: LandRegistryResult[]) => {
      if (!results || results.length === 0) return null;
@@ -1149,7 +1165,8 @@ export function ReportDisplay({
       {/* Modular 9-Page PDF Template */}
       <HomePackPdfTemplate
         pdfTemplateRef={pdfTemplateRef}
-        propertyData={propertyData}
+        propertyData={mergedPropertyData}
+        healthcare={activeHealthcare}
         address={address}
         landRegistry={landRegistry}
         epc={epc}
@@ -1159,6 +1176,7 @@ export function ReportDisplay({
         coalMining={coalMining}
         councilTax={councilTax}
         conditionReport={conditionReport}
+        planningHistory={planningHistory}
         isWhiteLabel={isWhiteLabel}
         brandLogo={brandLogo}
         brandPrimary={brandPrimary}
@@ -1282,10 +1300,14 @@ export function ReportDisplay({
             <MobileDisplay data={propertyData.mobile} summary={propertyData.mobileSummary} />
           </DataSection>
 
+          <DataSection id="section-healthcare" icon={Stethoscope} title="Healthcare & NHS Access">
+            <HealthcareDisplay data={activeHealthcare} postcode={address.postcode} />
+          </DataSection>
+
         </div>
         <div className="lg:col-span-1 space-y-6">
           <PropertyQuickNav
-            propertyData={propertyData}
+            propertyData={mergedPropertyData}
             primaryTransaction={primaryTransaction}
             epc={epc}
             councilTax={councilTax}

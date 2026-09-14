@@ -173,7 +173,95 @@ const SAMPLE_REPORT_DATA: ReportResult = {
         reference: '19/05678/LBC',
         url: '#'
       }
-    ]
+    ],
+    healthcare: {
+      postcode: 'SW1A 2AA',
+      gpSurgeries: [
+        {
+          name: 'The Westminster Medical Practice',
+          odsCode: 'E87012',
+          address: '42 Whitehall, Westminster, London',
+          postcode: 'SW1A 2BX',
+          distance: '0.3 miles',
+          isAcceptingNewPatients: true,
+          cqcRating: 'Good',
+          cqcPublicationDate: '2023-11-14',
+          cqcReportUrl: 'https://www.cqc.org.uk',
+          phone: '020 7930 1234',
+          website: 'https://www.westminstermedical.nhs.uk'
+        },
+        {
+          name: 'Victoria Health Centre',
+          odsCode: 'Y02456',
+          address: '77 Victoria Street, London',
+          postcode: 'SW1H 0HW',
+          distance: '0.6 miles',
+          isAcceptingNewPatients: true,
+          cqcRating: 'Outstanding',
+          cqcPublicationDate: '2024-02-18',
+          cqcReportUrl: 'https://www.cqc.org.uk',
+          phone: '020 7828 5678',
+          website: 'https://www.victoriahealthcentre.nhs.uk'
+        },
+        {
+          name: 'St James & Soho Surgery',
+          odsCode: 'Y04112',
+          address: '15 Great Chapel Street, London',
+          postcode: 'W1F 8FR',
+          distance: '0.9 miles',
+          isAcceptingNewPatients: false,
+          cqcRating: 'Good',
+          cqcPublicationDate: '2023-08-20',
+          phone: '020 7437 2345'
+        }
+      ],
+      dentists: [
+        {
+          name: 'Westminster Dental Care & Implant Clinic',
+          odsCode: 'V12098',
+          address: '28 Parliament Street, London',
+          postcode: 'SW1A 2JA',
+          distance: '0.2 miles',
+          isAcceptingNhsPatients: true,
+          cqcRating: 'CQC Inspected & Compliant',
+          phone: '020 7222 4321',
+          website: 'https://www.westminsterdental.co.uk'
+        },
+        {
+          name: 'St James Dental Practice',
+          odsCode: 'V18944',
+          address: '12 Pall Mall, London',
+          postcode: 'SW1Y 5ED',
+          distance: '0.5 miles',
+          isAcceptingNhsPatients: false,
+          cqcRating: 'Good',
+          phone: '020 7930 9876'
+        }
+      ],
+      pharmacies: [
+        {
+          name: 'Boots Pharmacy - Whitehall',
+          odsCode: 'FPM89',
+          address: '36 Whitehall, Westminster, London',
+          postcode: 'SW1A 2BX',
+          distance: '0.2 miles',
+          openingHours: 'Mon-Fri: 08:30 - 18:30, Sat: 09:00 - 17:00',
+          phone: '020 7930 5678',
+          services: ['NHS Pharmacy First', 'Prescription Dispensing', 'Flu Vaccination', 'Blood Pressure Check']
+        },
+        {
+          name: 'Parliament Street Chemist',
+          odsCode: 'FX412',
+          address: '14 Parliament Street, London',
+          postcode: 'SW1A 2NE',
+          distance: '0.3 miles',
+          openingHours: 'Mon-Fri: 09:00 - 18:00',
+          phone: '020 7222 1122',
+          services: ['Prescription Dispensing', 'Emergency Contraception', 'Stop Smoking Service']
+        }
+      ],
+      summary: 'Primary healthcare access near SW1A 2AA verified via NHS Service Search and CQC registers. 2 local GP surgeries accepting new NHS patients and community dispensing pharmacies within 0.3 miles.'
+    }
   },
   summary: "This property is a historic detached house in the City of Westminster. It has a solid sales history with significant value appreciation. The energy performance is currently rated C, which is typical for a building of this age, but there is potential to reach a B rating with floor insulation and solar panels. Flood risk is very low. Planning history shows recent approvals for security and internal improvements, indicating the property is well-maintained and adapted for modern use.",
   logs: []

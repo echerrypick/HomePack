@@ -9,6 +9,7 @@ import {
   ClipboardList, 
   Wifi, 
   Smartphone, 
+  Stethoscope,
   Camera,
   Download,
   CheckCircle2,
@@ -56,6 +57,7 @@ export function PropertyQuickNav({
     { id: 'section-planning', label: 'Planning History', icon: ClipboardList },
     { id: 'section-broadband', label: 'Broadband', icon: Wifi },
     { id: 'section-mobile', label: 'Mobile Coverage', icon: Smartphone },
+    { id: 'section-healthcare', label: 'Healthcare & NHS', icon: Stethoscope },
     { id: 'section-condition', label: 'AI Condition Report', icon: Camera },
   ];
 
@@ -150,12 +152,22 @@ export function PropertyQuickNav({
           </div>
 
           {/* Broadband */}
-          <div className="flex items-center justify-between py-1">
+          <div className="flex items-center justify-between py-1 border-b border-border/40">
             <span className="text-muted-foreground font-medium">Broadband Max:</span>
             <span className="font-bold text-blue-600 dark:text-blue-400">
               {broadband?.maxDownloadSpeed || 'Ultrafast'}
             </span>
           </div>
+
+          {/* Nearest GP */}
+          {propertyData?.healthcare?.gpSurgeries?.[0] && (
+            <div className="flex items-center justify-between py-1">
+              <span className="text-muted-foreground font-medium">Nearest GP:</span>
+              <span className="font-bold text-foreground text-xs truncate max-w-[140px] text-right" title={propertyData.healthcare.gpSurgeries[0].name}>
+                {propertyData.healthcare.gpSurgeries[0].name.replace(/Medical Centre|Surgery|Practice/gi, '').trim()} ({propertyData.healthcare.gpSurgeries[0].distance.split(' ')[0]} mi)
+              </span>
+            </div>
+          )}
 
           {/* Quick PDF Trigger */}
           <div className="pt-2 border-t border-border/60">

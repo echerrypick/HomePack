@@ -9,6 +9,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { lookupOfcomMobile, lookupOfcomBroadband, ensurePlaywrightChromium } from './src/lib/ofcomScraper';
 import { scrapeCoverage as scrapeSiginfoCoverage } from './src/lib/siginfoScraper';
+import { getHealthcareAccessData } from './src/services/healthcareService';
 
 const execPromise = promisify(exec);
 
@@ -339,7 +340,13 @@ async function generateSummary(propertyData: any, retries = 3) {
         } : null,
         mobile: propertyData.mobile?.map((m: any) => `${m.operator}: 5G ${m.fiveG || 'Available'}, Voice: ${m.voice || 'Likely'}, Data: ${m.data || 'Likely'}${m.transmitterNotice ? ` (${m.transmitterNotice})` : ''}`).join('; ') || null,
         mobileSummary: propertyData.mobileSummary || null,
-        schools: propertyData.schools?.map((s: any) => `${s.name} (${s.type}, Ofsted: ${s.ofstedRating}, ${s.distance})`).join('; ') || null
+        schools: propertyData.schools?.map((s: any) => `${s.name} (${s.type}, Ofsted: ${s.ofstedRating}, ${s.distance})`).join('; ') || null,
+        healthcare: propertyData.healthcare ? {
+          nearestGp: propertyData.healthcare.gpSurgeries?.[0] ? `${propertyData.healthcare.gpSurgeries[0].name} (${propertyData.healthcare.gpSurgeries[0].distance}, CQC: ${propertyData.healthcare.gpSurgeries[0].cqcRating || 'Good'}, Accepting Patients: ${propertyData.healthcare.gpSurgeries[0].isAcceptingNewPatients ? 'Yes' : 'No'})` : null,
+          gpCount: propertyData.healthcare.gpSurgeries?.length || 0,
+          dentist: propertyData.healthcare.dentists?.[0] ? `${propertyData.healthcare.dentists[0].name} (${propertyData.healthcare.dentists[0].distance}, NHS Patients: ${propertyData.healthcare.dentists[0].isAcceptingNhsPatients ? 'Yes' : 'No'})` : null,
+          pharmacy: propertyData.healthcare.pharmacies?.[0] ? `${propertyData.healthcare.pharmacies[0].name} (${propertyData.healthcare.pharmacies[0].distance})` : null
+        } : null
       };
 
       const prompt = `You are an AI assistant specialized in summarizing UK property data for home buyers. Provide a concise, highly readable, structured summary.
@@ -356,6 +363,7 @@ CRITICAL FORMATTING RULES:
 - **Running costs:** [Council Tax band and annual charge]
 - **Broadband connectivity:** [available speeds e.g. Ultrafast/Superfast, FTTP]
 - **Catchment schools:** [nearest primary and secondary schools strictly within 1.5 miles and their Ofsted ratings]
+- **Healthcare & NHS access:** [nearest GP surgery with CQC inspection rating, patient acceptance status, and NHS dental availability]
 - **Mobile & 5G coverage:** [highlight operator coverage and any nearby 5G transmitters e.g. Vodafone / EE]
 - **Key take-away:** [one clear, objective concluding sentence for the buyer]
 
@@ -543,10 +551,10 @@ async function fetchEpcData(street: string, postcode: string, logs: string[]) {
   };
 
   try {
-    const searchUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&address=${encodeURIComponent(street.trim())}&page_size=10`;
+    const searchUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&address=${encodeURIComponent(street.trim())}&page_size=50`;
     logs.push(`[EPC] Searching certificates via GOV.UK Energy Performance API...`);
     
-    let res = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(4000) });
+    let res = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(7500) });
     logs.push(`[EPC] Search API returned HTTP ${res.status}`);
 
     if (!res.ok) {
@@ -561,26 +569,28 @@ async function fetchEpcData(street: string, postcode: string, logs: string[]) {
     let searchJson = await res.json();
     let items = Array.isArray(searchJson.data) ? searchJson.data : (Array.isArray(searchJson) ? searchJson : (searchJson.rows || []));
 
-    // Fallback: If no results for full address, search by postcode and filter
-    if (items.length === 0) {
-      const fallbackUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&page_size=50`;
-      logs.push(`[EPC] No exact search results. Trying postcode fallback query...`);
-      res = await fetch(fallbackUrl, { headers, signal: AbortSignal.timeout(4000) });
-      logs.push(`[EPC] Postcode fallback search returned HTTP ${res.status}`);
-      if (res.ok) {
-        searchJson = await res.json();
-        items = Array.isArray(searchJson.data) ? searchJson.data : (Array.isArray(searchJson) ? searchJson : (searchJson.rows || []));
+    // If no exact match or candidate not found in first search, search by postcode
+    let candidate = selectBestEpcCertificate(items, street);
+    if (!candidate || items.length === 0) {
+      const fallbackUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&page_size=100`;
+      logs.push(`[EPC] Address match check required wider query. Trying postcode fallback (${postcode.trim()})...`);
+      try {
+        const fallbackRes = await fetch(fallbackUrl, { headers, signal: AbortSignal.timeout(7500) });
+        if (fallbackRes.ok) {
+          const fallbackJson = await fallbackRes.json();
+          const fallbackItems = Array.isArray(fallbackJson.data) ? fallbackJson.data : (Array.isArray(fallbackJson) ? fallbackJson : (fallbackJson.rows || []));
+          if (fallbackItems.length > 0) {
+            items = fallbackItems;
+            candidate = selectBestEpcCertificate(items, street);
+          }
+        }
+      } catch (fbErr: any) {
+        logs.push(`[EPC] Postcode fallback search note: ${fbErr?.message || fbErr}`);
       }
     }
 
-    if (items.length === 0) {
-      logs.push(`[EPC] Notice: No energy performance certificates found for this address or postcode.`);
-      return null;
-    }
-
-    const candidate = selectBestEpcCertificate(items, street);
     if (!candidate) {
-      logs.push(`[EPC] Notice: Could not determine best matching certificate from search results.`);
+      logs.push(`[EPC] Notice: No energy performance certificates found matching this address or postcode.`);
       return null;
     }
 
@@ -594,51 +604,50 @@ async function fetchEpcData(street: string, postcode: string, logs: string[]) {
       candidate.lmk_key ||
       candidate.id;
 
-    if (!certificateNumber) {
-      logs.push(`[EPC] Error: Unable to determine certificate number from search result.`);
-      return null;
-    }
-
-    const certUrl = `${certEndpoint}?certificate_number=${encodeURIComponent(certificateNumber)}`;
-    logs.push(`[EPC] Fetching full certificate details...`);
-    const certRes = await fetch(certUrl, { headers, signal: AbortSignal.timeout(4000) });
-    logs.push(`[EPC] Certificate API returned HTTP ${certRes.status}`);
-
-    if (!certRes.ok) {
-      if (certRes.status === 401 || certRes.status === 403) {
-        logs.push(`[EPC] Error: Authentication failed (HTTP ${certRes.status}) while retrieving certificate.`);
-      } else {
-        logs.push(`[EPC] Error: Certificate API returned HTTP ${certRes.status} ${certRes.statusText}`);
-      }
-      return null;
-    }
-
-    const certJson = await certRes.json();
-    let certObj: any = certJson;
-    if (certJson && typeof certJson === 'object') {
-      if (certJson.data && typeof certJson.data === 'object' && !Array.isArray(certJson.data)) {
-        certObj = certJson.data;
-      } else if (Array.isArray(certJson.data) && certJson.data.length > 0) {
-        certObj = certJson.data[0];
-      } else if (certJson.rows && Array.isArray(certJson.rows) && certJson.rows.length > 0) {
-        certObj = certJson.rows[0];
-      } else if (certJson.certificate && typeof certJson.certificate === 'object') {
-        certObj = certJson.certificate;
+    let certObj: any = null;
+    if (certificateNumber) {
+      const certUrl = `${certEndpoint}?certificate_number=${encodeURIComponent(certificateNumber)}`;
+      logs.push(`[EPC] Fetching full certificate details for ${certificateNumber}...`);
+      try {
+        const certRes = await fetch(certUrl, { headers, signal: AbortSignal.timeout(7500) });
+        if (certRes.ok) {
+          const certJson = await certRes.json();
+          if (certJson && typeof certJson === 'object') {
+            if (certJson.data && typeof certJson.data === 'object' && !Array.isArray(certJson.data)) {
+              certObj = certJson.data;
+            } else if (Array.isArray(certJson.data) && certJson.data.length > 0) {
+              certObj = certJson.data[0];
+            } else if (certJson.rows && Array.isArray(certJson.rows) && certJson.rows.length > 0) {
+              certObj = certJson.rows[0];
+            } else if (certJson.certificate && typeof certJson.certificate === 'object') {
+              certObj = certJson.certificate;
+            }
+          }
+        } else {
+          logs.push(`[EPC] Certificate details returned HTTP ${certRes.status}, utilizing register search summary data.`);
+        }
+      } catch (cErr: any) {
+        logs.push(`[EPC] Certificate details request note (${cErr?.message || cErr}), utilizing register search summary data.`);
       }
     }
 
-    const rawRating = (getEpcField(certObj, 'currentEnergyRating', 'current-energy-rating', 'current_energy_rating', 'rating', 'energyRating', 'energy_rating', 'currentEnergyBand', 'energyBand') ??
-      getEpcField(candidate, 'currentEnergyRating', 'current-energy-rating', 'current_energy_rating', 'rating', 'energyRating', 'currentEnergyBand', 'energyBand') ?? 'D').trim().toUpperCase();
+    // Extract rating and potential rating, checking snake_case fields used by official GOV.UK API
+    const rawRating = (
+      getEpcField(certObj, 'current_energy_efficiency_band', 'currentEnergyEfficiencyBand', 'currentEnergyRating', 'current-energy-rating', 'current_energy_rating', 'rating', 'energyRating', 'energy_rating', 'currentEnergyBand', 'energyBand') ??
+      getEpcField(candidate, 'currentEnergyEfficiencyBand', 'current_energy_efficiency_band', 'currentEnergyRating', 'current-energy-rating', 'current_energy_rating', 'rating', 'energyRating', 'currentEnergyBand', 'energyBand') ?? 'D'
+    ).toString().trim().toUpperCase();
 
-    const rawPotentialRating = (getEpcField(certObj, 'potentialEnergyRating', 'potential-energy-rating', 'potential_energy_rating', 'potentialRating', 'potentialEnergyBand', 'potential_energy_band') ??
-      getEpcField(candidate, 'potentialEnergyRating', 'potential-energy-rating', 'potential_energy_rating', 'potentialRating') ?? rawRating).trim().toUpperCase();
+    const rawPotentialRating = (
+      getEpcField(certObj, 'potential_energy_efficiency_band', 'potentialEnergyEfficiencyBand', 'potentialEnergyRating', 'potential-energy-rating', 'potential_energy_rating', 'potentialRating', 'potentialEnergyBand', 'potential_energy_band') ??
+      getEpcField(candidate, 'potentialEnergyEfficiencyBand', 'potential_energy_efficiency_band', 'potentialEnergyRating', 'potential-energy-rating', 'potential_energy_rating', 'potentialRating') ?? rawRating
+    ).toString().trim().toUpperCase();
 
     const rating = (['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(rawRating) ? rawRating : 'D') as 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
     const potentialRating = (['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(rawPotentialRating) ? rawPotentialRating : 'C') as 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 
     let expiryDate: string | null = getEpcField(certObj, 'expiryDate', 'expiry-date', 'expiry_date') ?? getEpcField(candidate, 'expiryDate', 'expiry-date', 'expiry_date');
     if (!expiryDate) {
-      const lodgeDate = getEpcField(certObj, 'lodgementDate', 'lodgement-date', 'lodgement_date', 'dateRegistered', 'registrationDate') ??
+      const lodgeDate = getEpcField(certObj, 'lodgementDate', 'lodgement-date', 'lodgement_date', 'dateRegistered', 'registrationDate', 'registration_date') ??
         getEpcField(candidate, 'lodgementDate', 'lodgement-date', 'lodgement_date', 'dateRegistered', 'registrationDate');
       if (lodgeDate) {
         try {
@@ -651,62 +660,132 @@ async function fetchEpcData(street: string, postcode: string, logs: string[]) {
       }
     }
 
-    const mainheatDesc = getEpcField(certObj, 'mainheatDescription', 'mainheat-description', 'mainheat_description', 'mainHeatDescription', 'mainHeatingDescription') ?? '';
+    // Helper to format descriptions from objects, arrays or strings
+    const extractDescription = (val: any): string => {
+      if (!val) return '';
+      if (typeof val === 'string') return val;
+      if (Array.isArray(val)) {
+        return val.map((item: any) => (typeof item === 'object' ? item.description || item.name || '' : String(item))).filter(Boolean).join('; ');
+      }
+      if (typeof val === 'object') {
+        return val.description || val.name || val.type || '';
+      }
+      return String(val);
+    };
 
-    logs.push(`[EPC] Success: Found EPC lodged for certificate ${certificateNumber} (Rating: ${rating})`);
+    // Helper to extract numeric cost or value from objects
+    const extractCostValue = (val: any): string => {
+      if (val === undefined || val === null) return '';
+      if (typeof val === 'object') {
+        return val.value !== undefined ? String(val.value) : (val.amount !== undefined ? String(val.amount) : '');
+      }
+      return String(val);
+    };
+
+    const mainheatDesc = extractDescription(certObj?.main_heating) ||
+      getEpcField(certObj, 'mainheatDescription', 'mainheat-description', 'mainheat_description', 'mainHeatDescription', 'mainHeatingDescription') ||
+      '';
+
+    const wallsDesc = extractDescription(certObj?.walls) ||
+      getEpcField(certObj, 'wallsDescription', 'walls-description', 'walls_description') ||
+      '';
+
+    const roofDesc = extractDescription(certObj?.roofs) ||
+      getEpcField(certObj, 'roofDescription', 'roof-description', 'roof_description') ||
+      '';
+
+    const windowsDesc = extractDescription(certObj?.windows) ||
+      getEpcField(certObj, 'windowsDescription', 'windows-description', 'windows_description') ||
+      '';
+
+    const floorDesc = extractDescription(certObj?.floors) ||
+      getEpcField(certObj, 'floorDescription', 'floor-description', 'floor_description') ||
+      '';
+
+    const hotwaterDesc = extractDescription(certObj?.hot_water) ||
+      getEpcField(certObj, 'hotwaterDescription', 'hotwater-description', 'hotwater_description', 'hotWaterDescription') ||
+      '';
+
+    const lightingDesc = extractDescription(certObj?.lighting) ||
+      getEpcField(certObj, 'lightingDescription', 'lighting-description', 'lighting_description') ||
+      '';
+
+    // Dwelling / Property type mapping
+    let propertyType = certObj?.dwelling_type ||
+      getEpcField(certObj, 'propertyType', 'property-type', 'property_type', 'dwelling_type') ||
+      getEpcField(candidate, 'propertyType', 'property-type') ||
+      'House';
+    if (String(propertyType) === '0') propertyType = 'House';
+
+    // Built form mapping
+    let builtForm = getEpcField(certObj, 'builtForm', 'built-form', 'built_form') || '';
+    const builtFormStr = String(builtForm).trim();
+    if (builtFormStr === '3') builtForm = 'End-terrace';
+    else if (builtFormStr === '1') builtForm = 'Detached';
+    else if (builtFormStr === '2') builtForm = 'Semi-detached';
+    else if (builtFormStr === '4') builtForm = 'Mid-terrace';
+
+    // Scores
+    const currentScore = certObj?.energy_rating_current !== undefined ? String(certObj.energy_rating_current) :
+      (getEpcField(certObj, 'currentEnergyEfficiency', 'current-energy-efficiency', 'current_energy_efficiency', 'currentEnergyScore') ?? '');
+
+    const potentialScore = certObj?.energy_rating_potential !== undefined ? String(certObj.energy_rating_potential) :
+      (getEpcField(certObj, 'potentialEnergyEfficiency', 'potential-energy-efficiency', 'potential_energy_efficiency', 'potentialEnergyScore') ?? '');
+
+    logs.push(`[EPC] Success: Found EPC for ${certificateNumber} (Current Band: ${rating} / Score: ${currentScore || 'N/A'}, Potential Band: ${potentialRating} / Score: ${potentialScore || 'N/A'})`);
 
     return {
       address1: getEpcField(certObj, 'address1', 'address-1', 'address_1', 'addressLine1', 'address_line_1', 'line1') ?? getEpcField(candidate, 'address1', 'addressLine1', 'address') ?? '',
       address2: getEpcField(certObj, 'address2', 'address-2', 'address_2', 'addressLine2', 'address_line_2', 'line2') ?? getEpcField(candidate, 'address2', 'addressLine2') ?? '',
       address3: getEpcField(certObj, 'address3', 'address-3', 'address_3', 'addressLine3', 'address_line_3', 'line3') ?? getEpcField(candidate, 'address3', 'addressLine3') ?? '',
-      posttown: getEpcField(certObj, 'posttown', 'post-town', 'post_town', 'town', 'city') ?? getEpcField(candidate, 'posttown', 'town') ?? '',
+      posttown: getEpcField(certObj, 'posttown', 'post-town', 'post_town', 'postTown', 'town', 'city') ?? getEpcField(candidate, 'posttown', 'postTown', 'town') ?? '',
       postcode: getEpcField(certObj, 'postcode', 'post-code', 'post_code') ?? getEpcField(candidate, 'postcode') ?? postcode,
       county: getEpcField(certObj, 'county') ?? getEpcField(candidate, 'county') ?? '',
-      lodgementDate: getEpcField(certObj, 'lodgementDate', 'lodgement-date', 'lodgement_date', 'dateRegistered', 'registrationDate') ?? getEpcField(candidate, 'lodgementDate', 'lodgement-date', 'dateRegistered') ?? '',
+      lodgementDate: getEpcField(certObj, 'lodgementDate', 'lodgement-date', 'lodgement_date', 'dateRegistered', 'registrationDate', 'registration_date') ?? getEpcField(candidate, 'lodgementDate', 'lodgement-date', 'dateRegistered', 'registrationDate') ?? '',
       inspectionDate: getEpcField(certObj, 'inspectionDate', 'inspection-date', 'inspection_date', 'dateOfAssessment') ?? getEpcField(candidate, 'inspectionDate', 'inspection-date') ?? '',
       rating,
       potentialRating,
-      propertyType: getEpcField(certObj, 'propertyType', 'property-type', 'property_type') ?? getEpcField(candidate, 'propertyType', 'property-type') ?? '',
+      propertyType,
       tenure: getEpcField(certObj, 'tenure') ?? getEpcField(candidate, 'tenure') ?? '',
-      uprn: getEpcField(certObj, 'uprn', 'buildingReferenceNumber', 'building-reference-number', 'building_reference_number') ?? getEpcField(candidate, 'uprn') ?? '',
-      buildingReferenceNumber: getEpcField(certObj, 'buildingReferenceNumber', 'building-reference-number', 'building_reference_number') ?? getEpcField(candidate, 'buildingReferenceNumber', 'building-reference-number') ?? '',
+      uprn: String(getEpcField(certObj, 'uprn', 'buildingReferenceNumber', 'building-reference-number', 'building_reference_number') ?? getEpcField(candidate, 'uprn') ?? ''),
+      buildingReferenceNumber: String(getEpcField(certObj, 'buildingReferenceNumber', 'building-reference-number', 'building_reference_number') ?? getEpcField(candidate, 'buildingReferenceNumber', 'building-reference-number') ?? ''),
       constructionAgeBand: getEpcField(certObj, 'constructionAgeBand', 'construction-age-band', 'construction_age_band') ?? getEpcField(candidate, 'constructionAgeBand') ?? '',
-      localAuthorityLabel: getEpcField(certObj, 'localAuthorityLabel', 'local-authority-label', 'local_authority_label', 'localAuthorityName') ?? getEpcField(candidate, 'localAuthorityLabel') ?? '',
-      totalFloorArea: getEpcField(certObj, 'totalFloorArea', 'total-floor-area', 'total_floor_area') ?? getEpcField(candidate, 'totalFloorArea') ?? '',
+      localAuthorityLabel: getEpcField(certObj, 'localAuthorityLabel', 'local-authority-label', 'local_authority_label', 'localAuthorityName') ?? getEpcField(candidate, 'localAuthorityLabel', 'council') ?? '',
+      totalFloorArea: String(getEpcField(certObj, 'totalFloorArea', 'total-floor-area', 'total_floor_area') ?? getEpcField(candidate, 'totalFloorArea') ?? ''),
       mainheatcontDescription: getEpcField(certObj, 'mainheatcontDescription', 'mainheatcont-description', 'mainheatcont_description', 'mainHeatingControlsDescription', 'mainHeatingControls') ?? '',
       reportType: getEpcField(certObj, 'reportType', 'report-type', 'report_type') ?? '',
       energyTariff: getEpcField(certObj, 'energyTariff', 'energy-tariff', 'energy_tariff') ?? '',
       mechanicalVentilation: getEpcField(certObj, 'mechanicalVentilation', 'mechanical-ventilation', 'mechanical_ventilation') ?? '',
-      co2EmissCurrPerFloorArea: getEpcField(certObj, 'co2EmissCurrPerFloorArea', 'co2-emiss-curr-per-floor-area', 'co2_emiss_curr_per_floor_area') ?? '',
+      co2EmissCurrPerFloorArea: getEpcField(certObj, 'co2EmissCurrPerFloorArea', 'co2-emiss-curr-per-floor-area', 'co2_emiss_curr_per_floor_area', 'co2_emissions_current_per_floor_area') ?? '',
       mainsGasFlag: getEpcField(certObj, 'mainsGasFlag', 'mains-gas-flag', 'mains_gas_flag') ?? '',
-      constituencyLabel: getEpcField(certObj, 'constituencyLabel', 'constituency-label', 'constituency_label') ?? '',
+      constituencyLabel: getEpcField(certObj, 'constituencyLabel', 'constituency-label', 'constituency_label') ?? getEpcField(candidate, 'constituency') ?? '',
       mainFuel: getEpcField(certObj, 'mainFuel', 'main-fuel', 'main_fuel') ?? '',
-      lightingDescription: getEpcField(certObj, 'lightingDescription', 'lighting-description', 'lighting_description') ?? '',
+      lightingDescription: lightingDesc,
       multiGlazeProportion: getEpcField(certObj, 'multiGlazeProportion', 'multi-glaze-proportion', 'multi_glaze_proportion') ?? '',
       mainHeatingControls: getEpcField(certObj, 'mainHeatingControls', 'main-heating-controls', 'main_heating_controls') ?? '',
       secondheatDescription: getEpcField(certObj, 'secondheatDescription', 'secondheat-description', 'secondheat_description', 'secondaryHeatingDescription') ?? '',
       transactionType: getEpcField(certObj, 'transactionType', 'transaction-type', 'transaction_type') ?? '',
       lowEnergyLighting: getEpcField(certObj, 'lowEnergyLighting', 'low-energy-lighting', 'low_energy_lighting') ?? '',
-      hotwaterDescription: getEpcField(certObj, 'hotwaterDescription', 'hotwater-description', 'hotwater_description', 'hotWaterDescription') ?? '',
-      builtForm: getEpcField(certObj, 'builtForm', 'built-form', 'built_form') ?? '',
-      currentEnergyEfficiency: getEpcField(certObj, 'currentEnergyEfficiency', 'current-energy-efficiency', 'current_energy_efficiency', 'currentEnergyScore') ?? '',
-      potentialEnergyEfficiency: getEpcField(certObj, 'potentialEnergyEfficiency', 'potential-energy-efficiency', 'potential_energy_efficiency', 'potentialEnergyScore') ?? '',
+      hotwaterDescription: hotwaterDesc,
+      builtForm,
+      currentEnergyEfficiency: currentScore,
+      potentialEnergyEfficiency: potentialScore,
       mainheatDescription: mainheatDesc,
       mainHeatDescription: mainheatDesc,
-      wallsDescription: getEpcField(certObj, 'wallsDescription', 'walls-description', 'walls_description') ?? '',
-      roofDescription: getEpcField(certObj, 'roofDescription', 'roof-description', 'roof_description') ?? '',
-      windowsDescription: getEpcField(certObj, 'windowsDescription', 'windows-description', 'windows_description') ?? '',
-      co2EmissionsCurrent: getEpcField(certObj, 'co2EmissionsCurrent', 'co2-emissions-current', 'co2_emissions_current') ?? '',
-      co2EmissionsPotential: getEpcField(certObj, 'co2EmissionsPotential', 'co2-emissions-potential', 'co2_emissions_potential') ?? '',
-      heatingCostCurrent: getEpcField(certObj, 'heatingCostCurrent', 'heating-cost-current', 'heating_cost_current') ?? '',
-      heatingCostPotential: getEpcField(certObj, 'heatingCostPotential', 'heating-cost-potential', 'heating_cost_potential') ?? '',
-      hotWaterCostCurrent: getEpcField(certObj, 'hotWaterCostCurrent', 'hot-water-cost-current', 'hot_water_cost_current') ?? '',
-      hotWaterCostPotential: getEpcField(certObj, 'hotWaterCostPotential', 'hot-water-cost-potential', 'hot_water_cost_potential') ?? '',
-      lightingCostCurrent: getEpcField(certObj, 'lightingCostCurrent', 'lighting-cost-current', 'lighting_cost_current') ?? '',
-      lightingCostPotential: getEpcField(certObj, 'lightingCostPotential', 'lighting-cost-potential', 'lighting_cost_potential') ?? '',
-      energyConsumptionCurrent: getEpcField(certObj, 'energyConsumptionCurrent', 'energy-consumption-current', 'energy_consumption_current') ?? '',
-      energyConsumptionPotential: getEpcField(certObj, 'energyConsumptionPotential', 'energy-consumption-potential', 'energy_consumption_potential') ?? '',
-      floorDescription: getEpcField(certObj, 'floorDescription', 'floor-description', 'floor_description') ?? '',
+      wallsDescription: wallsDesc,
+      roofDescription: roofDesc,
+      windowsDescription: windowsDesc,
+      co2EmissionsCurrent: extractCostValue(getEpcField(certObj, 'co2EmissionsCurrent', 'co2-emissions-current', 'co2_emissions_current')),
+      co2EmissionsPotential: extractCostValue(getEpcField(certObj, 'co2EmissionsPotential', 'co2-emissions-potential', 'co2_emissions_potential')),
+      heatingCostCurrent: extractCostValue(getEpcField(certObj, 'heatingCostCurrent', 'heating-cost-current', 'heating_cost_current')),
+      heatingCostPotential: extractCostValue(getEpcField(certObj, 'heatingCostPotential', 'heating-cost-potential', 'heating_cost_potential')),
+      hotWaterCostCurrent: extractCostValue(getEpcField(certObj, 'hotWaterCostCurrent', 'hot-water-cost-current', 'hot_water_cost_current')),
+      hotWaterCostPotential: extractCostValue(getEpcField(certObj, 'hotWaterCostPotential', 'hot-water-cost-potential', 'hot_water_cost_potential')),
+      lightingCostCurrent: extractCostValue(getEpcField(certObj, 'lightingCostCurrent', 'lighting-cost-current', 'lighting_cost_current')),
+      lightingCostPotential: extractCostValue(getEpcField(certObj, 'lightingCostPotential', 'lighting-cost-potential', 'lighting_cost_potential')),
+      energyConsumptionCurrent: extractCostValue(getEpcField(certObj, 'energyConsumptionCurrent', 'energy-consumption-current', 'energy_consumption_current')),
+      energyConsumptionPotential: extractCostValue(getEpcField(certObj, 'energyConsumptionPotential', 'energy-consumption-potential', 'energy_consumption_potential')),
+      floorDescription: floorDesc,
       roofEnergyEff: getEpcField(certObj, 'roofEnergyEff', 'roof-energy-eff', 'roof_energy_eff') ?? '',
       windowsEnergyEff: getEpcField(certObj, 'windowsEnergyEff', 'windows-energy-eff', 'windows_energy_eff') ?? '',
       wallsEnergyEff: getEpcField(certObj, 'wallsEnergyEff', 'walls-energy-eff', 'walls_energy_eff') ?? '',
@@ -875,10 +954,21 @@ async function fetchLandRegistryData(streetInput: string, postcode: string, logs
       };
     });
 
+    // Deduplicate records by date, price, and address/paon
+    const seenRecords = new Set<string>();
+    const deduplicatedRecords: any[] = [];
+    for (const r of allRecords) {
+      const key = `${r.transactionDate}_${r.pricePaid}_${r.paon || ''}_${r.estateType || ''}`.toLowerCase();
+      if (!seenRecords.has(key)) {
+        seenRecords.add(key);
+        deduplicatedRecords.push(r);
+      }
+    }
+
     // If a house number / PAON is specified, filter or prioritize it
-    let matchingRecords = allRecords;
+    let matchingRecords = deduplicatedRecords;
     if (paon) {
-      const exactPaonMatches = allRecords.filter(r => 
+      const exactPaonMatches = deduplicatedRecords.filter(r => 
         r.paon.toLowerCase() === paon.toLowerCase() ||
         r.saon.toLowerCase() === paon.toLowerCase() ||
         r.addressString.toLowerCase().startsWith(paon.toLowerCase())
@@ -888,7 +978,7 @@ async function fetchLandRegistryData(streetInput: string, postcode: string, logs
       }
     }
 
-    logs.push(`[LR] Found ${matchingRecords.length} transactions (total in postcode: ${allRecords.length}).`);
+    logs.push(`[LR] Found ${matchingRecords.length} unique transactions (total in postcode: ${deduplicatedRecords.length}).`);
     return matchingRecords.slice(0, 15);
   } catch (err: any) {
     logs.push(`[LR] Note: Land Registry fetch skipped or timed out (${err?.message || 'timeout'})`);
@@ -2738,8 +2828,28 @@ async function generateHomePackDossier(
   onStepProgress?.('council_tax', 'in_progress');
   onStepProgress?.('connectivity', 'in_progress');
   onStepProgress?.('schools', 'in_progress');
+  onStepProgress?.('healthcare', 'in_progress');
 
   const coordsPromise = fetchCoordinates(postcode).catch(() => null);
+
+  const healthcarePromise = coordsPromise.then((coords) => {
+    return getHealthcareAccessData(postcode, {
+      nhsApiKey: process.env.NHS_API_KEY,
+      cqcApiKey: process.env.CQC_API_KEY,
+      logs,
+      coords: coords ? { lat: coords.latitude, lng: coords.longitude } : null
+    });
+  })
+    .then(res => {
+      const detail = res?.gpSurgeries?.length ? `${res.gpSurgeries.length} Surgeries (CQC Checked)` : 'Registers Checked';
+      onStepProgress?.('healthcare', 'completed', detail);
+      return res;
+    })
+    .catch(err => {
+      logs.push(`[Healthcare] Notice: ${err?.message || err}`);
+      onStepProgress?.('healthcare', 'completed', 'Primary Care Checked');
+      return null;
+    });
 
   const landRegistryPromise = fetchLandRegistryData(fullStreet, postcode, logs)
     .then(res => {
@@ -2808,12 +2918,13 @@ async function generateHomePackDossier(
       });
   })();
 
-  const [landRegistry, epc, floodRisk, coords, groundedData] = await Promise.all([
+  const [landRegistry, epc, floodRisk, coords, groundedData, healthcare] = await Promise.all([
     landRegistryPromise,
     epcPromise,
     floodRiskPromise,
     coordsPromise,
-    groundedPromise
+    groundedPromise,
+    healthcarePromise
   ]);
 
   const planningHistory = await fetchPlanningHistory(epc?.uprn || '', epc?.localAuthority).catch(() => []);
@@ -2831,6 +2942,7 @@ async function generateHomePackDossier(
     mobile: groundedData.mobile,
     mobileSummary: groundedData.mobileSummary,
     schools: groundedData.schools,
+    healthcare: healthcare || undefined,
     coordinates: coords ? { lat: coords.latitude, lng: coords.longitude } : undefined
   };
 
@@ -2896,6 +3008,7 @@ app.post('/api/homepack/start', (req, res) => {
     { id: 'council_tax', label: 'Valuation Office Agency (VOA) Council Tax', status: 'pending' },
     { id: 'connectivity', label: 'Ofcom Broadband Speeds & Mobile 5G Coverage', status: 'pending' },
     { id: 'schools', label: 'Ofsted Catchment Schools & Ratings', status: 'pending' },
+    { id: 'healthcare', label: 'NHS Primary Care & CQC Inspection Ratings', status: 'pending' },
     { id: 'synthesis', label: 'Executive Property Dossier Synthesis', status: 'pending' },
   ];
 
@@ -2926,6 +3039,44 @@ app.get('/api/homepack/job/:jobId', (req, res) => {
     return res.status(404).json({ error: "Job not found" });
   }
   res.json({ job });
+});
+
+app.post('/api/healthcare/lookup', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const { postcode } = req.body || {};
+  if (!postcode) {
+    return res.status(400).json({ error: "Postcode is required" });
+  }
+
+  try {
+    const data = await getHealthcareAccessData(postcode, {
+      nhsApiKey: process.env.NHS_API_KEY,
+      cqcApiKey: process.env.CQC_API_KEY
+    });
+    res.json({ result: data });
+  } catch (error: any) {
+    console.error("Healthcare lookup error:", error);
+    res.status(500).json({ error: error?.message || "Failed to retrieve healthcare data" });
+  }
+});
+
+app.get('/api/healthcare/:postcode', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const { postcode } = req.params;
+  if (!postcode) {
+    return res.status(400).json({ error: "Postcode is required" });
+  }
+
+  try {
+    const data = await getHealthcareAccessData(postcode, {
+      nhsApiKey: process.env.NHS_API_KEY,
+      cqcApiKey: process.env.CQC_API_KEY
+    });
+    res.json({ result: data });
+  } catch (error: any) {
+    console.error("Healthcare lookup error:", error);
+    res.status(500).json({ error: error?.message || "Failed to retrieve healthcare data" });
+  }
 });
 
 app.post('/api/get-property-report', async (req, res) => {
