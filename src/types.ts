@@ -306,6 +306,87 @@ export type HealthcareAccessData = {
   lastUpdated?: string;
 };
 
+export interface CrimeMonthTrend {
+  date: string;
+  displayMonth: string;
+  totalCrimes: number;
+  burglary: number;
+  vehicleCrime: number;
+  antiSocialBehaviour: number;
+  violentCrime: number;
+  other: number;
+}
+
+export interface CrimeCategoryBreakdown {
+  categoryKey: string;
+  label: string;
+  count: number;
+  percentage: number;
+  riskLevel: 'Low' | 'Moderate' | 'Elevated';
+  benchmarkComparison?: string;
+  description?: string;
+}
+
+export interface CrimeBenchmark {
+  localAnnualTotal: number;
+  localAnnualRatePer1000: number;
+  forceName: string;
+  forceRatePer1000: number;
+  nationalRatePer1000: number;
+  vsForceComparison: 'Lower' | 'Average' | 'Higher';
+  vsForceDifferencePercent: number;
+  vsNationalComparison: 'Lower' | 'Average' | 'Higher';
+  vsNationalDifferencePercent: number;
+  safetyRating: 'Low Crime Area' | 'Moderate Crime Area' | 'Average Crime Area' | 'Higher Crime Area';
+  safetyScore: number;
+}
+
+export interface RecentCrimeIncident {
+  id: number | string;
+  category: string;
+  categoryLabel: string;
+  month: string;
+  streetName: string;
+  outcomeStatus?: string;
+}
+
+export interface CrimeKeyCategoryDetail {
+  count: number;
+  percentage: number;
+  ratePer1000: number;
+  forceRate: number;
+  nationalRate: number;
+  status: 'Lower' | 'Average' | 'Higher';
+  riskLevel: 'Low' | 'Moderate' | 'Elevated';
+  monthlyAvg: number;
+}
+
+export interface CrimeData {
+  radiusMiles: number;
+  totalLast12Months: number;
+  monthlyAverage: number;
+  latestMonth: string;
+  earliestMonth: string;
+  monthlyTrends: CrimeMonthTrend[];
+  categoryBreakdown: CrimeCategoryBreakdown[];
+  benchmarks: CrimeBenchmark;
+  keyCategories: {
+    burglary: CrimeKeyCategoryDetail;
+    vehicleCrime: CrimeKeyCategoryDetail;
+    asb: CrimeKeyCategoryDetail;
+    violentCrime: CrimeKeyCategoryDetail;
+  };
+  recentIncidents?: RecentCrimeIncident[];
+  policeForce: {
+    id: string;
+    name: string;
+    telephone: string;
+    url: string;
+  };
+  source: string;
+  lastUpdated?: string;
+}
+
 export type PropertyData = {
   address: string;
   landRegistry: LandRegistryResult[];
@@ -320,6 +401,7 @@ export type PropertyData = {
   mobileSummary?: string;
   schools?: School[];
   healthcare?: HealthcareAccessData;
+  crime?: CrimeData;
   coordinates?: { lat: number; lng: number };
 };
 

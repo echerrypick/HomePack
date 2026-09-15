@@ -7,6 +7,7 @@ import { ImageUploader } from './image-uploader';
 import { AiConditionReport } from './ai-condition-report';
 import { DataSection, DataItem } from './data-section';
 import { HealthcareDisplay } from './healthcare-display';
+import { CrimeDisplay } from './crime-display';
 import { Badge } from "@/components/ui/badge";
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -14,14 +15,13 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DATA_TOOLTIPS } from '@/lib/data-tooltips';
-import { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem, ReportResult, CouncilTaxData, RadonRiskData, CoalMiningData, BroadbandData, School, MobileData, HealthcareAccessData } from '@/types';
+import { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem, ReportResult, CouncilTaxData, RadonRiskData, CoalMiningData, BroadbandData, School, MobileData, HealthcareAccessData, CrimeData } from '@/types';
 import { PropertyMap } from './property-map';
 import { useAuth } from '@/contexts/AuthContext';
 import { purchaseReportForUser } from '@/firebase';
 import { toast } from 'sonner';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
-import html2pdf from 'html2pdf.js';
 import { HomePackPdfTemplate } from './HomePackPdfTemplate';
 import { PropertyQuickNav } from './PropertyQuickNav';
 
@@ -936,31 +936,34 @@ export function ReportDisplay({
             logging: false,
             backgroundColor: '#ffffff',
             onclone: (clonedDoc) => {
-              // Aggressive fix for "oklab" / "oklch" unsupported color functions in html2canvas
-              const styleTags = clonedDoc.getElementsByTagName('style');
-              for (let s = 0; s < styleTags.length; s++) {
-                let css = styleTags[s].innerHTML;
-                if (css.includes('oklch') || css.includes('oklab')) {
-                  css = css.replace(/oklch\([^)]+\)/g, '#64748b');
-                  css = css.replace(/oklab\([^)]+\)/g, '#64748b');
-                  styleTags[s].innerHTML = css;
-                }
-              }
-
-              const allElements = clonedDoc.getElementsByTagName('*');
-              for (let j = 0; j < allElements.length; j++) {
-                const el = allElements[j] as HTMLElement;
-                const props = ['color', 'backgroundColor', 'borderColor', 'outlineColor', 'fill', 'stroke'];
-                props.forEach(prop => {
+              try {
+                const styleTags = clonedDoc.getElementsByTagName('style');
+                for (let s = 0; s < styleTags.length; s++) {
                   try {
-                    const style = el.style as any;
-                    const val = style?.[prop];
-                    if (val && (val.includes('oklch') || val.includes('oklab'))) {
-                      style[prop] = '#64748b';
+                    let css = styleTags[s].innerHTML;
+                    if (css && (css.includes('oklch') || css.includes('oklab'))) {
+                      css = css.replace(/oklch\([^)]+\)/g, '#64748b');
+                      css = css.replace(/oklab\([^)]+\)/g, '#64748b');
+                      styleTags[s].innerHTML = css;
                     }
                   } catch (e) {}
-                });
-              }
+                }
+
+                const allElements = clonedDoc.getElementsByTagName('*');
+                for (let j = 0; j < allElements.length; j++) {
+                  const el = allElements[j] as HTMLElement;
+                  const props = ['color', 'backgroundColor', 'borderColor', 'outlineColor', 'fill', 'stroke'];
+                  props.forEach(prop => {
+                    try {
+                      const style = el.style as any;
+                      const val = style?.[prop];
+                      if (val && (val.includes('oklch') || val.includes('oklab'))) {
+                        style[prop] = '#64748b';
+                      }
+                    } catch (e) {}
+                  });
+                }
+              } catch (e) {}
             },
           });
 
@@ -1027,10 +1030,31 @@ export function ReportDisplay({
     }
   }, [propertyData.healthcare, address.postcode]);
 
+  // Real-time resilience: if report was cached without crime data, asynchronously load it
+  const [liveCrime, setLiveCrime] = useState<CrimeData | undefined>(propertyData.crime);
+
+  useEffect(() => {
+    if (propertyData.crime) {
+      setLiveCrime(propertyData.crime);
+    } else if (address.postcode) {
+      fetch(`/api/crime/${encodeURIComponent(address.postcode)}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          const fetched = data?.crime || data?.result;
+          if (fetched) {
+            setLiveCrime(fetched);
+          }
+        })
+        .catch(err => console.warn('Crime lookup notice:', err));
+    }
+  }, [propertyData.crime, address.postcode]);
+
   const activeHealthcare = liveHealthcare || propertyData.healthcare;
+  const activeCrime = liveCrime || propertyData.crime;
   const mergedPropertyData = {
     ...propertyData,
-    healthcare: activeHealthcare
+    healthcare: activeHealthcare,
+    crime: activeCrime
   };
   
   const getPrimaryTransaction = (results: LandRegistryResult[]) => {
@@ -1167,6 +1191,7 @@ export function ReportDisplay({
         pdfTemplateRef={pdfTemplateRef}
         propertyData={mergedPropertyData}
         healthcare={activeHealthcare}
+        crime={activeCrime}
         address={address}
         landRegistry={landRegistry}
         epc={epc}
@@ -1302,6 +1327,10 @@ export function ReportDisplay({
 
           <DataSection id="section-healthcare" icon={Stethoscope} title="Healthcare & NHS Access">
             <HealthcareDisplay data={activeHealthcare} postcode={address.postcode} />
+          </DataSection>
+
+          <DataSection id="section-crime" icon={ShieldAlert} title="Crime & Neighbourhood Safety">
+            <CrimeDisplay data={activeCrime} postcode={address.postcode} />
           </DataSection>
 
         </div>

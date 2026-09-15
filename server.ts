@@ -10,6 +10,7 @@ import { promisify } from 'util';
 import { lookupOfcomMobile, lookupOfcomBroadband, ensurePlaywrightChromium } from './src/lib/ofcomScraper';
 import { scrapeCoverage as scrapeSiginfoCoverage } from './src/lib/siginfoScraper';
 import { getHealthcareAccessData } from './src/services/healthcareService';
+import { getCrimeDataForCoordinates } from './src/services/crimeService';
 
 const execPromise = promisify(exec);
 
@@ -346,6 +347,21 @@ async function generateSummary(propertyData: any, retries = 3) {
           gpCount: propertyData.healthcare.gpSurgeries?.length || 0,
           dentist: propertyData.healthcare.dentists?.[0] ? `${propertyData.healthcare.dentists[0].name} (${propertyData.healthcare.dentists[0].distance}, NHS Patients: ${propertyData.healthcare.dentists[0].isAcceptingNhsPatients ? 'Yes' : 'No'})` : null,
           pharmacy: propertyData.healthcare.pharmacies?.[0] ? `${propertyData.healthcare.pharmacies[0].name} (${propertyData.healthcare.pharmacies[0].distance})` : null
+        } : null,
+        crime: propertyData.crime ? {
+          totalLast12Months: propertyData.crime.totalLast12Months,
+          monthlyAverage: propertyData.crime.monthlyAverage,
+          safetyRating: propertyData.crime.benchmarks?.safetyRating,
+          forceName: propertyData.crime.benchmarks?.forceName,
+          vsForceComparison: propertyData.crime.benchmarks?.vsForceComparison,
+          vsForceDiff: `${propertyData.crime.benchmarks?.vsForceDifferencePercent}%`,
+          vsNationalComparison: propertyData.crime.benchmarks?.vsNationalComparison,
+          vsNationalDiff: `${propertyData.crime.benchmarks?.vsNationalDifferencePercent}%`,
+          burglary12m: propertyData.crime.keyCategories?.burglary?.count,
+          burglaryRisk: propertyData.crime.keyCategories?.burglary?.riskLevel,
+          vehicle12m: propertyData.crime.keyCategories?.vehicleCrime?.count,
+          asb12m: propertyData.crime.keyCategories?.asb?.count,
+          violence12m: propertyData.crime.keyCategories?.violentCrime?.count
         } : null
       };
 
@@ -364,6 +380,7 @@ CRITICAL FORMATTING RULES:
 - **Broadband connectivity:** [available speeds e.g. Ultrafast/Superfast, FTTP]
 - **Catchment schools:** [nearest primary and secondary schools strictly within 1.5 miles and their Ofsted ratings]
 - **Healthcare & NHS access:** [nearest GP surgery with CQC inspection rating, patient acceptance status, and NHS dental availability]
+- **Crime & safety:** [Police.uk 12-month summary, local safety rating e.g. Low Crime Area, burglary and vehicle crime stats, and comparison against police force and national benchmarks]
 - **Mobile & 5G coverage:** [highlight operator coverage and any nearby 5G transmitters e.g. Vodafone / EE]
 - **Key take-away:** [one clear, objective concluding sentence for the buyer]
 
@@ -2829,8 +2846,24 @@ async function generateHomePackDossier(
   onStepProgress?.('connectivity', 'in_progress');
   onStepProgress?.('schools', 'in_progress');
   onStepProgress?.('healthcare', 'in_progress');
+  onStepProgress?.('crime', 'in_progress');
 
   const coordsPromise = fetchCoordinates(postcode).catch(() => null);
+
+  const crimePromise = coordsPromise.then(async (coords) => {
+    if (!coords) return null;
+    return getCrimeDataForCoordinates(coords.latitude, coords.longitude, { logs });
+  })
+    .then(res => {
+      const detail = res ? `${res.totalLast12Months} crimes • ${res.benchmarks?.safetyRating || 'Verified'}` : 'Police.uk Checked';
+      onStepProgress?.('crime', 'completed', detail);
+      return res;
+    })
+    .catch(err => {
+      logs.push(`[Police.uk] Notice: ${err?.message || err}`);
+      onStepProgress?.('crime', 'completed', 'Standard Local Profile');
+      return null;
+    });
 
   const healthcarePromise = coordsPromise.then((coords) => {
     return getHealthcareAccessData(postcode, {
@@ -2918,13 +2951,14 @@ async function generateHomePackDossier(
       });
   })();
 
-  const [landRegistry, epc, floodRisk, coords, groundedData, healthcare] = await Promise.all([
+  const [landRegistry, epc, floodRisk, coords, groundedData, healthcare, crime] = await Promise.all([
     landRegistryPromise,
     epcPromise,
     floodRiskPromise,
     coordsPromise,
     groundedPromise,
-    healthcarePromise
+    healthcarePromise,
+    crimePromise
   ]);
 
   const planningHistory = await fetchPlanningHistory(epc?.uprn || '', epc?.localAuthority).catch(() => []);
@@ -2943,6 +2977,7 @@ async function generateHomePackDossier(
     mobileSummary: groundedData.mobileSummary,
     schools: groundedData.schools,
     healthcare: healthcare || undefined,
+    crime: crime || undefined,
     coordinates: coords ? { lat: coords.latitude, lng: coords.longitude } : undefined
   };
 
@@ -3009,6 +3044,7 @@ app.post('/api/homepack/start', (req, res) => {
     { id: 'connectivity', label: 'Ofcom Broadband Speeds & Mobile 5G Coverage', status: 'pending' },
     { id: 'schools', label: 'Ofsted Catchment Schools & Ratings', status: 'pending' },
     { id: 'healthcare', label: 'NHS Primary Care & CQC Inspection Ratings', status: 'pending' },
+    { id: 'crime', label: 'Police.uk Street Crime & 12-Month Safety Trends', status: 'pending' },
     { id: 'synthesis', label: 'Executive Property Dossier Synthesis', status: 'pending' },
   ];
 
@@ -3076,6 +3112,54 @@ app.get('/api/healthcare/:postcode', async (req, res) => {
   } catch (error: any) {
     console.error("Healthcare lookup error:", error);
     res.status(500).json({ error: error?.message || "Failed to retrieve healthcare data" });
+  }
+});
+
+app.post('/api/crime/lookup', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const { lat, lng, postcode } = req.body || {};
+
+  try {
+    let latitude = typeof lat === 'number' ? lat : parseFloat(lat);
+    let longitude = typeof lng === 'number' ? lng : parseFloat(lng);
+
+    if (isNaN(latitude) || isNaN(longitude)) {
+      if (!postcode) {
+        return res.status(400).json({ error: "Coordinates (lat, lng) or valid postcode is required" });
+      }
+      const coords = await fetchCoordinates(postcode);
+      if (!coords) {
+        return res.status(404).json({ error: `Could not geocode postcode: ${postcode}` });
+      }
+      latitude = coords.latitude;
+      longitude = coords.longitude;
+    }
+
+    const data = await getCrimeDataForCoordinates(latitude, longitude);
+    res.json({ result: data });
+  } catch (error: any) {
+    console.error("Crime lookup error:", error);
+    res.status(500).json({ error: error?.message || "Failed to retrieve crime data" });
+  }
+});
+
+app.get('/api/crime/:postcode', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const { postcode } = req.params;
+  if (!postcode) {
+    return res.status(400).json({ error: "Postcode is required" });
+  }
+
+  try {
+    const coords = await fetchCoordinates(postcode);
+    if (!coords) {
+      return res.status(404).json({ error: `Could not geocode postcode: ${postcode}` });
+    }
+    const data = await getCrimeDataForCoordinates(coords.latitude, coords.longitude);
+    res.json({ result: data });
+  } catch (error: any) {
+    console.error("Crime lookup error:", error);
+    res.status(500).json({ error: error?.message || "Failed to retrieve crime data" });
   }
 });
 
