@@ -70,6 +70,7 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
 
   const trendValues = monthlyTrends.map(getTrendValue);
   const maxTrendVal = Math.max(...trendValues, 1);
+  const publishedMonthCount = monthlyTrends.filter((month) => month.isPublished !== false).length;
 
   // Safety Score Styling
   const getSafetyBadge = (rating: string, score: number) => {
@@ -172,7 +173,7 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
               <span className="text-xs font-normal text-muted-foreground ml-1">/ 1k pop</span>
             </div>
             <div className="text-xs text-muted-foreground pt-0.5">
-              <span className="font-semibold text-foreground">{totalLast12Months}</span> crimes recorded over 12 months (avg. {monthlyAverage}/mo)
+              <span className="font-semibold text-foreground">{totalLast12Months}</span> crimes recorded across {publishedMonthCount || monthlyTrends.length} published months (avg. {monthlyAverage}/mo)
             </div>
           </div>
 
@@ -255,7 +256,7 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
                   Burglary
                 </span>
                 <Badge variant={keyCategories.burglary.riskLevel === 'Low' ? 'secondary' : keyCategories.burglary.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0">
-                  {keyCategories.burglary.riskLevel} Risk
+                  {keyCategories.burglary.status} vs national
                 </Badge>
               </div>
               <div className="text-2xl font-bold text-foreground">
@@ -286,7 +287,7 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
                   Vehicle Crime
                 </span>
                 <Badge variant={keyCategories.vehicleCrime.riskLevel === 'Low' ? 'secondary' : keyCategories.vehicleCrime.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0">
-                  {keyCategories.vehicleCrime.riskLevel} Risk
+                  {keyCategories.vehicleCrime.status} vs national
                 </Badge>
               </div>
               <div className="text-2xl font-bold text-foreground">
@@ -313,7 +314,7 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
                   Anti-Social Behaviour
                 </span>
                 <Badge variant={keyCategories.asb.riskLevel === 'Low' ? 'secondary' : keyCategories.asb.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0">
-                  {keyCategories.asb.riskLevel} Risk
+                  {keyCategories.asb.status} vs national
                 </Badge>
               </div>
               <div className="text-2xl font-bold text-foreground">
@@ -340,7 +341,7 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
                   Violence & Safety
                 </span>
                 <Badge variant={keyCategories.violentCrime.riskLevel === 'Low' ? 'secondary' : keyCategories.violentCrime.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0">
-                  {keyCategories.violentCrime.riskLevel} Risk
+                  {keyCategories.violentCrime.status} vs national
                 </Badge>
               </div>
               <div className="text-2xl font-bold text-foreground">
@@ -400,18 +401,19 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
           <div className="h-44 flex items-end justify-between gap-1.5 sm:gap-2 pt-6 px-1">
             {monthlyTrends.map((m, idx) => {
               const val = getTrendValue(m);
-              const heightPercent = Math.max(8, Math.round((val / maxTrendVal) * 100));
+              const isPublished = m.isPublished !== false;
+              const heightPercent = isPublished ? Math.max(8, Math.round((val / maxTrendVal) * 100)) : 8;
 
               return (
                 <div key={m.date} className="flex-1 flex flex-col items-center h-full justify-end group relative">
                   {/* Tooltip on hover */}
                   <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-foreground text-background text-[10px] font-medium py-0.5 px-1.5 rounded shadow-xs whitespace-nowrap z-10">
-                    {val} incidents ({m.displayMonth})
+                    {isPublished ? `${val} incidents` : 'Not yet published'} ({m.displayMonth})
                   </div>
 
                   {/* Number label above bar */}
                   <span className="text-[10px] font-semibold text-muted-foreground mb-1 group-hover:text-foreground transition-colors">
-                    {val}
+                    {isPublished ? val : 'N/P'}
                   </span>
 
                   {/* The Bar */}
@@ -421,7 +423,7 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
                       trendFilter === 'vehicle' ? 'bg-blue-500/80 group-hover:bg-blue-600' :
                       trendFilter === 'asb' ? 'bg-purple-500/80 group-hover:bg-purple-600' :
                       trendFilter === 'violence' ? 'bg-rose-500/80 group-hover:bg-rose-600' :
-                      'bg-primary/80 group-hover:bg-primary'
+                      isPublished ? 'bg-primary/80 group-hover:bg-primary' : 'bg-slate-300'
                     }`}
                     style={{ height: `${heightPercent}%` }}
                   />
@@ -545,7 +547,7 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-medium text-foreground truncate">
-                    {incident.streetName}
+                    {incident.streetName}{incident.distanceMiles !== undefined ? ` • ${incident.distanceMiles.toFixed(1)} miles away` : ''}
                   </span>
                   <Badge variant="secondary" className="text-[10px] shrink-0 font-medium">
                     {incident.categoryLabel}

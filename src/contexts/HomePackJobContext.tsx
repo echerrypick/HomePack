@@ -6,6 +6,20 @@ import { useNavigate, useLocation } from 'react-router-dom';
 const ACTIVE_JOB_KEY = 'homepack_active_job_id';
 const RECENT_REPORTS_KEY = 'homepack_recent_reports';
 
+function unwrapLinkedDataValues(value: any): any {
+  if (Array.isArray(value)) return value.map(unwrapLinkedDataValues);
+  if (!value || typeof value !== 'object') return value;
+
+  const keys = Object.keys(value);
+  if ('value' in value && keys.every(key => ['value', 'language', 'lang', 'type', 'datatype'].includes(key))) {
+    return unwrapLinkedDataValues(value.value);
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [key, unwrapLinkedDataValues(nestedValue)])
+  );
+}
+
 interface SavedReportSummary {
   id: string;
   addressString: string;
@@ -41,7 +55,7 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
   const [recentReports, setRecentReports] = useState<SavedReportSummary[]>(() => {
     try {
       const saved = localStorage.getItem(RECENT_REPORTS_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return saved ? unwrapLinkedDataValues(JSON.parse(saved)) : [];
     } catch {
       return [];
     }
@@ -87,7 +101,7 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
         }
         return;
       }
-      const data = await res.json();
+      const data = unwrapLinkedDataValues(await res.json());
       const updatedJob: HomePackJob = data.job;
 
       setActiveJob(updatedJob);
@@ -102,11 +116,12 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
         saveRecentReport(updatedJob);
 
         const addrLabel = `${updatedJob.address.houseNumber} ${updatedJob.address.street}`.trim() || updatedJob.address.postcode;
-        toast.success(`HomePack for ${addrLabel} is ready!`, {
-          description: 'All 7 property registers and AI dossier have been generated.',
-          duration: 9000,
+        toast.success('Your HomePack is ready', {
+          id: `homepack-complete-${updatedJob.id}`,
+          description: `${addrLabel} has finished compiling and is ready to review.`,
+          duration: 6500,
           action: {
-            label: 'View Report',
+            label: 'Open report',
             onClick: () => {
               setIsModalOpen(false);
               navigate('/tool', { state: { report: updatedJob.result, address: updatedJob.address } });
@@ -189,7 +204,7 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
   };
 
   const loadReport = (report: ReportResult, address: Address, fromHistory: boolean = false) => {
-    navigate('/tool', { state: { report, address, fromHistory } });
+    navigate('/tool', { state: { report: unwrapLinkedDataValues(report), address, fromHistory } });
   };
 
   return (

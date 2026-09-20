@@ -125,8 +125,8 @@ const SAMPLE_REPORT_DATA: ReportResult = {
       postcode: 'SW1A 2AA',
       riskOfFloodingFromRiversAndSea: 'Very Low',
       riskOfFloodingFromSurfaceWater: 'Very Low',
-      riskOfFloodingFromGroundwater: 'Negligible',
-      riskOfFloodingFromReservoirs: 'No Risk',
+      riskOfFloodingFromGroundwater: 'Not assessed by this source',
+      riskOfFloodingFromReservoirs: 'Check Environment Agency map',
       suitability: 'County to Town',
       publishDate: '2023-06-01',
       easting: '530000',
@@ -139,7 +139,7 @@ const SAMPLE_REPORT_DATA: ReportResult = {
       band: 'H',
       annualAmount: '1824.38',
       authority: 'City of Westminster',
-      year: '2024/25'
+      year: `${new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1}/${String((new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1) + 1).slice(-2)}`
     },
     radonRisk: {
       riskLevel: 'Low',
@@ -260,7 +260,7 @@ const SAMPLE_REPORT_DATA: ReportResult = {
           services: ['Prescription Dispensing', 'Emergency Contraception', 'Stop Smoking Service']
         }
       ],
-      summary: 'Primary healthcare access near SW1A 2AA verified via NHS Service Search and CQC registers. 2 local GP surgeries accepting new NHS patients and community dispensing pharmacies within 0.3 miles.'
+      summary: 'Illustrative healthcare directory near SW1A 2AA. Registration and NHS availability must be confirmed directly with each provider.'
     }
   },
   summary: "This property is a historic detached house in the City of Westminster. It has a solid sales history with significant value appreciation. The energy performance is currently rated C, which is typical for a building of this age, but there is potential to reach a B rating with floor insulation and solar panels. Flood risk is very low. Planning history shows recent approvals for security and internal improvements, indicating the property is well-maintained and adapted for modern use.",
@@ -272,9 +272,14 @@ export default function SampleReportPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       <main className="container mx-auto px-4 py-12 flex-grow">
-        <div className="mb-8 p-4 bg-primary/10 border border-primary/20 rounded-lg text-center">
-          <h1 className="text-xl font-bold text-primary">Sample Property Report</h1>
-          <p className="text-sm text-muted-foreground">This is a demonstration of the comprehensive data provided in a HomePack.</p>
+        <div className="mb-8 p-5 bg-amber-50 border border-amber-300 rounded-lg text-center" role="note" aria-label="Illustrative sample report notice">
+          <h1 className="text-xl font-bold text-amber-900">Illustrative Sample Report</h1>
+          <p className="mt-1 text-sm font-medium text-amber-900">
+            Demonstration only — 10 Downing Street is used as an example address. All property details, prices, ratings, nearby services and conclusions shown below are illustrative and have not been verified for this property.
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            This sample must not be relied upon for a purchase, valuation, legal decision or other property due diligence.
+          </p>
         </div>
         <ReportDisplay 
           address={SAMPLE_ADDRESS} 

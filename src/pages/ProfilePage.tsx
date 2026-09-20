@@ -524,7 +524,7 @@ export default function ProfilePage() {
                           </h5>
                           <p className="text-[11px] text-muted-foreground">Property Information Report</p>
                           <div className="mt-3 pt-2 border-t text-[11px] text-muted-foreground flex justify-between items-center">
-                            <span>Prepared by {profile?.branding?.agentName || profile?.displayName || 'Certified Agent'}</span>
+                            <span>Prepared by {profile?.branding?.agentName || profile?.displayName || 'Property Agent'}</span>
                             <span>{profile?.branding?.agencyPhone || 'Official Due Diligence'}</span>
                           </div>
                         </div>
@@ -1248,4 +1248,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

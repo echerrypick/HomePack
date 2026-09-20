@@ -95,7 +95,7 @@ export function PropertyQuickNav({
   const isFloodMed = floodLevel.toLowerCase().includes('medium');
 
   return (
-    <div className="space-y-5 sticky top-20">
+    <div className="min-w-0 space-y-5">
       {/* Key Facts Summary Card */}
       <Card className="shadow-xs border-border/80 bg-card rounded-xl overflow-hidden">
         <CardHeader className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/60 py-3 px-4">

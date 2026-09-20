@@ -2,6 +2,7 @@ export interface School {
   name: string;
   type: 'Primary' | 'Secondary';
   ofstedRating: string;
+  inspectionDate?: string;
   distance: string;
   location?: {
     lat: number;
@@ -77,7 +78,7 @@ CRITICAL CATCHMENT RULES:
 2. Primary schools must be strictly within ~0.4 to 1.3 miles.
 3. Secondary schools must be the designated comprehensive local authority feeder academy (under ~1.8 miles).
 4. Do NOT include schools 2.5+ miles away across town.
-For each school provide: name, type ("Primary" or "Secondary"), ofstedRating, distance in miles, and location { lat, lng }.
+For each school provide: name, type ("Primary" or "Secondary"), ofstedRating, inspectionDate (YYYY-MM-DD, only when verified), distance in miles, and location { lat, lng }.
 Return as a JSON array of objects.`;
 
   try {

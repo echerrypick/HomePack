@@ -73,6 +73,17 @@ const NATIONAL_BENCHMARK = {
   violenceRate: 32.4
 };
 
+function incidentDistanceMiles(lat: number, lng: number, incidentLat?: string, incidentLng?: string): number | undefined {
+  const targetLat = Number(incidentLat);
+  const targetLng = Number(incidentLng);
+  if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return undefined;
+  const radians = (value: number) => value * Math.PI / 180;
+  const dLat = radians(targetLat - lat);
+  const dLng = radians(targetLng - lng);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(lat)) * Math.cos(radians(targetLat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+}
+
 // Friendly Category Information
 const CATEGORY_MAP: Record<string, { label: string; description: string }> = {
   'burglary': {
@@ -243,7 +254,7 @@ export async function getCrimeDataForCoordinates(
     outcome_status?: { category: string; date: string } | null;
   }
 
-  const monthlyResults: { date: string; crimes: RawCrimeRecord[] }[] = [];
+  const monthlyResults: { date: string; crimes: RawCrimeRecord[]; isPublished: boolean }[] = [];
   const chunkSize = 3;
 
   for (let i = 0; i < targetMonths.length; i += chunkSize) {
@@ -252,14 +263,15 @@ export async function getCrimeDataForCoordinates(
       try {
         const url = `https://data.police.uk/api/crimes-street/all-crime?lat=${lat}&lng=${lng}&date=${month}`;
         const res = await fetch(url, { signal: AbortSignal.timeout(4500) });
-        if (!res.ok) return { date: month, crimes: [] as RawCrimeRecord[] };
+        if (!res.ok) return { date: month, crimes: [] as RawCrimeRecord[], isPublished: false };
         const data = await res.json();
         return {
           date: month,
-          crimes: Array.isArray(data) ? (data as RawCrimeRecord[]) : []
+          crimes: Array.isArray(data) ? (data as RawCrimeRecord[]) : [],
+          isPublished: Array.isArray(data)
         };
       } catch {
-        return { date: month, crimes: [] as RawCrimeRecord[] };
+        return { date: month, crimes: [] as RawCrimeRecord[], isPublished: false };
       }
     });
 
@@ -279,7 +291,7 @@ export async function getCrimeDataForCoordinates(
   for (const item of sortedMonths) {
     const crimes = item.crimes;
     const monthTotal = crimes.length;
-    totalLast12Months += monthTotal;
+    if (item.isPublished) totalLast12Months += monthTotal;
 
     let burglaryCount = 0;
     let vehicleCount = 0;
@@ -308,6 +320,7 @@ export async function getCrimeDataForCoordinates(
       date: item.date,
       displayMonth: formatMonthLabel(item.date),
       totalCrimes: monthTotal,
+      isPublished: item.isPublished,
       burglary: burglaryCount,
       vehicleCrime: vehicleCount,
       antiSocialBehaviour: asbCount,
@@ -317,7 +330,8 @@ export async function getCrimeDataForCoordinates(
   }
 
   // Extract up to 12 recent sample incidents from the latest available month
-  const latestMonthEntry = sortedMonths[sortedMonths.length - 1];
+  const publishedMonths = sortedMonths.filter(item => item.isPublished);
+  const latestMonthEntry = publishedMonths[publishedMonths.length - 1];
   if (latestMonthEntry && latestMonthEntry.crimes.length > 0) {
     for (const c of latestMonthEntry.crimes.slice(0, 15)) {
       const catConfig = CATEGORY_MAP[c.category] || { label: c.category || 'Incident' };
@@ -327,7 +341,8 @@ export async function getCrimeDataForCoordinates(
         categoryLabel: catConfig.label,
         month: formatMonthLabel(c.month),
         streetName: c.location?.street?.name || 'On or near street',
-        outcomeStatus: c.outcome_status?.category || 'Status awaiting police update'
+        outcomeStatus: c.outcome_status?.category || 'Status awaiting police update',
+        distanceMiles: incidentDistanceMiles(lat, lng, c.location?.latitude, c.location?.longitude)
       });
     }
   }
@@ -345,7 +360,7 @@ export async function getCrimeDataForCoordinates(
   // Standard UK 1-mile radius population estimator (approx 22,000 residents in suburban/town environments)
   const estimatedCatchmentPopulation = 22000;
   const localAnnualRatePer1000 = Math.round((totalLast12Months / estimatedCatchmentPopulation) * 1000 * 10) / 10;
-  const monthlyAverage = Math.round((totalLast12Months / (sortedMonths.length || 12)) * 10) / 10;
+  const monthlyAverage = Math.round((totalLast12Months / (publishedMonths.length || 1)) * 10) / 10;
 
   // Percentage differences
   const vsForceDiff = Math.round(((localAnnualRatePer1000 - forceBenchmark.totalRate) / forceBenchmark.totalRate) * 100);
@@ -365,7 +380,7 @@ export async function getCrimeDataForCoordinates(
     safetyRating = 'Low Crime Area';
     safetyScore = Math.min(96, Math.max(82, 90 - Math.round(vsNationalDiff / 5)));
   } else if (vsNationalDiff <= -8) {
-    safetyRating = 'Moderate Crime Area';
+    safetyRating = 'Low Crime Area';
     safetyScore = Math.min(84, Math.max(72, 78 - Math.round(vsNationalDiff / 6)));
   } else if (vsNationalDiff <= 15) {
     safetyRating = 'Average Crime Area';
@@ -457,8 +472,8 @@ export async function getCrimeDataForCoordinates(
     radiusMiles: 1.0,
     totalLast12Months,
     monthlyAverage,
-    latestMonth: sortedMonths.length > 0 ? sortedMonths[sortedMonths.length - 1].date : '',
-    earliestMonth: sortedMonths.length > 0 ? sortedMonths[0].date : '',
+    latestMonth: publishedMonths.length > 0 ? publishedMonths[publishedMonths.length - 1].date : '',
+    earliestMonth: publishedMonths.length > 0 ? publishedMonths[0].date : '',
     monthlyTrends,
     categoryBreakdown,
     benchmarks,

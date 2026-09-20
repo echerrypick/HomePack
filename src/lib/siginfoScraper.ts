@@ -26,13 +26,17 @@ export interface CoverageResult {
 
 export async function scrapeCoverage(
   postcode: string,
-  _houseNumber?: string
+  _houseNumber?: string,
+  signal?: AbortSignal
 ): Promise<CoverageResult> {
   console.log(`[Siginfo] Starting coverage scrape for postcode: ${postcode}`);
 
   let browser: Browser | null = null;
+  const abortHandler = () => void browser?.close().catch(() => undefined);
+  signal?.addEventListener('abort', abortHandler, { once: true });
 
   try {
+    if (signal?.aborted) throw new Error('Siginfo lookup timed out');
     try {
       browser = await chromium.launch({
         headless: true,
@@ -166,6 +170,14 @@ export async function scrapeCoverage(
 
     if (modernCheckers && modernCheckers.length > 0) {
       console.log(`[Siginfo] Found modern network checkers for: ${modernCheckers.join(", ")}`);
+      console.log('[Siginfo] Checker links found, but no operator measurements were exposed; not substituting default coverage.');
+      return {
+        postcode: postcode.toUpperCase().trim(),
+        summary: locationText ? `Operator checkers available for ${locationText}` : '',
+        operators: [],
+        scrapedAt: new Date().toISOString(),
+        source: "siginfo.uk checker links only",
+      };
       
       const defaultOperators: OperatorCoverage[] = [
         {
@@ -228,6 +240,7 @@ export async function scrapeCoverage(
       source: "siginfo.uk",
     };
   } finally {
+    signal?.removeEventListener('abort', abortHandler);
     if (browser) await browser.close();
   }
 }

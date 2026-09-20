@@ -10,7 +10,6 @@ import {
   MapPin, 
   Info,
   BadgeCheck,
-  Check,
   Building,
   Sparkles
 } from 'lucide-react';
@@ -89,8 +88,7 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
     );
   };
 
-  const acceptingCount = gpSurgeries.filter(g => g.isAcceptingNewPatients).length;
-  const nhsDentistCount = dentists.filter(d => d.isAcceptingNhsPatients).length;
+  const nhsServiceSearchUrl = `https://www.nhs.uk/service-search/?location=${encodeURIComponent(postcode || '')}`;
 
   return (
     <div className="space-y-6">
@@ -101,8 +99,8 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Primary Care & Community Health
             </span>
-            <Badge variant="outline" className="text-[10px] h-5 px-2 font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800">
-              NHS England & CQC Grounded
+            <Badge variant="outline" className="text-[10px] h-5 px-2 font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800">
+              NHS Directory results
             </Badge>
           </div>
           {postcode && (
@@ -113,7 +111,7 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
         </div>
 
         <p className="text-xs text-foreground/80 leading-relaxed">
-          {summary || `Primary healthcare directory for ${postcode || 'this property'}, combining operational patient-acceptance records with independent Care Quality Commission (CQC) inspection ratings.`}
+          {summary || `Primary healthcare directory for ${postcode || 'this property'}, using NHS and Care Quality Commission (CQC) records. Contact providers directly to confirm registration.`}
         </p>
 
         {/* 3-Column Responsive Metric Highlights */}
@@ -129,8 +127,8 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
               <span className="text-base font-bold text-foreground block">
                 {gpSurgeries.length} Identified
               </span>
-              <span className={`text-[11px] font-medium block truncate ${acceptingCount > 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-amber-600'}`}>
-                {acceptingCount > 0 ? `✓ ${acceptingCount} accepting new patients` : 'Consult practices directly'}
+              <span className="text-[11px] font-medium block truncate text-muted-foreground">
+                Check registration directly
               </span>
             </div>
           </div>
@@ -146,8 +144,8 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
               <span className="text-base font-bold text-foreground block">
                 {dentists.length} Nearby
               </span>
-              <span className={`text-[11px] font-medium block truncate ${nhsDentistCount > 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-muted-foreground'}`}>
-                {nhsDentistCount > 0 ? `✓ ${nhsDentistCount} taking NHS patients` : 'Private & referral active'}
+              <span className="text-[11px] font-medium block truncate text-muted-foreground">
+                Check NHS availability directly
               </span>
             </div>
           </div>
@@ -161,10 +159,10 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
                 Dispensing Pharmacy
               </span>
               <span className="text-base font-bold text-foreground block">
-                {pharmacies[0]?.distance || '< 1.0 mi'}
+                {pharmacies[0]?.distance || 'Not available'}
               </span>
               <span className="text-[11px] text-muted-foreground block truncate font-medium">
-                {pharmacies[0]?.name || 'Community Chemist'}
+                {pharmacies[0]?.name || 'No verified result'}
               </span>
             </div>
           </div>
@@ -247,38 +245,13 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
 
                   {/* Key Operational Statuses */}
                   <div className="pt-2 border-t border-border/50 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                    {/* Accepting Patients Pill */}
-                    <div className={`p-2.5 rounded-lg border ${
-                      gp.isAcceptingNewPatients 
-                        ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200/80 dark:border-emerald-900/60' 
-                        : 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/80 dark:border-amber-900/60'
-                    }`}>
+                    <div className="p-2.5 rounded-lg border bg-blue-50/70 dark:bg-blue-950/30 border-blue-200/80 dark:border-blue-900/60">
                       <div className="flex items-center gap-2">
-                        {gp.isAcceptingNewPatients ? (
-                          <>
-                            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] uppercase font-bold text-emerald-800 dark:text-emerald-300 block tracking-wider">
-                                Patient Registration
-                              </span>
-                              <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                                Currently Accepting New NHS Patients
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] uppercase font-bold text-amber-800 dark:text-amber-300 block tracking-wider">
-                                Patient Registration
-                              </span>
-                              <span className="font-bold text-amber-700 dark:text-amber-400">
-                                List Temporarily Closed / Capacity Reached
-                              </span>
-                            </div>
-                          </>
-                        )}
+                        <Info className="h-4 w-4 text-blue-600 shrink-0" />
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] uppercase font-bold text-blue-800 dark:text-blue-300 block tracking-wider">Patient Registration</span>
+                          <a href={gp.website || nhsServiceSearchUrl} target="_blank" rel="noreferrer" className="font-bold text-blue-700 dark:text-blue-400 hover:underline">Check the NHS profile or contact the practice</a>
+                        </div>
                       </div>
                     </div>
 
@@ -371,38 +344,13 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
                   </div>
 
                   <div className="pt-2 border-t border-border/50 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                    {/* NHS Acceptance Status */}
-                    <div className={`p-2.5 rounded-lg border ${
-                      dentist.isAcceptingNhsPatients 
-                        ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200/80 dark:border-emerald-900/60' 
-                        : 'bg-slate-50 dark:bg-slate-900/50 border-border/60'
-                    }`}>
+                    <div className="p-2.5 rounded-lg border bg-blue-50/70 dark:bg-blue-950/30 border-blue-200/80 dark:border-blue-900/60">
                       <div className="flex items-center gap-2">
-                        {dentist.isAcceptingNhsPatients ? (
-                          <>
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] uppercase font-bold text-emerald-800 dark:text-emerald-300 block tracking-wider">
-                                NHS Provision
-                              </span>
-                              <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                                Accepting New NHS Patients
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] uppercase font-bold text-muted-foreground block tracking-wider">
-                                NHS Provision
-                              </span>
-                              <span className="font-semibold text-amber-700 dark:text-amber-400">
-                                Private Only / Referral Required
-                              </span>
-                            </div>
-                          </>
-                        )}
+                        <Info className="h-4 w-4 text-blue-600 shrink-0" />
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] uppercase font-bold text-blue-800 dark:text-blue-300 block tracking-wider">NHS Provision</span>
+                          <a href={dentist.website || nhsServiceSearchUrl} target="_blank" rel="noreferrer" className="font-bold text-blue-700 dark:text-blue-400 hover:underline">Check current NHS availability</a>
+                        </div>
                       </div>
                     </div>
 
@@ -489,9 +437,12 @@ export function HealthcareDisplay({ data, postcode }: HealthcareDisplayProps) {
                     <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-border/50">
                       <div className="flex items-center gap-2">
                         <Clock className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                        <span className="font-semibold text-foreground">
-                          {pharmacy.openingHours || 'Mon-Fri: 09:00 - 18:00'}
-                        </span>
+                        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-medium text-foreground">
+                          {(pharmacy.openingHours ? pharmacy.openingHours.split('; ') : ['Hours not published']).map((entry) => {
+                            const [day, ...hours] = entry.split(' ');
+                            return <React.Fragment key={entry}><span className="font-bold">{day}</span><span>{hours.join(' ')}</span></React.Fragment>;
+                          })}
+                        </div>
                       </div>
                       {pharmacy.phone && (
                         <a 

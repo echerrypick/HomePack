@@ -118,7 +118,7 @@ export function PropertyMap({ propertyLocation, schools, address, heightClassNam
     let primaryCount = 0;
     let secondaryCount = 0;
 
-    return (schools || []).map((school, index) => {
+    return (schools || []).slice(0, 5).map((school, index) => {
       let lat = school.location?.lat;
       let lng = school.location?.lng;
 
@@ -130,7 +130,8 @@ export function PropertyMap({ propertyLocation, schools, address, heightClassNam
         typeof lng === 'number' && 
         !isNaN(lng) && 
         lng !== 0 &&
-        Math.abs(lat - propertyLocation.lat) < 0.25;
+        Math.abs(lat - propertyLocation.lat) < 0.04 &&
+        Math.abs(lng - propertyLocation.lng) < 0.06;
 
       if (!isValidCoord) {
         // Parse distance from string (e.g. "0.8 miles away" -> 0.8)

@@ -98,7 +98,7 @@ export function Header() {
                 size="sm" 
                 className="rounded-full px-4 h-9 text-xs font-semibold shadow-md shadow-primary/20 hover:shadow-primary/30 transition-all gap-1.5 mr-2"
               >
-                <Link to="/tool">
+                <Link to="/tool" state={{ startNewHomePack: true }}>
                   <span>New HomePack</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
@@ -279,7 +279,7 @@ export function Header() {
                     <DropdownMenuSeparator className="my-1" />
                     
                     <DropdownMenuItem render={
-                      <Link to="/tool" className="flex items-center gap-2.5 p-2 rounded-md hover:bg-muted cursor-pointer font-medium text-sm">
+                      <Link to="/tool" state={{ startNewHomePack: true }} className="flex items-center gap-2.5 p-2 rounded-md hover:bg-muted cursor-pointer font-medium text-sm">
                         <ArrowRight className="h-4 w-4 text-primary" />
                         <span>New HomePack</span>
                       </Link>
@@ -380,7 +380,7 @@ export function Header() {
           <div className="space-y-1">
             {user && (
               <Button asChild className="w-full justify-center rounded-full font-semibold shadow-md shadow-primary/20 gap-2 mb-2">
-                <Link to="/tool" onClick={() => setIsMenuOpen(false)}>
+                <Link to="/tool" state={{ startNewHomePack: true }} onClick={() => setIsMenuOpen(false)}>
                   <span>New HomePack</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -545,4 +545,3 @@ export function Header() {
     </header>
   );
 }
-

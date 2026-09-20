@@ -54,6 +54,47 @@ export function HomePackPdfTemplate({
   const healthcareData = healthcare || propertyData?.healthcare;
   const crimeData = crime || propertyData?.crime;
   const allPlanning = planningHistory || propertyData?.planningHistory || propertyData?.planning || [];
+  const allPlanningConstraints = propertyData?.planningConstraints || [];
+  const floodPlanningConstraint = allPlanningConstraints.find((constraint: any) => constraint?.dataset === 'flood-risk-zone');
+  const floodPlanningLabel = floodPlanningConstraint?.detail || floodPlanningConstraint?.name || '';
+  const hasPlanningFloodFlag = /zone\s*[23]|medium|high/i.test(String(floodPlanningLabel));
+  const epcRating = String(epc?.rating || '').trim().toUpperCase();
+  const epcDescription = epcRating === 'A'
+    ? 'excellent thermal efficiency'
+    : epcRating === 'B'
+      ? 'high thermal performance'
+      : epcRating === 'C'
+        ? 'good, broadly typical thermal efficiency'
+        : 'standard efficiency with improvement potential';
+  const builtForm = epc?.builtForm || epc?.propertyType || 'Not recorded';
+  const todaysPharmacyHours = (() => {
+    const hours = String(healthcareData?.pharmacies?.[0]?.openingHours || '');
+    const day = new Date().toLocaleDateString('en-GB', { weekday: 'short' });
+    return hours.split('; ').find((entry: string) => entry.startsWith(day)) || 'Today’s hours not published';
+  })();
+  const buyerName = (() => {
+    const candidate = String(profile?.displayName || '').trim();
+    const looksLikeUsername = /\d/.test(candidate) || (!candidate.includes(' ') && candidate.length > 16);
+    return candidate && !looksLikeUsername ? candidate : 'HomePack customer';
+  })();
+  const schoolsForPdf = React.useMemo(() => {
+    const schools = Array.isArray(propertyData?.schools) ? propertyData.schools : [];
+    const primary = schools.filter((school: any) => String(school?.type).toLowerCase().includes('primary')).slice(0, 3);
+    const secondary = schools.filter((school: any) => String(school?.type).toLowerCase().includes('secondary')).slice(0, 2);
+    return [...primary, ...secondary];
+  }, [propertyData?.schools]);
+  const formatDecision = (value: unknown) => {
+    const decision = String(value || 'Decision not recorded').trim();
+    if (/grant|approv/i.test(decision) && /condition/i.test(decision)) return 'Approved with conditions';
+    if (/grant|approv/i.test(decision)) return 'Approved';
+    if (/refus|reject/i.test(decision)) return 'Refused';
+    if (/pending|undecided|consultation|submitted/i.test(decision)) return 'Pending';
+    return decision.replace(/\b\w/g, char => char.toUpperCase());
+  };
+  const councilTaxAmount = (() => {
+    const amount = Number(String(councilTax?.annualAmount || '').replace(/[^0-9.]/g, ''));
+    return Number.isFinite(amount) && amount > 0 ? `£${amount.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : 'Check local authority';
+  })();
 
   // Calculate price per m² if both price and floor area exist
   const pricePerM2 = React.useMemo(() => {
@@ -123,7 +164,7 @@ export function HomePackPdfTemplate({
                 {isWhiteLabel ? (
                   <div className="pt-4 space-y-2 border-t" style={{ borderColor: brandAccent }}>
                     <p className="text-sm text-[#4a5568] font-medium">
-                      Prepared by <span className="font-bold" style={{ color: brandPrimary }}>{branding?.agentName || profile?.displayName || profile?.company || 'Certified Property Agent'}</span>
+                      Prepared by <span className="font-bold" style={{ color: brandPrimary }}>{branding?.agentName || profile?.displayName || profile?.company || 'Property Agent'}</span>
                     </p>
                     {branding?.agentBio && (
                       <p className="text-xs italic text-muted-foreground max-w-md mx-auto">{branding.agentBio}</p>
@@ -137,7 +178,7 @@ export function HomePackPdfTemplate({
                   </div>
                 ) : (
                   <div className="pt-4 space-y-1.5 border-t border-[#d1e3f8]">
-                    <p className="text-sm text-[#4a5568]">Prepared for <span className="font-semibold">{profile?.displayName || profile?.email || 'Homebuyer / Property Investor'}</span></p>
+                    <p className="text-sm text-[#4a5568]">Prepared for <span className="font-semibold">{buyerName}</span></p>
                     <p className="text-xs text-muted-foreground">Generated on {new Date().toLocaleDateString('en-GB')}</p>
                   </div>
                 )}
@@ -145,7 +186,7 @@ export function HomePackPdfTemplate({
               
               <div className="mt-8 max-w-md">
                 <p className="text-sm font-serif italic text-muted-foreground leading-relaxed">
-                  A comprehensive, data-backed due diligence report synthesizing official Land Registry records, EPC ratings, Environment Agency flood risk, local planning history, and community amenities.
+                  A comprehensive, data-backed due diligence report synthesising official Land Registry records, EPC ratings, Environment Agency flood risk, local planning history, and community amenities.
                 </p>
               </div>
             </div>
@@ -177,7 +218,7 @@ export function HomePackPdfTemplate({
                   { id: 5, title: 'Council Tax & Flood Risk Analysis', page: '07' },
                   { id: 6, title: 'Environmental Hazards & Planning History', page: '08' },
                   { id: 7, title: 'Police.uk Crime & Neighbourhood Safety Analysis', page: '09' },
-                  { id: 8, title: 'Broadband, Mobile & Advisory Sign-Off', page: '10' },
+                  { id: 8, title: 'Connectivity, Sources & Limitations', page: '10' },
                 ].map((item) => (
                   <div key={item.id} className="flex items-end gap-3 group">
                     <span className="text-[#2d4a77] font-bold w-6 text-sm">{item.id}.</span>
@@ -218,7 +259,7 @@ export function HomePackPdfTemplate({
                 <div className="space-y-2 text-xs leading-relaxed text-[#2d3748]">
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
-                    <span><strong>Energy Efficiency:</strong> Current EPC rating is <strong>{epc?.rating || 'B'}</strong> (potential to reach <strong>{epc?.potentialRating || 'A'}</strong>), indicating {epc?.rating === 'A' || epc?.rating === 'B' ? 'above-average thermal efficiency' : 'standard efficiency with improvement potential'}.</span>
+                    <span><strong>Energy Efficiency:</strong> Current EPC rating is <strong>{epc?.rating || 'Not recorded'}</strong> (potential to reach <strong>{epc?.potentialRating || 'Not recorded'}</strong>), indicating {epcDescription}.</span>
                   </p>
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
@@ -226,19 +267,19 @@ export function HomePackPdfTemplate({
                   </p>
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
-                    <span><strong>Flood Risk:</strong> Rivers & sea flooding risk is classified as <strong>{floodRisk?.riskOfFloodingFromRiversAndSea || 'Low'}</strong> with {floodRisk?.activeWarnings || 'no active warnings'}.</span>
+                    <span><strong>Flood:</strong> {hasPlanningFloodFlag ? <><strong>{floodPlanningLabel} (probability ignoring defences)</strong>; </> : null}Environment Agency defended rivers/sea rating: <strong>{floodRisk?.riskOfFloodingFromRiversAndSea || 'not returned'}</strong>. Current warning status: <strong>{String(floodRisk?.activeWarnings || 'no active warnings').toLowerCase()}</strong>.</span>
                   </p>
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
-                    <span><strong>Neighbourhood Safety:</strong> {crimeData?.benchmarks ? `Rated as a ${crimeData.benchmarks.safetyRating || 'Verified Profile'} (${crimeData.benchmarks.safetyScore ?? 80}/100 index) with ${crimeData.benchmarks.localAnnualRatePer1000 ?? crimeData.benchmarks.localAnnualRatePer1k ?? '54.2'} incidents/1,000 residents vs. ${crimeData.benchmarks.nationalRatePer1000 ?? crimeData.benchmarks.nationalAnnualRatePer1k ?? '85.5'}/1,000 nationally.` : 'Low local crime rate confirmed via official Police.uk street-level database with below-average incident frequency.'}</span>
+                    <span><strong>Neighbourhood Safety:</strong> {crimeData?.benchmarks ? `Rated as a ${crimeData.benchmarks.safetyRating || 'calculated profile'} (${crimeData.benchmarks.safetyScore ?? 'not scored'}/100 index) with ${crimeData.benchmarks.localAnnualRatePer1000 ?? crimeData.benchmarks.localAnnualRatePer1k ?? 'an unavailable rate'} incidents/1,000 residents vs. ${crimeData.benchmarks.nationalRatePer1000 ?? crimeData.benchmarks.nationalAnnualRatePer1k ?? 'an unavailable national rate'}/1,000 nationally.` : 'Police.uk comparison data was unavailable; no safety rating has been inferred.'}</span>
                   </p>
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
-                    <span><strong>Connectivity:</strong> {broadband?.superfastAvailable ? 'Superfast/Ultrafast broadband coverage is confirmed' : 'Broadband availability confirmed'}, supporting modern remote working requirements.</span>
+                    <span><strong>Connectivity:</strong> {broadband?.maxDownloadSpeed && !/unknown|not available/i.test(broadband.maxDownloadSpeed) ? `Ofcom lookup returned a maximum download speed of ${broadband.maxDownloadSpeed}` : 'Ofcom speed data was not available for this address; verify with providers'}, before relying on connectivity for remote working.</span>
                   </p>
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
-                    <span><strong>Healthcare Provision:</strong> {healthcareData?.gpSurgeries?.[0] ? `${healthcareData.gpSurgeries[0].name} (${healthcareData.gpSurgeries[0].distance}, CQC: ${healthcareData.gpSurgeries[0].cqcRating || 'Good'}) is ${healthcareData.gpSurgeries[0].isAcceptingNewPatients ? 'currently accepting new NHS patients' : 'operating at list capacity'}. Local NHS dental access within ${healthcareData.dentists?.[0]?.distance || 'immediate radius'}.` : 'Verified local primary care GP surgeries, dental practices, and community dispensing pharmacies within immediate catchment.'}</span>
+                    <span><strong>Healthcare Provision:</strong> {healthcareData?.gpSurgeries?.[0] ? `${healthcareData.gpSurgeries[0].name} (${healthcareData.gpSurgeries[0].distance || 'nearby'}, CQC: ${healthcareData.gpSurgeries[0].cqcRating || 'not rated'}). Registration status must be checked directly with the practice.` : 'Live provider details were unavailable. Use NHS Find a Service and confirm registration directly with providers.'}</span>
                   </p>
                 </div>
                 <div className="mt-3 pt-3 border-t border-[#d1e3f8] text-xs text-[#2d4a77]">
@@ -253,7 +294,7 @@ export function HomePackPdfTemplate({
                 </div>
                 <div className="p-4 border-b border-[#e2e8f0]">
                   <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Current EPC Rating</p>
-                  <p className="text-2xl font-serif font-bold text-[#2d4a77]">{epc?.rating || 'B'} <span className="text-xs text-muted-foreground font-sans font-normal">(Potential: {epc?.potentialRating || 'A'})</span></p>
+                  <p className="text-2xl font-serif font-bold text-[#2d4a77]">{epc?.rating || 'Not recorded'} <span className="text-xs text-muted-foreground font-sans font-normal">(Potential: {epc?.potentialRating || 'Not recorded'})</span></p>
                 </div>
                 <div className="p-4 border-r border-[#e2e8f0]">
                   <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Flood Risk Level</p>
@@ -276,7 +317,7 @@ export function HomePackPdfTemplate({
                   </div>
                   <div className="p-3 flex justify-between">
                     <span className="text-muted-foreground">Built Form:</span>
-                    <span className="font-semibold">{epc?.builtForm || 'Semi-detached / End-terrace'}</span>
+                    <span className="font-semibold">{builtForm}</span>
                   </div>
                   <div className="p-3 flex justify-between">
                     <span className="text-muted-foreground">Tenure:</span>
@@ -328,11 +369,11 @@ export function HomePackPdfTemplate({
               <div className="mb-3">
                 <h3 className="text-xs font-serif font-bold text-[#2d4a77] border-b pb-1 mb-2">Nearest Educational Institutions (Ofsted Rated)</h3>
                 <div className="space-y-1.5">
-                  {(propertyData.schools || []).slice(0, 3).map((school: any, idx: number) => (
+                  {schoolsForPdf.map((school: any, idx: number) => (
                     <div key={idx} className="p-2 bg-[#f0f7ff] rounded border border-[#d1e3f8] flex justify-between items-center text-xs">
                       <div className="min-w-0 pr-3">
                         <p className="font-bold text-[#2d4a77] truncate">{school.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{school.type} School • {formatSchoolDistance(school.distance)}</p>
+                        <p className="text-[10px] text-muted-foreground">{school.type} School • {formatSchoolDistance(school.distance)}{school.inspectionDate ? ` • inspected ${new Date(school.inspectionDate).toLocaleDateString('en-GB')}` : ' • inspection date not verified'}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Ofsted:</span>
@@ -350,6 +391,7 @@ export function HomePackPdfTemplate({
                   {(!propertyData.schools || propertyData.schools.length === 0) && (
                     <p className="text-xs text-muted-foreground italic py-1.5">No school data available for this location.</p>
                   )}
+                  <p className="text-[9px] text-muted-foreground">Source and data date: Ofsted status as returned at report generation; historic grades should be read with their inspection date.</p>
                 </div>
               </div>
 
@@ -357,9 +399,7 @@ export function HomePackPdfTemplate({
               <div className="mb-3">
                 <div className="flex items-center justify-between border-b pb-1 mb-2">
                   <h3 className="text-xs font-serif font-bold text-[#2d4a77]">NHS Primary Healthcare & CQC Inspection Ratings</h3>
-                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                    Verified CQC & NHS Registry
-                  </span>
+                  <span className="text-[9px] font-bold text-[#2d4a77]">NHS & CQC sources</span>
                 </div>
 
                 {/* 3 Core Highlights (GP, Dentist, Pharmacy) */}
@@ -368,41 +408,37 @@ export function HomePackPdfTemplate({
                   <div className="p-2 bg-[#f8fafc] border border-[#cbd5e1] rounded">
                     <p className="text-[10px] font-bold text-[#1e3a8a] uppercase tracking-wider">Nearest GP Practice</p>
                     <p className="font-bold text-[#2d4a77] truncate mt-0.5 text-xs">
-                      {healthcareData?.gpSurgeries?.[0]?.name || 'Local GP Surgery'}
+                      {healthcareData?.gpSurgeries?.[0]?.name || 'Live result unavailable'}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {healthcareData?.gpSurgeries?.[0]?.distance || 'Nearby'} • CQC: <strong className="text-foreground">{healthcareData?.gpSurgeries?.[0]?.cqcRating || 'Good'}</strong>
+                      {healthcareData?.gpSurgeries?.[0]?.distance || 'Use NHS Find a GP'} • CQC: <strong className="text-foreground">{healthcareData?.gpSurgeries?.[0]?.cqcRating || 'Not checked'}</strong>
                     </p>
-                    <p className="text-[10px] text-emerald-700 font-bold mt-1">
-                      {healthcareData?.gpSurgeries?.[0]?.isAcceptingNewPatients ? '✓ Accepting NHS Patients' : 'List Closed / Inquire'}
-                    </p>
+                    <p className="text-[10px] text-[#2d4a77] font-bold mt-1">Check registration with practice</p>
                   </div>
 
                   {/* Dentist Box */}
                   <div className="p-2 bg-[#f8fafc] border border-[#cbd5e1] rounded">
                     <p className="text-[10px] font-bold text-[#1e3a8a] uppercase tracking-wider">NHS Dental Surgery</p>
                     <p className="font-bold text-[#2d4a77] truncate mt-0.5 text-xs">
-                      {healthcareData?.dentists?.[0]?.name || 'Dental Practice'}
+                      {healthcareData?.dentists?.[0]?.name || 'Live result unavailable'}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {healthcareData?.dentists?.[0]?.distance || 'Nearby'} • CQC Regulated
+                      {healthcareData?.dentists?.[0]?.distance || 'Use NHS Find a Dentist'}
                     </p>
-                    <p className="text-[10px] text-emerald-700 font-bold mt-1">
-                      {healthcareData?.dentists?.[0]?.isAcceptingNhsPatients ? '✓ NHS Patients Accepted' : 'Private / Referral'}
-                    </p>
+                    <p className="text-[10px] text-[#2d4a77] font-bold mt-1">Check NHS availability directly</p>
                   </div>
 
                   {/* Pharmacy Box */}
                   <div className="p-2 bg-[#f8fafc] border border-[#cbd5e1] rounded">
                     <p className="text-[10px] font-bold text-[#1e3a8a] uppercase tracking-wider">Dispensing Pharmacy</p>
                     <p className="font-bold text-[#2d4a77] truncate mt-0.5 text-xs">
-                      {healthcareData?.pharmacies?.[0]?.name || 'Local Chemist'}
+                      {healthcareData?.pharmacies?.[0]?.name || 'Live result unavailable'}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {healthcareData?.pharmacies?.[0]?.distance || '< 1 mi'} • {healthcareData?.pharmacies?.[0]?.openingHours || 'Mon-Fri'}
+                      {healthcareData?.pharmacies?.[0]?.distance || 'Use NHS Find a Pharmacy'} — {todaysPharmacyHours}
                     </p>
                     <p className="text-[10px] text-[#2d4a77] font-semibold mt-1">
-                      {healthcareData?.pharmacies?.[0]?.phone || 'NHS Pharmacy First'}
+                      {healthcareData?.pharmacies?.[0]?.phone || 'Check NHS service profile'}
                     </p>
                   </div>
                 </div>
@@ -412,7 +448,7 @@ export function HomePackPdfTemplate({
                   <div className="border border-[#e2e8f0] rounded overflow-hidden text-[11px] mb-2">
                     <div className="bg-[#f8fafc] px-2.5 py-1 font-semibold text-[#2d4a77] border-b border-[#e2e8f0] flex justify-between text-[10px]">
                       <span>Additional Catchment GP Surgeries</span>
-                      <span className="text-muted-foreground">Patient Acceptance Status</span>
+                      <span className="text-muted-foreground">Directory details</span>
                     </div>
                     <div className="divide-y divide-[#e2e8f0]">
                       {healthcareData.gpSurgeries.slice(1, 3).map((gp: any, idx: number) => (
@@ -422,11 +458,9 @@ export function HomePackPdfTemplate({
                             <span className="text-muted-foreground ml-1">({gp.distance}) • {gp.address}</span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="px-1 py-0.2 rounded bg-blue-50 text-blue-700 text-[9px] font-semibold border border-blue-200">
-                              CQC: {gp.cqcRating || 'Good'}
-                            </span>
-                            <span className={`text-[9px] font-bold ${gp.isAcceptingNewPatients ? 'text-emerald-700' : 'text-amber-700'}`}>
-                              {gp.isAcceptingNewPatients ? '✓ Accepting' : 'Waitlist'}
+                            <span className="text-blue-700 text-[9px] font-semibold">CQC: {gp.cqcRating || 'Not matched'}</span>
+                            <span className="text-[9px] font-bold text-[#2d4a77]">
+                              Check registration
                             </span>
                           </div>
                         </div>
@@ -539,19 +573,19 @@ export function HomePackPdfTemplate({
                 <div className="p-5 bg-[#f0fdf4] border-r border-[#e2e8f0]">
                   <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1">Current Energy Rating</p>
                   <div className="flex items-baseline gap-2">
-                    <p className="text-5xl font-serif font-bold text-emerald-700">{epc?.rating || 'B'}</p>
+                    <p className="text-5xl font-serif font-bold text-emerald-700">{epc?.rating || '-'}</p>
                     {epc?.currentEnergyEfficiency && (
                       <span className="text-sm font-bold text-emerald-800">
                         Score: {epc.currentEnergyEfficiency}/100
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#065f46] font-medium mt-1">High thermal performance & lower carbon footprint</p>
+                  <p className="text-xs text-[#065f46] font-medium mt-1">{epcDescription}</p>
                 </div>
                 <div className="p-5 bg-[#f0f7ff]">
                   <p className="text-[10px] font-bold text-[#2d4a77] uppercase tracking-wider mb-1">Potential Energy Rating</p>
                   <div className="flex items-baseline gap-2">
-                    <p className="text-5xl font-serif font-bold text-[#2d4a77]">{epc?.potentialRating || 'A'}</p>
+                    <p className="text-5xl font-serif font-bold text-[#2d4a77]">{epc?.potentialRating || '-'}</p>
                     {epc?.potentialEnergyEfficiency && (
                       <span className="text-sm font-bold text-[#2d4a77]">
                         Score: {epc.potentialEnergyEfficiency}/100
@@ -565,44 +599,48 @@ export function HomePackPdfTemplate({
               <div className="border border-[#e2e8f0] mb-4">
                 <div className="grid grid-cols-3 text-xs">
                   <div className="p-2.5 border-r border-b border-[#e2e8f0] text-muted-foreground">Property type</div>
-                  <div className="p-2.5 border-r border-b border-[#e2e8f0] font-bold">{epc?.propertyType || 'House'}</div>
-                  <div className="p-2.5 border-b border-[#e2e8f0] font-medium">{epc?.builtForm || 'Semi-detached'}</div>
+                  <div className="p-2.5 border-r border-b border-[#e2e8f0] font-bold">{epc?.propertyType || 'Not recorded'}</div>
+                  <div className="p-2.5 border-b border-[#e2e8f0] font-medium">{builtForm}</div>
                   
                   <div className="p-2.5 border-r border-[#e2e8f0] text-muted-foreground">Total floor area</div>
-                  <div className="p-2.5 border-r border-[#e2e8f0] font-bold">{epc?.totalFloorArea ? `${epc.totalFloorArea} m²` : '63.0 m²'}</div>
+                  <div className="p-2.5 border-r border-[#e2e8f0] font-bold">{epc?.totalFloorArea ? `${epc.totalFloorArea} m²` : 'Not recorded'}</div>
                   <div className="p-2.5 text-muted-foreground italic">Official EPC internal area</div>
                 </div>
+              </div>
+
+              <div className="p-3 bg-[#f8fafc] border border-[#e2e8f0] text-[10px] text-[#4a5568] mb-4">
+                <strong>EPC verification:</strong> {epc?.address1 || `${address.houseNumber} ${address.street}`}, {epc?.postcode || address.postcode} • Certificate: {epc?.lmkKey || 'not recorded'} • Lodged: {epc?.lodgementDate ? new Date(epc.lodgementDate).toLocaleDateString('en-GB') : 'not recorded'}. Cost figures use the certificate's assessment-date prices and are not current tariffs.
               </div>
 
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Building fabric specifications & energy costs</h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
                 <div className="grid grid-cols-3 p-2">
                   <span className="text-muted-foreground font-medium">Main heating</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.mainHeatDescription, 'Boiler and radiators, mains gas')}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.mainHeatDescription, 'Not recorded')}</span>
                 </div>
                 <div className="grid grid-cols-3 p-2">
                   <span className="text-muted-foreground font-medium">Walls & insulation</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.wallsDescription, 'Cavity wall, standard insulation')}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.wallsDescription, 'Not recorded')}</span>
                 </div>
                 <div className="grid grid-cols-3 p-2">
                   <span className="text-muted-foreground font-medium">Roof & insulation</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.roofDescription, 'Pitched, standard loft insulation')}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.roofDescription, 'Not recorded')}</span>
                 </div>
                 <div className="grid grid-cols-3 p-2">
                   <span className="text-muted-foreground font-medium">Windows & glazing</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.windowsDescription, 'High performance double glazing')}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.windowsDescription, 'Not recorded')}</span>
                 </div>
                 <div className="grid grid-cols-3 p-2">
                   <span className="text-muted-foreground font-medium">Hot water system</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.hotwaterDescription, 'From main system')}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(epc?.hotwaterDescription, 'Not recorded')}</span>
                 </div>
                 <div className="grid grid-cols-3 p-2">
-                  <span className="text-muted-foreground font-medium">Estimated annual heating</span>
-                  <span className="col-span-2 font-bold text-emerald-700">{formatAnnualCost(epc?.heatingCostCurrent, '£195 / year')}</span>
+                  <span className="text-muted-foreground font-medium">Heating estimate at assessment date</span>
+                  <span className="col-span-2 font-bold text-emerald-700">{formatAnnualCost(epc?.heatingCostCurrent, 'Not recorded')}</span>
                 </div>
                 <div className="grid grid-cols-3 p-2">
                   <span className="text-muted-foreground font-medium">Projected CO2 emissions</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{formatCo2Tonnes(epc?.co2EmissionsCurrent, '1.0 tonnes / year')}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{formatCo2Tonnes(epc?.co2EmissionsCurrent, 'Not recorded')}</span>
                 </div>
               </div>
 
@@ -640,7 +678,7 @@ export function HomePackPdfTemplate({
                   <div className="p-3">
                     <p className="text-muted-foreground mb-1">Est. Annual Charge</p>
                     <p className="text-base font-bold text-[#2d4a77]">
-                      {councilTax?.annualAmount ? `£${String(councilTax.annualAmount).replace(/[^0-9.]/g, '')}` : '£1,850 - £2,200'}
+                      {councilTaxAmount}
                     </p>
                   </div>
                   <div className="p-3">
@@ -649,10 +687,11 @@ export function HomePackPdfTemplate({
                   </div>
                   <div className="p-3">
                     <p className="text-muted-foreground mb-1">Charging Period</p>
-                    <p className="font-semibold">{councilTax?.year || '2024 / 2025'}</p>
+                    <p className="font-semibold">{councilTax?.year || 'Current year - verify with council'}</p>
                   </div>
                 </div>
               </div>
+              <p className="text-[9px] text-muted-foreground mb-3">Source and data date: {councilTax?.source || `VOA band and ${councilTax?.authority || 'local authority'} charges`} ({councilTax?.year || 'year not recorded'}).</p>
 
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Multi-source flood risk assessment</h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
@@ -666,9 +705,16 @@ export function HomePackPdfTemplate({
                 </div>
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Groundwater & Reservoirs</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{floodRisk?.riskOfFloodingFromGroundwater || 'Negligible Risk'}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{floodRisk?.riskOfFloodingFromGroundwater || 'Not assessed by this source'} • {floodRisk?.riskOfFloodingFromReservoirs || 'Check Environment Agency map'}</span>
                 </div>
               </div>
+
+              {hasPlanningFloodFlag && (
+                <div className="p-3 mb-4 bg-amber-50 border border-amber-300 text-[10px] leading-relaxed text-amber-950">
+                  <strong>Planning flood flag: {floodPlanningLabel}.</strong> The Flood Map for Planning generally shows probability without taking flood defences into account. A live-warning status or separate defended-risk assessment can therefore differ; neither should be used to dismiss the planning flag.
+                </div>
+              )}
+              <p className="text-[9px] text-muted-foreground mb-3">Source and data date: Environment Agency live warnings and Planning Data constraints, checked {new Date().toLocaleDateString('en-GB')}.</p>
 
               <div className="p-3.5 bg-[#f0fdf4] border border-[#bbf7d0] rounded text-xs text-emerald-800 mb-5">
                 <p className="font-bold mb-0.5">Active Flood Status</p>
@@ -703,43 +749,61 @@ export function HomePackPdfTemplate({
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-5">
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Radon Gas Risk</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{radonRisk?.riskLevel || 'Low (< 1% of homes estimated at or above action level)'}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{radonRisk?.riskLevel || 'Unknown - check ukradon.org'}</span>
                 </div>
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Coal Mining Reporting Area</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{coalMining?.isReportingArea ? 'Within designated coal mining reporting boundary' : 'Outside designated coal mining reporting area'}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{coalMining?.isReportingArea ? 'Within designated coal mining reporting boundary' : coalMining?.description && !/not assessed|unavailable/i.test(coalMining.description) ? 'Outside designated coal mining reporting area' : 'Not assessed by an official property-level source'}</span>
                 </div>
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Natural Ground Stability</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(propertyData.groundStability, 'Standard natural ground stability / low hazard')}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(propertyData.groundStability, 'Not assessed - obtain a licensed ground stability search if required')}</span>
                 </div>
               </div>
 
-              <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Local authority planning applications</h3>
+              <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Planning constraints at this location</h3>
+              <div className="border border-[#fde68a] bg-[#fffbeb] rounded-sm divide-y divide-[#fde68a] text-xs mb-4">
+                {allPlanningConstraints.slice(0, 3).map((constraint: any, i: number) => (
+                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 p-2.5 items-start">
+                    <div className="min-w-0">
+                      <p className="font-bold text-[#92400e] capitalize">{String(constraint.dataset || 'Planning constraint').replace(/-/g, ' ')}</p>
+                      <p className="text-[10px] text-[#4a5568] break-words">{constraint.detail || constraint.name || 'Recorded constraint'}</p>
+                    </div>
+                    <span className="text-[9px] text-[#78716c]">Ref: {constraint.reference || 'N/A'}</span>
+                  </div>
+                ))}
+                {allPlanningConstraints.length === 0 && (
+                  <div className="p-3 text-[10px] text-[#4a5568]">
+                    No intersecting records were returned by the selected Planning Data datasets. This does not confirm that the property is constraint-free.
+                  </div>
+                )}
+              </div>
+
+              <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Nearby and property-linked planning applications</h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
-                {allPlanning.slice(0, 4).map((p: any, i: number) => {
+                {allPlanning.slice(0, 3).map((p: any, i: number) => {
                   const title = p.application || p.proposal || p.description || 'Planning Application';
-                  const decision = p.decision || p.status || 'Decided';
+                  const decision = formatDecision(p.decision || p.status);
                   const ref = p.reference || p.ref || 'Recorded';
                   const date = p.date || p.decisionDate || 'On file';
                   return (
-                    <div key={i} className="p-3">
+                    <div key={i} className="p-2.5">
                       <div className="flex justify-between items-start mb-1">
-                        <span className="font-bold text-[#2d4a77] truncate pr-2">{title}</span>
+                        <span className="font-bold text-[#2d4a77] leading-tight line-clamp-2 pr-2">{title}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-[#f0f7ff] text-[#2d4a77] shrink-0">{decision}</span>
                       </div>
                       <div className="flex justify-between text-muted-foreground text-[11px]">
-                        <span>Ref: {ref}</span>
-                        <span>Date: {date}</span>
+                        <span>Ref: {ref}{p.distanceKm !== undefined ? ` - ${(Number(p.distanceKm) * 0.621371).toFixed(1)} miles away` : ''}</span>
+                        <span>{date}</span>
                       </div>
                     </div>
                   );
                 })}
                 {allPlanning.length === 0 && (
                   <div className="p-4 text-center">
-                    <p className="text-xs font-semibold text-[#2d4a77] mb-1">✓ No Adverse Planning Notices or Statutory Enforcement</p>
+                    <p className="text-xs font-semibold text-[#2d4a77] mb-1">No applications returned by the available sources</p>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      No contentious planning applications or restrictive notices recorded on the local authority statutory register for this dwelling. Standard permitted development rights apply.
+                      This does not confirm that no planning activity exists; local register coverage can vary.
                     </p>
                   </div>
                 )}
@@ -748,6 +812,7 @@ export function HomePackPdfTemplate({
               <div className="p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded text-xs text-[#4a5568]">
                 <span className="font-semibold">Planning Advice:</span> Alterations, single-storey extensions, and changes of use remain subject to local planning policies, permitted development limits, and conservation area restrictions.
               </div>
+              <p className="text-[9px] text-muted-foreground mt-2">Source and data date: Planning Data constraints and PlanIt/local-authority applications, checked {new Date().toLocaleDateString('en-GB')}.</p>
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
@@ -832,7 +897,7 @@ export function HomePackPdfTemplate({
                       <th className="py-1.5 px-3 font-bold text-center">12M Incidents</th>
                       <th className="py-1.5 px-3 font-bold text-center">% of Local Crime</th>
                       <th className="py-1.5 px-3 font-bold text-center">Monthly Avg</th>
-                      <th className="py-1.5 px-3 font-bold text-right">Risk Evaluation</th>
+                      <th className="py-1.5 px-3 font-bold text-right">Rate vs national</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#e2e8f0] text-[11px]">
@@ -840,41 +905,28 @@ export function HomePackPdfTemplate({
                       { 
                         name: 'Burglary (Residential & Commercial)', 
                         detail: crimeData?.keyCategories?.burglary,
-                        defaultCount: 8,
-                        defaultPct: 4.8,
-                        defaultAvg: 0.7,
-                        defaultRisk: 'Low'
+                        defaultCount: '—', defaultPct: '—', defaultAvg: '—'
                       },
                       { 
                         name: 'Vehicle Crime (Theft of/from Vehicle)', 
                         detail: crimeData?.keyCategories?.vehicleCrime,
-                        defaultCount: 14,
-                        defaultPct: 8.4,
-                        defaultAvg: 1.2,
-                        defaultRisk: 'Low'
+                        defaultCount: '—', defaultPct: '—', defaultAvg: '—'
                       },
                       { 
                         name: 'Anti-Social Behaviour (ASB)', 
                         detail: crimeData?.keyCategories?.asb || crimeData?.keyCategories?.antiSocialBehaviour,
-                        defaultCount: 42,
-                        defaultPct: 25.1,
-                        defaultAvg: 3.5,
-                        defaultRisk: 'Moderate'
+                        defaultCount: '—', defaultPct: '—', defaultAvg: '—'
                       },
                       { 
                         name: 'Violence & Sexual Offences', 
                         detail: crimeData?.keyCategories?.violentCrime,
-                        defaultCount: 52,
-                        defaultPct: 31.1,
-                        defaultAvg: 4.3,
-                        defaultRisk: 'Moderate'
+                        defaultCount: '—', defaultPct: '—', defaultAvg: '—'
                       },
                     ].map((row, idx) => {
                       const count = row.detail?.count ?? row.defaultCount;
                       const pct = row.detail?.percentage ?? row.defaultPct;
                       const avg = row.detail?.monthlyAvg ?? row.detail?.monthlyAverage ?? row.defaultAvg;
-                      const risk = row.detail?.riskLevel ?? row.defaultRisk;
-                      const riskColor = risk === 'Low' ? 'text-emerald-700 bg-emerald-50' : risk === 'Moderate' ? 'text-blue-700 bg-blue-50' : 'text-amber-700 bg-amber-50';
+                      const comparison = row.detail?.status ? `${row.detail.status} (${row.detail.ratePer1000}/1k)` : 'Not calculated';
                       return (
                         <tr key={idx} className="hover:bg-[#fcfdfe]">
                           <td className="py-1.5 px-3 font-medium text-[#2d4a77]">{row.name}</td>
@@ -882,9 +934,7 @@ export function HomePackPdfTemplate({
                           <td className="py-1.5 px-3 text-center text-muted-foreground">{pct}%</td>
                           <td className="py-1.5 px-3 text-center text-muted-foreground">{avg}/mo</td>
                           <td className="py-1.5 px-3 text-right">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${riskColor}`}>
-                              {risk}
-                            </span>
+                            <span className="inline-block px-2 py-0.5 text-[10px] font-bold text-[#334155] border border-[#94a3b8] bg-white">{comparison}</span>
                           </td>
                         </tr>
                       );
@@ -901,16 +951,24 @@ export function HomePackPdfTemplate({
                   </h3>
                   <div className="flex items-center gap-2 text-[10px]">
                     <span className="text-muted-foreground">Overall 12M Trajectory:</span>
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                      {crimeData?.benchmarks?.vsNationalComparison ? `${crimeData.benchmarks.vsNationalComparison.toUpperCase()} CRIME TREND` : 'STABLE'}
-                    </span>
+                    <span className="font-bold text-[#334155]">{(() => {
+                      const months = (crimeData?.monthlyTrends || []).filter((month: any) => month.isPublished !== false);
+                      if (months.length < 8) return 'INSUFFICIENT DATA';
+                      const midpoint = Math.floor(months.length / 2);
+                      const average = (items: any[]) => items.reduce((sum, item) => sum + Number(item.totalCrimes || 0), 0) / Math.max(items.length, 1);
+                      const previous = average(months.slice(0, midpoint));
+                      const recent = average(months.slice(midpoint));
+                      const change = previous ? ((recent - previous) / previous) * 100 : 0;
+                      return change <= -10 ? 'DECREASING' : change >= 10 ? 'INCREASING' : 'BROADLY STABLE';
+                    })()}</span>
                   </div>
                 </div>
 
                 {/* Trend bars */}
                 {(() => {
                   const trendsList = crimeData?.monthlyTrends || crimeData?.trends || [];
-                  const maxVal = Math.max(...trendsList.map((item: any) => item.count || 0), 20);
+                  const trendCount = (item: any) => Number(item.totalCrimes ?? item.count ?? 0);
+                  const maxVal = Math.max(...trendsList.map(trendCount), 20);
                   return (
                     <div className="h-28 flex items-end justify-between gap-1.5 pt-4 pb-1 border-b border-[#e2e8f0]">
                       {(trendsList.length > 0 ? trendsList : [
@@ -927,23 +985,29 @@ export function HomePackPdfTemplate({
                         { month: 'Nov', count: 10 },
                         { month: 'Dec', count: 9 },
                       ]).map((t: any, i: number) => {
-                        const cnt = typeof t.count === 'number' ? t.count : 0;
-                        const heightPercent = Math.min(100, Math.max(12, Math.round((cnt / maxVal) * 100)));
+                        const cnt = trendCount(t);
+                        const isPublished = t.isPublished !== false;
+                        const heightPercent = isPublished ? Math.min(100, Math.max(12, Math.round((cnt / maxVal) * 100))) : 8;
                         const isLast = i === (trendsList.length > 0 ? trendsList.length - 1 : 11);
-                        const label = t.monthLabel ? t.monthLabel.slice(0, 3) : (typeof t.month === 'string' ? (t.month.includes('-') ? t.month.slice(5) : t.month.slice(0, 3)) : `M${i+1}`);
+                        const rawLabel = t.displayMonth || t.monthLabel || t.date || t.month;
+                        const label = typeof rawLabel === 'string'
+                          ? (/^\d{4}-\d{2}$/.test(rawLabel)
+                            ? new Date(`${rawLabel}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
+                            : rawLabel.slice(0, 3))
+                          : `M${i + 1}`;
                         return (
                           <div key={i} className="flex-1 flex flex-col items-center h-full justify-end group">
-                            <span className="text-[9px] font-bold text-[#2d4a77] mb-1">{cnt}</span>
+                            <span className="text-[9px] font-bold text-[#2d4a77] mb-1">{isPublished ? cnt : 'N/P'}</span>
                             <div 
                               className="w-full rounded-t-sm"
                               style={{ 
                                 height: `${heightPercent}%`, 
-                                backgroundColor: isLast ? '#2563eb' : '#2d4a77',
+                                backgroundColor: !isPublished ? '#cbd5e1' : isLast ? '#2563eb' : '#2d4a77',
                                 minHeight: '8px'
                               }}
                             />
                             <span className="text-[8px] font-medium text-muted-foreground mt-1 truncate">
-                              {label}
+                              {isPublished ? label : `${label}*`}
                             </span>
                           </div>
                         );
@@ -953,7 +1017,7 @@ export function HomePackPdfTemplate({
                 })()}
                 <div className="flex justify-between items-center text-[9px] text-muted-foreground pt-1.5">
                   <span>← 12 months ago</span>
-                  <span>Average: {crimeData?.monthlyAverage || '12.4'} crimes/month in ~1-mile radius</span>
+                  <span>Average: {crimeData?.monthlyAverage ?? 'N/A'} crimes per published month in ~1-mile radius (* not published)</span>
                   <span>Most recent recorded month →</span>
                 </div>
               </div>
@@ -964,23 +1028,28 @@ export function HomePackPdfTemplate({
                   <h4 className="text-[11px] font-bold text-[#2d4a77] uppercase mb-1.5">Recent Local Street Incidents</h4>
                   <div className="space-y-1.5 text-[10px]">
                     {(crimeData?.recentIncidents || []).slice(0, 3).map((inc: any, idx: number) => {
-                      const category = inc.categoryLabel || inc.category || 'Incident';
+                      const category = String(inc.categoryLabel || inc.category || 'Incident');
                       const streetRaw = inc.streetName || (typeof inc.location === 'string' ? inc.location : (inc.location?.street?.name || 'Local Street'));
                       const cleanStreet = String(streetRaw).replace(/^On or near\s+/i, '');
-                      const outcome = inc.outcomeStatus || inc.outcome || 'Recorded';
+                      const outcome = String(inc.outcomeStatus || inc.outcome || 'Recorded');
+                      const incidentMonthRaw = String(inc.month || crimeData?.latestMonth || 'Date unavailable');
+                      const incidentMonth = /^\d{4}-\d{2}$/.test(incidentMonthRaw)
+                        ? new Date(`${incidentMonthRaw}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+                        : incidentMonthRaw;
                       return (
-                        <div key={idx} className="flex justify-between items-center py-0.5 border-b border-[#f1f5f9] last:border-none">
-                          <span className="font-medium text-[#0f172a] truncate max-w-[170px]" title={cleanStreet}>
-                            {category} ({cleanStreet})
-                          </span>
-                          <span className="text-[9px] text-muted-foreground shrink-0 ml-1 truncate max-w-[120px]" title={outcome}>
-                            {outcome.slice(0, 20)}
-                          </span>
+                        <div key={idx} className="py-1 border-b border-[#f1f5f9] last:border-none">
+                          <div className="font-medium leading-tight text-[#0f172a] break-words" title={cleanStreet}>
+                            {category} ({cleanStreet}{inc.distanceMiles !== undefined ? `, ${Number(inc.distanceMiles).toFixed(1)} miles away` : ''})
+                          </div>
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-start mt-0.5 text-[9px] leading-tight">
+                            <span className="min-w-0 text-muted-foreground break-words" title={outcome}>{outcome}</span>
+                            <span className="shrink-0 font-semibold text-[#2d4a77]">{incidentMonth}</span>
+                          </div>
                         </div>
                       );
                     })}
                     {(!crimeData?.recentIncidents || crimeData.recentIncidents.length === 0) && (
-                      <p className="text-muted-foreground text-[10px] italic">No high-severity street crimes recorded in immediate vicinity during latest reporting cycle.</p>
+                      <p className="text-muted-foreground text-[10px] italic">No street-level incident samples were returned for the latest reporting month. The category totals above still include all incidents returned across the 12-month period.</p>
                     )}
                   </div>
                 </div>
@@ -990,10 +1059,11 @@ export function HomePackPdfTemplate({
                     <span>🛡️</span> Homebuyer Security & Insurance Note
                   </h4>
                   <p>
-                    Standard residential buildings & contents insurance policies require British Standard <strong>BS3621</strong> mortice deadlocks on external timber doors and multi-point locking systems on uPVC doors. Active neighbourhood watch schemes and certified intruder alarms can qualify properties for additional premium discounts.
+                    Insurers may ask about British Standard <strong>BS3621</strong> mortice deadlocks on external timber doors and multi-point locking systems on uPVC doors. Check the chosen policy's security conditions and any discounts directly with the insurer.
                   </p>
                 </div>
               </div>
+              <p className="text-[9px] text-muted-foreground mt-2">Source and data date: Police.uk, {crimeData?.earliestMonth || 'start date unavailable'} to {crimeData?.latestMonth || 'latest published month unavailable'}; unpublished months excluded from the average.</p>
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
@@ -1009,24 +1079,24 @@ export function HomePackPdfTemplate({
             style={{ width: '794px', height: '1123px', minHeight: '1123px', maxHeight: '1123px', boxSizing: 'border-box', overflow: 'hidden' }}
           >
             <div>
-              <h2 className="text-2xl font-serif font-bold text-[#2d4a77] mb-1">8. Digital Connectivity & Property Sign-Off</h2>
+              <h2 className="text-2xl font-serif font-bold text-[#2d4a77] mb-1">8. Connectivity, Sources & Limitations</h2>
               <p className="text-muted-foreground mb-4 text-xs">
-                Broadband speed capabilities from Ofcom data, mobile coverage across 4 major UK networks, and professional due diligence sign-off.
+                Broadband speed capabilities from Ofcom data, mobile coverage across 4 major UK networks, and source and limitation notes.
               </p>
 
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Broadband availability & performance (Ofcom)</h3>
               <div className="grid grid-cols-3 gap-2.5 mb-4 text-center">
                 <div className="p-3 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Max Download</p>
-                  <p className="text-base font-bold text-[#2d4a77]">{broadband?.maxDownloadSpeed || '1,000 Mbps'}</p>
+                  <p className="text-base font-bold text-[#2d4a77]">{broadband?.maxDownloadSpeed || 'Not available'}</p>
                 </div>
                 <div className="p-3 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Max Upload</p>
-                  <p className="text-base font-bold text-[#2d4a77]">{broadband?.maxUploadSpeed || '220 Mbps'}</p>
+                  <p className="text-base font-bold text-[#2d4a77]">{broadband?.maxUploadSpeed || 'Not available'}</p>
                 </div>
                 <div className="p-3 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Network Tier</p>
-                  <p className="text-xs font-bold text-emerald-700 mt-1">{broadband?.superfastAvailable ? 'Ultrafast Fibre (FTTP)' : 'Standard Superfast'}</p>
+                  <p className="text-xs font-bold text-emerald-700 mt-1">{broadband?.ultrafastAvailable ? 'Ultrafast (300+ Mbps)' : broadband?.superfastAvailable ? 'Superfast (30+ Mbps)' : broadband?.standardAvailable ? 'Standard broadband' : 'Not verified'}</p>
                 </div>
               </div>
 
@@ -1038,11 +1108,11 @@ export function HomePackPdfTemplate({
                     <div key={i} className="p-2.5 border border-[#e2e8f0] rounded-sm flex justify-between items-center text-xs">
                       <div className="flex-grow pr-3">
                         <p className="font-bold text-[#2d4a77]">{m.operator}</p>
-                        <p className="text-[11px] text-muted-foreground">Voice: {m.voice} • Data: {m.data || m.data4g || '4G Available'}</p>
+                        <p className="text-[11px] text-muted-foreground">Voice: {m.voice || m.overall || 'Check operator'} - Data: {m.data || m.data4g || m.overall || 'Check operator'}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold text-white ${isFiveGGood ? 'bg-emerald-600' : 'bg-slate-400'}`}>
-                          5G: {m.fiveG || 'Limited'}
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold text-white ${isFiveGGood ? 'bg-emerald-600' : 'bg-slate-500'}`}>
+                          {m.fiveG ? `5G: ${m.fiveG}` : (m.overall || 'Ofcom prediction')}
                         </span>
                       </div>
                     </div>
@@ -1053,12 +1123,13 @@ export function HomePackPdfTemplate({
                     {['EE', 'Vodafone', 'Three', 'O2'].map((op) => (
                       <div key={op} className="p-2 border border-[#e2e8f0] rounded text-center text-xs">
                         <p className="font-bold text-[#2d4a77]">{op}</p>
-                        <p className="text-[10px] text-emerald-600 font-semibold">4G / 5G Good</p>
+                        <p className="text-[10px] text-muted-foreground font-semibold">Coverage not verified</p>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
+              <p className="text-[9px] text-muted-foreground">Source and data date: Ofcom address checker and operator-specific mobile checker, checked {new Date().toLocaleDateString('en-GB')}. Missing values are shown as unavailable rather than estimated.</p>
 
               {conditionReport && (
                 <div className="mb-4">
@@ -1073,7 +1144,7 @@ export function HomePackPdfTemplate({
             <div>
               {isWhiteLabel ? (
                 <div className="py-3 px-6 rounded-sm border text-center mb-2" style={{ backgroundColor: '#f8fafc', borderColor: brandAccent, borderTop: `3px solid ${brandPrimary}` }}>
-                  <h3 className="text-base font-serif font-bold mb-0.5" style={{ color: brandPrimary }}>{branding?.agentName || profile?.company || 'Certified Property Agent'}</h3>
+                  <h3 className="text-base font-serif font-bold mb-0.5" style={{ color: brandPrimary }}>{branding?.agentName || profile?.company || 'Property Agent'}</h3>
                   {branding?.companyTagline && <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">{branding.companyTagline}</p>}
                   <div className="flex flex-wrap justify-center items-center gap-4 text-xs text-[#4a5568] font-medium">
                     {branding?.agencyPhone && <span>📞 {branding.agencyPhone}</span>}
@@ -1083,8 +1154,8 @@ export function HomePackPdfTemplate({
                 </div>
               ) : (
                 <div className="py-3 px-6 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm text-center mb-2">
-                  <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-0.5">Official HomePackAI Certification</h3>
-                  <p className="text-xs text-[#4a5568] italic">Comprehensive UK property information dossier compiled and certified by HomePackAI.</p>
+                  <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-0.5">HomePackAI Data Compilation Statement</h3>
+                  <p className="text-xs text-[#4a5568] italic">Compiled by HomePackAI from the cited public and official sources. This is not a professional certification, valuation, survey, or legal opinion.</p>
                 </div>
               )}
               

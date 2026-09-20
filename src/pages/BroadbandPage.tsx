@@ -309,7 +309,7 @@ export default function BroadbandPage() {
                             <div key={idx} className="flex justify-between items-center text-sm border-b border-border pb-2 last:border-0 last:pb-0">
                               <div className="flex flex-col">
                                 <span className="font-bold text-[#2d4a77]">{m.operator}</span>
-                                <span className="text-[10px] text-muted-foreground uppercase">Voice: {m.voice} | Data: {m.data}</span>
+                                <span className="text-[10px] text-muted-foreground uppercase">Voice: {m.voice || 'Check operator'} | Data: {m.data || 'Check operator'}</span>
                               </div>
                               <Badge className={m.fiveG === 'Available' ? 'bg-green-600' : 'bg-muted text-muted-foreground'}>
                                 5G: {m.fiveG}

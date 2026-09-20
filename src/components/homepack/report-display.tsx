@@ -15,7 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DATA_TOOLTIPS } from '@/lib/data-tooltips';
-import { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem, ReportResult, CouncilTaxData, RadonRiskData, CoalMiningData, BroadbandData, School, MobileData, HealthcareAccessData, CrimeData } from '@/types';
+import { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem, PlanningConstraint, ReportResult, CouncilTaxData, RadonRiskData, CoalMiningData, BroadbandData, School, MobileData, HealthcareAccessData, CrimeData } from '@/types';
 import { PropertyMap } from './property-map';
 import { useAuth } from '@/contexts/AuthContext';
 import { purchaseReportForUser } from '@/firebase';
@@ -56,7 +56,8 @@ export function formatCo2Tonnes(val: any, fallback = 'Not recorded on certificat
   if (!clean) return fallback;
   const num = parseFloat(clean.replace(/[^0-9.-]/g, ''));
   if (isNaN(num)) return fallback;
-  return `${num.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tonnes / year`;
+  const formatted = num.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return `${formatted} ${num === 1 ? 'tonne' : 'tonnes'} / year`;
 }
 
 export function formatKwhYear(val: any, fallback = 'Not recorded on certificate'): string {
@@ -124,9 +125,9 @@ function SchoolsDisplay({ schools, coordinates, address }: { schools: School[] |
           return (
             <div 
               key={idx} 
-              className="p-3.5 rounded-xl border border-border/80 bg-card hover:bg-muted/40 transition-all shadow-2xs hover:shadow-xs flex items-center justify-between gap-3"
+              className="p-4 rounded-xl border border-border/80 bg-card hover:bg-muted/40 transition-all shadow-2xs hover:shadow-xs min-w-0"
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-start gap-3 min-w-0">
                 {/* Marker Identifier Pin Pill matching the map */}
                 <div className="flex flex-col items-center shrink-0">
                   <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs text-white shadow-xs ${
@@ -136,28 +137,27 @@ function SchoolsDisplay({ schools, coordinates, address }: { schools: School[] |
                   </span>
                 </div>
 
-                <div className="min-w-0">
-                  <p className="font-bold text-sm text-foreground truncate">{school.name}</p>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                    <span className="flex items-center gap-1 shrink-0">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <p className="font-bold text-sm text-foreground leading-snug break-words min-w-0">{school.name}</p>
+                    <Badge className={`shrink-0 max-w-[13rem] h-auto min-h-5 whitespace-normal text-center leading-tight py-1 ${
+                      isOutstanding ? 'bg-emerald-600 text-white' :
+                      isGood ? 'bg-blue-600 text-white' :
+                      school.ofstedRating.toLowerCase().includes('improvement') ? 'bg-amber-500 text-white' :
+                      'bg-slate-600 text-white'
+                    } border-none text-[10px] px-2 font-semibold shadow-2xs`}>
+                      {school.ofstedRating}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
                       {school.isPrimary ? <GraduationCap className="h-3.5 w-3.5 text-blue-600" /> : <SchoolIcon className="h-3.5 w-3.5 text-purple-600" />}
                       <span>{school.type} School</span>
                     </span>
-                    <span>•</span>
-                    <span className="font-medium text-foreground/80 shrink-0">{formatSchoolDistance(school.distance)}</span>
+                    <span className="font-medium text-foreground/80">{formatSchoolDistance(school.distance)}</span>
+                    <span className="basis-full sm:basis-auto">{school.inspectionDate && !Number.isNaN(new Date(school.inspectionDate).getTime()) ? `Inspected ${new Date(school.inspectionDate).toLocaleDateString('en-GB')}` : 'Inspection date not published'}</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="text-right shrink-0">
-                <Badge className={`
-                  ${isOutstanding ? 'bg-emerald-600 text-white' : 
-                    isGood ? 'bg-blue-600 text-white' : 
-                    school.ofstedRating.toLowerCase().includes('improvement') ? 'bg-amber-500 text-white' : 
-                    'bg-slate-600 text-white'} border-none text-[10px] h-5 px-2 font-semibold shadow-2xs whitespace-nowrap
-                `}>
-                  {school.ofstedRating}
-                </Badge>
               </div>
             </div>
           );
@@ -367,8 +367,9 @@ function EpcDisplay({ epcData, logs, isFree, isAdmin }: { epcData: EpcData, logs
     );
 }
 
-function FloodRiskDisplay({ floodRiskData, logs, isAdmin }: { floodRiskData: FloodRiskData, logs: string[], isAdmin: boolean }) {
+function FloodRiskDisplay({ floodRiskData, constraints = [], logs, isAdmin }: { floodRiskData: FloodRiskData, constraints?: PlanningConstraint[], logs: string[], isAdmin: boolean }) {
     const floodLogs = logs.filter(log => log.startsWith('[FLOOD'));
+    const planningFlood = constraints.find(constraint => constraint.dataset === 'flood-risk-zone');
 
     const isNullOrEmpty = (value: string | undefined | null) => value === null || value === undefined || value.trim() === '' || value.toLowerCase() === 'null';
 
@@ -396,6 +397,9 @@ function FloodRiskDisplay({ floodRiskData, logs, isAdmin }: { floodRiskData: Flo
 
     const getFloodRiskBadge = (level: string) => {
       const l = (level || '').toLowerCase();
+      if (!l || l.includes('not assessed') || l.includes('not available') || l.includes('requires map') || l.includes('check environment')) {
+        return { bg: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700', label: level || 'Not assessed' };
+      }
       if (l.includes('high')) return { bg: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900', label: level };
       if (l.includes('medium')) return { bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900', label: level };
       if (l.includes('low') && !l.includes('very')) return { bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900', label: level };
@@ -436,6 +440,11 @@ function FloodRiskDisplay({ floodRiskData, logs, isAdmin }: { floodRiskData: Flo
                     <span className="font-medium">{floodRiskData.activeWarnings}</span>
                 </p>
             </div>
+            {planningFlood && /zone\s*[23]|medium|high/i.test(`${planningFlood.detail || ''} ${planningFlood.name || ''}`) && (
+              <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 leading-relaxed">
+                <strong>Flood Map for Planning flag: {planningFlood.detail || planningFlood.name}.</strong> This planning map generally ignores defences, while live warnings and defended long-term risk are separate measures. Review both rather than treating them as contradictory.
+              </div>
+            )}
 
             <Accordion className="w-full" data-pdf-ignore>
                 <AccordionItem value="technical-details">
@@ -529,7 +538,7 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
       </div>
 
       <p className="text-[10px] text-muted-foreground italic">
-        Source: Valuation Office Agency (VOA) / {data.authority}
+        Source and data date: {data.source || `Valuation Office Agency band / ${data.authority} charge table`} ({data.year || 'year not recorded'})
       </p>
       
       {isAdmin && (
@@ -560,6 +569,7 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
 }
 
 function EnvironmentalHazardsDisplay({ radon, coal }: { radon: RadonRiskData, coal: CoalMiningData }) {
+  const coalWasAssessed = Boolean(coal?.description) && !/not assessed|unavailable/i.test(coal.description);
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -586,7 +596,7 @@ function EnvironmentalHazardsDisplay({ radon, coal }: { radon: RadonRiskData, co
             </p>
           </div>
           <p className="text-[10px] text-muted-foreground/70 italic pt-2 border-t border-border/40">
-            Source: British Geological Survey (BGS) / UKHSA
+            Source: UKHSA / UKradon. <a href="https://www.ukradon.org/information/ukmaps" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Check the official radon map</a>
           </p>
         </div>
 
@@ -599,11 +609,11 @@ function EnvironmentalHazardsDisplay({ radon, coal }: { radon: RadonRiskData, co
                 <span>Coal Mining & Ground Stability</span>
               </h4>
               <Badge variant={coal?.isHighRiskArea ? 'destructive' : 'outline'} className="text-[10px] font-semibold shrink-0">
-                {coal?.isHighRiskArea ? 'High Risk' : 'No Known Risk'}
+                {coal?.isHighRiskArea ? 'High Risk' : coalWasAssessed ? 'Outside reporting area' : 'Not assessed'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {coal?.description || 'Mining stability records indicate no historical activity.'}
+              {coal?.description || 'Coal mining data not available; no risk conclusion has been inferred.'}
             </p>
           </div>
           <p className="text-[10px] text-muted-foreground/70 italic pt-2 border-t border-border/40">
@@ -656,9 +666,15 @@ function BroadbandDisplay({ data }: { data: BroadbandData }) {
         <div className="mt-3">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Available Physical Networks</p>
           <div className="flex flex-wrap gap-1.5">
-            {data.networks.map((n, i) => (
-              <Badge key={i} variant="outline" className="text-xs py-0.5 px-2.5 h-6 bg-background font-medium shadow-2xs">{n}</Badge>
-            ))}
+            {data.networks.map((network, i) => {
+              const networkData = network as any;
+              const label = typeof networkData === 'string'
+                ? networkData
+                : [networkData?.name, networkData?.type].filter(Boolean).join(' • ');
+              return label ? (
+                <Badge key={i} variant="outline" className="text-xs py-0.5 px-2.5 h-6 bg-background font-medium shadow-2xs">{label}</Badge>
+              ) : null;
+            })}
           </div>
         </div>
       )}
@@ -677,7 +693,7 @@ function MobileDisplay({ data, summary }: { data: MobileData[] | undefined, summ
         <div className="p-4 bg-muted/40 rounded-lg border border-border flex items-center justify-between">
           <div className="space-y-1">
             <p className="text-sm font-semibold text-foreground">Mobile Coverage</p>
-            <p className="text-xs text-muted-foreground">Detailed provider data pending or loading.</p>
+            <p className="text-xs text-muted-foreground">Operator-level measurements were not available from the automated Ofcom lookup. No coverage rating has been inferred.</p>
           </div>
           <a
             href="https://checker.ofcom.org.uk/en-gb/mobile-coverage"
@@ -723,12 +739,13 @@ function MobileDisplay({ data, summary }: { data: MobileData[] | undefined, summ
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         {data.map((m, i) => {
           const isFiveGGood = m.fiveG && (m.fiveG.toLowerCase().includes('good') || m.fiveG.toLowerCase().includes('available') || m.fiveG.toLowerCase().includes('excellent'));
+          const statusLabel = m.fiveG ? `5G: ${m.fiveG}` : (m.overall || 'Ofcom prediction');
           return (
             <div key={i} className="p-3.5 bg-card/80 rounded-xl border border-border/80 shadow-2xs hover:shadow-xs transition-all space-y-2.5">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-sm text-foreground">{m.operator}</span>
                 <Badge variant={isFiveGGood ? 'default' : 'outline'} className={`text-[10px] h-5 ${isFiveGGood ? 'bg-emerald-600 text-white' : ''}`}>
-                  5G: {m.fiveG}
+                  {statusLabel}
                 </Badge>
               </div>
 
@@ -766,14 +783,21 @@ function MobileDisplay({ data, summary }: { data: MobileData[] | undefined, summ
         })}
       </div>
       <p className="text-[10px] text-muted-foreground italic">
-        Source: Ofcom Mobile Checker & Mast Infrastructure Grounding
+        Source: Ofcom Connected Nations Mobile API (indoor/outdoor predictions)
       </p>
     </div>
   );
 }
 
-function PlanningHistoryDisplay({ planningHistory, uprn, localAuthorityId, logs, isAdmin }: { planningHistory: PlanningHistoryItem[], uprn: string, localAuthorityId: string | null | undefined, logs: string[], isAdmin: boolean }) {
+function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, uprn, logs, isAdmin }: { planningHistory: PlanningHistoryItem[], constraints?: PlanningConstraint[], coverage?: PropertyData['planningCoverage'], uprn: string, logs: string[], isAdmin: boolean }) {
     const planningLogs = logs.filter(log => log.startsWith('[PLANNING'));
+    const formatDecision = (value: string) => {
+      if (/grant|approv/i.test(value) && /condition/i.test(value)) return 'Approved with conditions';
+      if (/grant|approv/i.test(value)) return 'Approved';
+      if (/refus|reject/i.test(value)) return 'Refused';
+      if (/pending|undecided|consultation|submitted/i.test(value)) return 'Pending';
+      return value;
+    };
 
     return (
         <div className="space-y-4">
@@ -786,6 +810,33 @@ function PlanningHistoryDisplay({ planningHistory, uprn, localAuthorityId, logs,
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 {uprn && <span>UPRN: <span className="font-mono font-medium text-foreground">{uprn}</span></span>}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-foreground">Planning constraints at this location</h3>
+                <Badge variant="outline" className="text-[10px]">Planning Data</Badge>
+              </div>
+              {constraints.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {constraints.map((constraint, index) => (
+                    <a key={`${constraint.dataset}-${constraint.reference}-${index}`} href={constraint.url} target="_blank" rel="noopener noreferrer" className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 hover:border-amber-300 transition-colors">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">{constraint.dataset.replace(/-/g, ' ')}</p>
+                      <p className="text-sm font-semibold text-foreground mt-0.5">{constraint.detail || constraint.name}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Ref: {constraint.reference} • {constraint.quality}</p>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg border border-dashed text-xs text-muted-foreground">
+                  No intersecting constraints were returned by the selected Planning Data datasets. This is not confirmation that the property is constraint-free.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <h3 className="text-sm font-semibold text-foreground">Nearby and property-linked applications</h3>
+              <span className="text-[10px] text-muted-foreground">Planning Data + PlanIt</span>
             </div>
 
             {planningHistory.length > 0 ? (
@@ -807,12 +858,13 @@ function PlanningHistoryDisplay({ planningHistory, uprn, localAuthorityId, logs,
                                       : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300'
                                   }`}
                                 >
-                                  {item.decision}
+                                  {formatDecision(item.decision)}
                                 </Badge>
                               </div>
                               <div className="flex flex-wrap justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border/40 gap-2">
-                                  <span>Decided on: <span className="font-medium text-foreground">{item.date}</span></span>
+                                  <span>Date: <span className="font-medium text-foreground">{item.date}</span>{item.distanceKm !== undefined ? ` • ${(item.distanceKm * 0.621371).toFixed(1)} miles away` : ''}</span>
                                   <div className="flex items-center gap-3">
+                                    {(item.applicationSize || item.applicationType) && <span>{[item.applicationSize, item.applicationType].filter(Boolean).join(' • ')}</span>}
                                     <span className="font-mono text-[11px]">Ref: {item.reference}</span>
                                     {item.url && (
                                       <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 font-medium text-xs">
@@ -827,10 +879,12 @@ function PlanningHistoryDisplay({ planningHistory, uprn, localAuthorityId, logs,
                 </div>
             ) : (
                 <div className="p-4 rounded-xl bg-muted/30 border border-dashed border-border text-center space-y-1">
-                    <p className="text-sm font-medium text-foreground">No recent planning history recorded</p>
-                    <p className="text-xs text-muted-foreground">No major structural planning applications found matching this property's spatial boundaries.</p>
+                    <p className="text-sm font-medium text-foreground">No applications returned by the available sources</p>
+                    <p className="text-xs text-muted-foreground">This does not confirm that no planning activity exists; local register coverage can vary.</p>
                 </div>
             )}
+
+            {coverage && <p className="text-[10px] text-muted-foreground leading-relaxed">Coverage: {coverage.applications}. Constraints use {coverage.constraints.toLowerCase()}.</p>}
 
             <div className="flex flex-col gap-2 pt-1" data-pdf-ignore>
                 <Accordion className="w-full">
@@ -1009,7 +1063,7 @@ export function ReportDisplay({
   if (!reportData) return null;
 
   const { propertyData, summary, logs } = reportData;
-  const { landRegistry, epc, floodRisk, planningHistory, councilTax, radonRisk, coalMining, broadband } = propertyData;
+  const { landRegistry, epc, floodRisk, planningHistory, planningConstraints, planningCoverage, councilTax, radonRisk, coalMining, broadband } = propertyData;
 
   // Real-time resilience: if report was cached without healthcare data, asynchronously load it
   const [liveHealthcare, setLiveHealthcare] = useState<HealthcareAccessData | undefined>(propertyData.healthcare);
@@ -1211,8 +1265,8 @@ export function ReportDisplay({
         primaryTransaction={primaryTransaction}
       />
 
-      <div ref={reportRef} className="grid grid-cols-1 lg:grid-cols-3 gap-8 bg-background p-4 rounded-xl">
-        <div className="lg:col-span-2 space-y-8">
+      <div ref={reportRef} className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start bg-background p-4 rounded-xl">
+        <div className="min-w-0 lg:col-span-2 space-y-8">
           <div id="section-summary">
             <AiSummary summary={summary} />
           </div>
@@ -1306,15 +1360,15 @@ export function ReportDisplay({
           </DataSection>
           
           <DataSection id="section-flood" icon={Waves} title="Flood Risk">
-            <FloodRiskDisplay floodRiskData={floodRisk} logs={logs} isAdmin={isAdmin} />
+            <FloodRiskDisplay floodRiskData={floodRisk} constraints={propertyData.planningConstraints || []} logs={logs} isAdmin={isAdmin} />
           </DataSection>
 
           <DataSection id="section-environmental" icon={ShieldAlert} title="Environmental Hazards">
             <EnvironmentalHazardsDisplay radon={radonRisk} coal={coalMining} />
           </DataSection>
 
-          <DataSection id="section-planning" icon={ClipboardList} title="Planning History">
-            <PlanningHistoryDisplay planningHistory={planningHistory} uprn={epc?.uprn || ''} localAuthorityId={epc?.localAuthority} logs={logs} isAdmin={isAdmin} />
+          <DataSection id="section-planning" icon={ClipboardList} title="Planning Constraints & Applications">
+            <PlanningHistoryDisplay planningHistory={planningHistory} constraints={planningConstraints} coverage={planningCoverage} uprn={epc?.uprn || ''} logs={logs} isAdmin={isAdmin} />
           </DataSection>
 
           <DataSection id="section-broadband" icon={Wifi} title="Broadband & Connectivity">
@@ -1334,7 +1388,7 @@ export function ReportDisplay({
           </DataSection>
 
         </div>
-        <div className="lg:col-span-1 space-y-6">
+        <div className="min-w-0 lg:col-span-1 space-y-6">
           <PropertyQuickNav
             propertyData={mergedPropertyData}
             primaryTransaction={primaryTransaction}

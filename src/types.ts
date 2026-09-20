@@ -177,6 +177,7 @@ export type CouncilTaxData = {
   annualAmount: string;
   authority: string;
   year: string;
+  source?: string;
 } | null;
 
 export type RadonRiskData = {
@@ -235,7 +236,22 @@ export type PlanningHistoryItem = {
     date: string;
     reference: string;
     url: string;
+    address?: string;
+    distanceKm?: number;
+    applicationType?: string;
+    applicationSize?: string;
+    source?: string;
+    isActive?: boolean;
   };
+
+export type PlanningConstraint = {
+  dataset: string;
+  name: string;
+  reference: string;
+  quality: string;
+  detail?: string;
+  url: string;
+};
   
 export type PropertyDocument = {
   id: string;
@@ -250,6 +266,10 @@ export type School = {
   name: string;
   type: 'Primary' | 'Secondary';
   ofstedRating: string;
+  inspectionDate?: string;
+  reportCardOutcome?: string;
+  urn?: string;
+  ofstedPublication?: string;
   distance: string;
   location?: {
     lat: number;
@@ -310,6 +330,7 @@ export interface CrimeMonthTrend {
   date: string;
   displayMonth: string;
   totalCrimes: number;
+  isPublished?: boolean;
   burglary: number;
   vehicleCrime: number;
   antiSocialBehaviour: number;
@@ -348,6 +369,7 @@ export interface RecentCrimeIncident {
   month: string;
   streetName: string;
   outcomeStatus?: string;
+  distanceMiles?: number;
 }
 
 export interface CrimeKeyCategoryDetail {
@@ -393,6 +415,11 @@ export type PropertyData = {
   epc: EpcData;
   floodRisk: FloodRiskData;
   planningHistory: PlanningHistoryItem[];
+  planningConstraints?: PlanningConstraint[];
+  planningCoverage?: {
+    applications: string;
+    constraints: string;
+  };
   councilTax: CouncilTaxData;
   radonRisk: RadonRiskData;
   coalMining: CoalMiningData;

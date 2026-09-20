@@ -2,6 +2,7 @@ import { GpSurgery, DentistPractice, Pharmacy, HealthcareAccessData } from '../t
 
 export interface HealthcareFetchOptions {
   nhsApiKey?: string;
+  nhsApiBaseUrl?: string;
   cqcApiKey?: string;
   logs?: string[];
   coords?: { lat: number; lng: number } | null;
@@ -20,11 +21,34 @@ export function calculateDistanceMiles(lat1: number, lon1: number, lat2: number,
   return Math.round(R * c * 10) / 10;
 }
 
+function getNhsContact(provider: any, method: 'Telephone' | 'Website'): string | undefined {
+  const contact = Array.isArray(provider?.Contacts)
+    ? provider.Contacts.find((item: any) => item?.ContactMethodType === method && item?.ContactValue)
+    : null;
+  return contact?.ContactValue;
+}
+
+function formatNhsOpeningTimes(provider: any): string | undefined {
+  if (!Array.isArray(provider?.OpeningTimes)) return undefined;
+  const byDay = new Map<string, string[]>();
+  provider.OpeningTimes
+    .filter((item: any) => item?.IsOpen && item?.Weekday)
+    .forEach((item: any) => {
+      const periods = byDay.get(item.Weekday) || [];
+      periods.push(`${item.OpeningTime || ''}-${item.ClosingTime || ''}`.replace(/-$/, ''));
+      byDay.set(item.Weekday, periods);
+    });
+  if (!byDay.size) return undefined;
+  return Array.from(byDay.entries())
+    .map(([day, periods]) => `${day.slice(0, 3)} ${periods.join(', ')}`)
+    .join('; ');
+}
+
 /**
  * Query the Care Quality Commission (CQC) API for inspection ratings using ODS code or CQC Location ID
  */
 export async function fetchCqcRatingForOds(odsCode: string, cqcApiKey?: string): Promise<{ rating: string; publicationDate?: string; locationId?: string; reportUrl?: string }> {
-  if (!odsCode) return { rating: 'Not Rated' };
+  if (!odsCode) return { rating: 'CQC match unavailable' };
   
   try {
     const headers: Record<string, string> = {
@@ -52,7 +76,7 @@ export async function fetchCqcRatingForOds(odsCode: string, cqcApiKey?: string):
     // Non-fatal; return fallback
   }
 
-  return { rating: 'Good' }; // Standard compliant baseline for registered practices
+  return { rating: 'CQC match unavailable' };
 }
 
 /**
@@ -62,19 +86,36 @@ export async function fetchNhsServiceSearch(
   postcode: string, 
   orgType: 'GP' | 'DEN' | 'PHA', 
   apiKey: string,
+  apiBaseUrl: string,
+  coords?: { lat: number; lng: number } | null,
   cqcApiKey?: string,
   logs?: string[]
 ): Promise<any[]> {
-  const cleanPostcode = postcode.toUpperCase().replace(/\s+/g, '');
-  const url = `https://api.nhs.uk/service-search/search?api-version=1&search=${encodeURIComponent(cleanPostcode)}&$filter=OrganisationTypeId%20eq%20'${orgType}'`;
+  const cleanPostcode = postcode.toUpperCase().trim();
+  const organisationFilter = orgType === 'GP'
+    ? "(OrganisationTypeId eq 'GPB' or OrganisationTypeId eq 'GPP')"
+    : `OrganisationTypeId eq '${orgType}'`;
+  const params = new URLSearchParams({
+    'api-version': '3',
+    '$filter': organisationFilter,
+    '$top': '6'
+  });
+  if (coords) {
+    params.set('$orderby', `geo.distance(Geocode, geography'POINT(${coords.lng} ${coords.lat})')`);
+  } else {
+    params.set('search', cleanPostcode.split(' ')[0]);
+    params.set('searchFields', 'Postcode');
+  }
+  const url = `${apiBaseUrl.replace(/\/$/, '')}?${params.toString()}`;
   
   try {
     logs?.push(`[NHS-API] Querying NHS Directory for ${orgType} near ${cleanPostcode}...`);
     const res = await fetch(url, {
       headers: {
-        'subscription-key': apiKey,
+        'apikey': apiKey,
         'Accept': 'application/json'
-      }
+      },
+      signal: AbortSignal.timeout(8000)
     });
 
     if (!res.ok) {
@@ -224,30 +265,30 @@ export async function getHealthcareAccessData(
   const cleanPostcode = postcode.toUpperCase().trim();
   const compactPostcode = cleanPostcode.replace(/\s+/g, '');
   const { nhsApiKey, cqcApiKey, logs, coords } = options;
+  const nhsApiBaseUrl = options.nhsApiBaseUrl || 'https://int.api.service.nhs.uk/service-search-api';
 
-  // 1. Check benchmark postcode for instant verified data
-  if (compactPostcode === 'DE723UA' || compactPostcode.startsWith('DE723')) {
-    logs?.push(`[Healthcare] Verified local NHS surgeries & CQC records retrieved for ${cleanPostcode}`);
-    return getBenchmarkHealthcareDE72(cleanPostcode);
-  }
-
-  // 2. If real NHS API Key is provided, fetch live and cross-reference with CQC
+  // Use live directories only. Do not substitute benchmark or inferred providers.
   if (nhsApiKey && nhsApiKey !== 'YOUR_NHS_API_KEY' && nhsApiKey.length > 5) {
     try {
       logs?.push(`[Healthcare] Querying live NHS Service Search API for ${cleanPostcode}...`);
-      const [gpList, denList, phaList] = await Promise.all([
-        fetchNhsServiceSearch(cleanPostcode, 'GP', nhsApiKey, cqcApiKey, logs),
-        fetchNhsServiceSearch(cleanPostcode, 'DEN', nhsApiKey, cqcApiKey, logs),
-        fetchNhsServiceSearch(cleanPostcode, 'PHA', nhsApiKey, cqcApiKey, logs)
-      ]);
+      // NHS integration is limited to one request per second. Keep these sequential.
+      const gpList = await fetchNhsServiceSearch(cleanPostcode, 'GP', nhsApiKey, nhsApiBaseUrl, coords, cqcApiKey, logs);
+      await new Promise(resolve => setTimeout(resolve, 1050));
+      const denList = await fetchNhsServiceSearch(cleanPostcode, 'DEN', nhsApiKey, nhsApiBaseUrl, coords, cqcApiKey, logs);
+      await new Promise(resolve => setTimeout(resolve, 1050));
+      const phaList = await fetchNhsServiceSearch(cleanPostcode, 'PHA', nhsApiKey, nhsApiBaseUrl, coords, cqcApiKey, logs);
 
       if (gpList.length > 0 || denList.length > 0 || phaList.length > 0) {
         // Cross-reference GPs with CQC
         const gpSurgeries: GpSurgery[] = await Promise.all(
           gpList.slice(0, 4).map(async (p) => {
-            const odsCode = p.OdsCode || p.odsCode || '';
+            const odsCode = p.ODSCode || p.OdsCode || p.odsCode || '';
             const cqcInfo = await fetchCqcRatingForOds(odsCode, cqcApiKey);
-            const dist = p.Distance ? `${parseFloat(p.Distance).toFixed(1)} miles away` : 'Nearby';
+            const coordinates = p.Geocode?.coordinates || p.geocode?.coordinates;
+            const distanceMiles = coords && Array.isArray(coordinates) && coordinates.length >= 2
+              ? calculateDistanceMiles(coords.lat, coords.lng, Number(coordinates[1]), Number(coordinates[0]))
+              : null;
+            const dist = distanceMiles != null ? `${distanceMiles.toFixed(1)} miles away` : 'Distance unavailable';
             return {
               name: p.OrganisationName || p.name || 'Local Medical Centre',
               odsCode,
@@ -255,37 +296,43 @@ export async function getHealthcareAccessData(
               address: [p.Address1, p.Address2, p.City].filter(Boolean).join(', ') || 'Local Surgery Address',
               postcode: p.Postcode || cleanPostcode,
               distance: dist,
-              isAcceptingNewPatients: p.IsAcceptingNewPatients !== false,
-              cqcRating: cqcInfo.rating || 'Good',
+              isAcceptingNewPatients: null,
+              cqcRating: cqcInfo.rating || 'CQC match unavailable',
               cqcPublicationDate: cqcInfo.publicationDate,
               cqcReportUrl: cqcInfo.reportUrl,
-              phone: p.Phone || p.ContactTelephoneNumber,
-              website: p.URL || p.Website
+              phone: getNhsContact(p, 'Telephone') || p.Phone || p.ContactTelephoneNumber,
+              website: getNhsContact(p, 'Website') || p.URL || p.Website
             };
           })
         );
 
         // Process Dentists
         const dentists: DentistPractice[] = denList.slice(0, 3).map((d) => {
-          const isAccepting = d.IsAcceptingNewPatients ?? 
-            (d.ServicesProvided?.some((s: any) => s.ServiceName?.toLowerCase().includes('dental') && s.AcceptingNewPatients !== false) ?? true);
-          const dist = d.Distance ? `${parseFloat(d.Distance).toFixed(1)} miles away` : 'Nearby';
+          const coordinates = d.Geocode?.coordinates || d.geocode?.coordinates;
+          const distanceMiles = coords && Array.isArray(coordinates) && coordinates.length >= 2
+            ? calculateDistanceMiles(coords.lat, coords.lng, Number(coordinates[1]), Number(coordinates[0]))
+            : null;
+          const dist = distanceMiles != null ? `${distanceMiles.toFixed(1)} miles away` : 'Distance unavailable';
           return {
             name: d.OrganisationName || d.name || 'Dental Practice',
-            odsCode: d.OdsCode,
+            odsCode: d.ODSCode || d.OdsCode,
             address: [d.Address1, d.Address2, d.City].filter(Boolean).join(', ') || 'Local Dental Clinic',
             postcode: d.Postcode || cleanPostcode,
             distance: dist,
-            isAcceptingNhsPatients: isAccepting,
+            isAcceptingNhsPatients: null,
             cqcRating: 'Inspected / Compliant',
-            phone: d.Phone || d.ContactTelephoneNumber,
-            website: d.URL || d.Website
+            phone: getNhsContact(d, 'Telephone') || d.Phone || d.ContactTelephoneNumber,
+            website: getNhsContact(d, 'Website') || d.URL || d.Website
           };
         });
 
         // Process Pharmacies
         const pharmacies: Pharmacy[] = phaList.slice(0, 3).map((ph) => {
-          const dist = ph.Distance ? `${parseFloat(ph.Distance).toFixed(1)} miles away` : 'Nearby';
+          const coordinates = ph.Geocode?.coordinates || ph.geocode?.coordinates;
+          const distanceMiles = coords && Array.isArray(coordinates) && coordinates.length >= 2
+            ? calculateDistanceMiles(coords.lat, coords.lng, Number(coordinates[1]), Number(coordinates[0]))
+            : null;
+          const dist = distanceMiles != null ? `${distanceMiles.toFixed(1)} miles away` : 'Distance unavailable';
           const services: string[] = [];
           if (ph.ServicesProvided && Array.isArray(ph.ServicesProvided)) {
             ph.ServicesProvided.forEach((s: any) => {
@@ -298,12 +345,12 @@ export async function getHealthcareAccessData(
 
           return {
             name: ph.OrganisationName || ph.name || 'Community Pharmacy',
-            odsCode: ph.OdsCode,
+            odsCode: ph.ODSCode || ph.OdsCode,
             address: [ph.Address1, ph.Address2, ph.City].filter(Boolean).join(', ') || 'Local Pharmacy',
             postcode: ph.Postcode || cleanPostcode,
             distance: dist,
-            openingHours: ph.OpeningTimes || 'Standard Hours (Mon-Fri 09:00 - 18:00)',
-            phone: ph.Phone || ph.ContactTelephoneNumber,
+            openingHours: formatNhsOpeningTimes(ph),
+            phone: getNhsContact(ph, 'Telephone') || ph.Phone || ph.ContactTelephoneNumber,
             services: services.slice(0, 4)
           };
         });
@@ -323,137 +370,14 @@ export async function getHealthcareAccessData(
     }
   }
 
-  // 3. Grounded Healthcare directory fallback based on Postcode and Regional Primary Care Network
-  let areaName = "Local Area";
-  let propLat = coords?.lat;
-  let propLng = coords?.lng;
-
-  try {
-    const pcRes = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(cleanPostcode)}`);
-    if (pcRes.ok) {
-      const pcData = await pcRes.json();
-      if (pcData?.result) {
-        areaName = pcData.result.admin_ward || pcData.result.admin_district || pcData.result.parish || areaName;
-        propLat = propLat || pcData.result.latitude;
-        propLng = propLng || pcData.result.longitude;
-      }
-    }
-  } catch {}
-
-  // Cross-reference with CQC locations search directly if possible
-  let directCqcGpList: any[] = [];
-  try {
-    const cqcSearchUrl = `https://api.cqc.org.uk/public/v1/locations?postalCode=${encodeURIComponent(cleanPostcode)}`;
-    const cqcRes = await fetch(cqcSearchUrl, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'HomePack-Healthcare/1.0',
-        ...(cqcApiKey ? { 'Ocp-Apim-Subscription-Key': cqcApiKey } : {})
-      }
-    });
-    if (cqcRes.ok) {
-      const cqcData = await cqcRes.json();
-      if (cqcData.locations && cqcData.locations.length > 0) {
-        directCqcGpList = cqcData.locations.slice(0, 3);
-      }
-    }
-  } catch {}
-
-  const defaultGps: GpSurgery[] = [
-    {
-      name: directCqcGpList[0]?.locationName || `${areaName} Health Centre`,
-      odsCode: directCqcGpList[0]?.odsCode || "C81001",
-      cqcLocationId: directCqcGpList[0]?.locationId,
-      address: `High Street, ${areaName}`,
-      postcode: cleanPostcode,
-      distance: "0.5 miles away",
-      isAcceptingNewPatients: true,
-      cqcRating: directCqcGpList[0]?.currentRatings?.overall?.rating || "Good",
-      cqcPublicationDate: "2024-04-10",
-      phone: "0800 000 111",
-      website: "https://www.nhs.uk"
-    },
-    {
-      name: directCqcGpList[1]?.locationName || `${areaName} Medical Practice`,
-      odsCode: directCqcGpList[1]?.odsCode || "C81002",
-      cqcLocationId: directCqcGpList[1]?.locationId,
-      address: `Station Road, ${areaName}`,
-      postcode: cleanPostcode,
-      distance: "1.1 miles away",
-      isAcceptingNewPatients: true,
-      cqcRating: directCqcGpList[1]?.currentRatings?.overall?.rating || "Good",
-      cqcPublicationDate: "2023-09-15",
-      phone: "0800 000 222",
-      website: "https://www.nhs.uk"
-    },
-    {
-      name: `${areaName} Village Surgery`,
-      odsCode: "C81003",
-      address: `Church Lane, ${areaName}`,
-      postcode: cleanPostcode,
-      distance: "1.7 miles away",
-      isAcceptingNewPatients: true,
-      cqcRating: "Good",
-      cqcPublicationDate: "2024-02-01",
-      phone: "0800 000 333"
-    }
-  ];
-
-  const defaultDentists: DentistPractice[] = [
-    {
-      name: `${areaName} Dental Surgery`,
-      odsCode: "V3901",
-      address: `Market Place, ${areaName}`,
-      postcode: cleanPostcode,
-      distance: "0.8 miles away",
-      isAcceptingNhsPatients: true,
-      cqcRating: "Compliant / Good Standards",
-      phone: "0800 111 222",
-      website: "https://www.nhs.uk"
-    },
-    {
-      name: `${areaName} Community Dental Clinic`,
-      odsCode: "V3902",
-      address: `Victoria Road, ${areaName}`,
-      postcode: cleanPostcode,
-      distance: "1.4 miles away",
-      isAcceptingNhsPatients: true,
-      cqcRating: "Compliant / Good Standards",
-      phone: "0800 111 333"
-    }
-  ];
-
-  const defaultPharmacies: Pharmacy[] = [
-    {
-      name: `Boots Pharmacy ${areaName}`,
-      odsCode: "FA001",
-      address: `High Street, ${areaName}`,
-      postcode: cleanPostcode,
-      distance: "0.6 miles away",
-      openingHours: "Mon-Fri 08:30 - 18:30, Sat 09:00 - 13:00",
-      phone: "0800 222 333",
-      services: ["Electronic Prescription Service (EPS)", "NHS Pharmacy First", "Flu Vaccination"]
-    },
-    {
-      name: `Well Pharmacy ${areaName}`,
-      odsCode: "FA002",
-      address: `Church Road, ${areaName}`,
-      postcode: cleanPostcode,
-      distance: "1.2 miles away",
-      openingHours: "Mon-Fri 09:00 - 18:00",
-      phone: "0800 222 444",
-      services: ["Electronic Prescription Service (EPS)", "New Medicine Service", "Blood Pressure Check"]
-    }
-  ];
-
-  logs?.push(`[Healthcare] Grounded regional primary care services compiled for ${areaName} (${cleanPostcode})`);
-
+  logs?.push(`[Healthcare] No verified live directory result for ${cleanPostcode}; returning official service-search links only.`);
   return {
-    gpSurgeries: defaultGps,
-    dentists: defaultDentists,
-    pharmacies: defaultPharmacies,
-    summary: `Primary care access in ${areaName} (${cleanPostcode}) includes multiple GP surgeries with 'Good' CQC inspection ratings currently accepting new NHS patients, local dental practices taking NHS patients, and dispensing pharmacies with NHS Pharmacy First consultations.`,
-    source: "NHS Directory of Healthcare Services & CQC Open Data",
-    lastUpdated: "2025/2026 Register"
+    postcode: cleanPostcode,
+    gpSurgeries: [],
+    dentists: [],
+    pharmacies: [],
+    summary: `Live provider details were unavailable for ${cleanPostcode}. Use NHS Find a Service to check current practices and contact providers directly about registration.`,
+    source: "NHS Find a Service",
+    lastUpdated: new Date().toLocaleDateString('en-GB')
   };
 }

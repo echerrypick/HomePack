@@ -25,7 +25,6 @@ import { Footer } from './components/layout/Footer';
 import { AuthProvider } from './contexts/AuthContext';
 import { HomePackJobProvider } from './contexts/HomePackJobContext';
 import { HomePackChecklistModal } from './components/homepack/homepack-checklist-modal';
-import { HomePackFloatingPill } from './components/homepack/homepack-job-pill';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function LandingPage() {
@@ -168,8 +167,7 @@ export default function App() {
               <Route path="/contact" element={<ContactPage />} />
             </Routes>
             <HomePackChecklistModal />
-            <HomePackFloatingPill />
-            <Toaster position="bottom-right" />
+            <Toaster position="top-right" offset={80} visibleToasts={3} closeButton />
           </HomePackJobProvider>
         </Router>
       </AuthProvider>

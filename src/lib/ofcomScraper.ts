@@ -1,22 +1,32 @@
 import { chromium, Page, Browser, BrowserContext } from 'playwright';
 import fs from 'fs';
-import { exec } from 'child_process';
+import path from 'path';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 
-let isInstallingChromium = false;
+let chromiumInstallPromise: Promise<void> | null = null;
 export async function ensurePlaywrightChromium(): Promise<void> {
-  if (isInstallingChromium) return;
-  isInstallingChromium = true;
+  if (fs.existsSync(chromium.executablePath())) return;
+  if (!chromiumInstallPromise) {
+    chromiumInstallPromise = (async () => {
+      console.log('[Playwright] Auto-installing Playwright Chromium binary in background...');
+      const playwrightCli = path.resolve(process.cwd(), 'node_modules/playwright/cli.js');
+      if (!fs.existsSync(playwrightCli)) {
+        throw new Error(`Local Playwright CLI not found at ${playwrightCli}`);
+      }
+      await execFilePromise(process.execPath, [playwrightCli, 'install', 'chromium']);
+      console.log('[Playwright] Chromium installation completed.');
+    })().finally(() => {
+      chromiumInstallPromise = null;
+    });
+  }
   try {
-    console.log('[Playwright] Auto-installing Playwright Chromium binary in background...');
-    await execPromise('npx playwright install chromium');
-    console.log('[Playwright] Chromium installation completed.');
+    await chromiumInstallPromise;
   } catch (err: any) {
     console.error('[Playwright] Error installing chromium:', err.message);
-  } finally {
-    isInstallingChromium = false;
+    throw err;
   }
 }
 
@@ -520,7 +530,8 @@ export async function lookupOfcomBroadband(
   houseNumber: string,
   street: string,
   postcode: string,
-  mode: 'lookup' | 'addresses' = 'lookup'
+  mode: 'lookup' | 'addresses' = 'lookup',
+  signal?: AbortSignal
 ): Promise<any> {
   const pcNoSpaces = postcode.toUpperCase().replace(/\s+/g, "");
   const url = `https://checker.ofcom.org.uk/en-gb/broadband-coverage`;
@@ -537,8 +548,11 @@ export async function lookupOfcomBroadband(
     }
   });
   const page = await setupPage(context);
+  const abortHandler = () => void context.close().catch(() => undefined);
+  signal?.addEventListener('abort', abortHandler, { once: true });
 
   try {
+    if (signal?.aborted) throw new Error('Ofcom broadband lookup timed out');
     console.log(`[OfcomScraper] Navigating to ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
@@ -806,9 +820,10 @@ export async function lookupOfcomBroadband(
         const row = rows.find(r => r.textContent?.includes(type));
         if (row) {
           const cells = Array.from(row.querySelectorAll('td, .cell, div[role="cell"]'));
-          // In some layouts, the speeds are in the 2nd and 3rd cells
-          const download = cells[1]?.textContent?.trim() || "N/A";
-          const upload = cells[2]?.textContent?.trim() || "N/A";
+          const rowText = row.textContent?.replace(/\s+/g, ' ').trim() || '';
+          const speeds = Array.from(rowText.matchAll(/(?:up to\s*)?(\d+(?:\.\d+)?)\s*M(?:bit\/s|bps)/gi)).map(match => `${match[1]} Mbps`);
+          const download = speeds[0] || cells[1]?.textContent?.trim() || "N/A";
+          const upload = speeds[1] || cells[2]?.textContent?.trim() || "N/A";
           const available = !row.textContent?.toLowerCase().includes('not available');
           data.push({ type, downloadSpeed: download, uploadSpeed: upload, available });
         } else {
@@ -849,6 +864,7 @@ export async function lookupOfcomBroadband(
     console.error(`[OfcomScraper] Broadband Error: ${error.message}`);
     return { success: false, error: error.message, broadband: [], networks: [] };
   } finally {
+    signal?.removeEventListener('abort', abortHandler);
     await context.close();
   }
 }

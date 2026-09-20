@@ -19,7 +19,7 @@ type Step = 'address' | 'report';
 
 export default function ToolPage() {
   const { user, profile, loading } = useAuth();
-  const { activeJob, openModal, startJob, recentReports, loadReport } = useHomePackJob();
+  const { activeJob, openModal, startJob, recentReports, loadReport, dismissActiveJob } = useHomePackJob();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -32,7 +32,15 @@ export default function ToolPage() {
 
   // Check if routed from a notification or history with preloaded report
   useEffect(() => {
-    if (location.state?.report && location.state?.address) {
+    if (location.state?.startNewHomePack) {
+      dismissActiveJob();
+      setIsFromHistory(false);
+      setStep('address');
+      setSelectedAddress(null);
+      setReportData(null);
+      setError(null);
+      window.history.replaceState({}, document.title);
+    } else if (location.state?.report && location.state?.address) {
       setReportData(location.state.report);
       setSelectedAddress(location.state.address);
       setStep('report');
@@ -44,6 +52,7 @@ export default function ToolPage() {
 
   // When activeJob completes, if the user is on ToolPage, automatically show the report
   useEffect(() => {
+    if (location.state?.startNewHomePack) return;
     if (activeJob?.status === 'completed' && activeJob.result) {
       setReportData(activeJob.result);
       setSelectedAddress(activeJob.address);

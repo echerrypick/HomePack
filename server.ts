@@ -31,6 +31,10 @@ if (apiKeyRaw) {
 }
 
 const COUNCIL_TAX_RATES: Record<string, Record<string, number>> = {
+  "Tamworth": {
+    "A": 1533.83, "B": 1789.48, "C": 2045.12, "D": 2300.76,
+    "E": 2812.04, "F": 3323.33, "G": 3834.59, "H": 4601.52
+  },
   "Three Rivers": {
     "A": 1455.33, "B": 1697.89, "C": 1940.44, "D": 2183.00, "E": 2668.11, "F": 3153.22, "G": 3638.33, "H": 4366.00
   },
@@ -61,19 +65,48 @@ function calculateCouncilTaxAmount(band: string, authority: string): string {
   if (!band || band === "Unknown" || band === "Not Available") return "Unknown";
   
   const normalizedAuthority = authority.replace(/District Council|Borough Council|City Council/i, "").trim();
-  const rates = COUNCIL_TAX_RATES[normalizedAuthority] || COUNCIL_TAX_RATES["Three Rivers"]; // Default to Three Rivers for demo
+  const matchedAuthority = Object.keys(COUNCIL_TAX_RATES).find(name => normalizedAuthority.toLowerCase().includes(name.toLowerCase()));
+  const rates = matchedAuthority ? COUNCIL_TAX_RATES[matchedAuthority] : undefined;
   
-  const amount = rates[band.toUpperCase()];
+  const amount = rates?.[band.toUpperCase()];
   if (amount) {
     return `£${amount.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   
-  const estimates: Record<string, string> = {
-    "A": "£1,450", "B": "£1,690", "C": "£1,930", "D": "£2,180",
-    "E": "£2,660", "F": "£3,150", "G": "£3,630", "H": "£4,360"
-  };
-  
-  return estimates[band.toUpperCase()] || "Unknown";
+  return "Check local authority";
+}
+
+function getCurrentCouncilTaxYear(date = new Date()): string {
+  const year = date.getFullYear();
+  const startYear = date.getMonth() >= 3 ? year : year - 1;
+  return `${startYear}/${String(startYear + 1).slice(-2)}`;
+}
+
+async function resolveBillingAuthority(postcode: string): Promise<string | null> {
+  try {
+    const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode.trim())}`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data?.result?.admin_district || null;
+  } catch {
+    return null;
+  }
+}
+
+function speedMbps(value: unknown): number | null {
+  const matches = String(value || '').match(/\d+(?:\.\d+)?/g);
+  if (!matches?.length) return null;
+  return Math.max(...matches.map(Number).filter(Number.isFinite));
+}
+
+function fastestBroadbandSpeed(results: any[], field: 'downloadSpeed' | 'uploadSpeed'): string {
+  const speeds = results
+    .filter(item => item?.available)
+    .map(item => speedMbps(item?.[field]))
+    .filter((value): value is number => value !== null);
+  return speeds.length ? `${Math.max(...speeds)} Mbps` : 'Not available from Ofcom lookup';
 }
 
 // Bounded timeout helper to prevent external network or scraper hangs
@@ -85,8 +118,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
 }
 
+async function trackTiming<T>(label: string, logs: string[], operation: () => Promise<T>): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    return await operation();
+  } finally {
+    const elapsedMs = Math.round(performance.now() - startedAt);
+    const message = `[Timing] ${label}: ${elapsedMs}ms`;
+    logs.push(message);
+    console.log(message);
+  }
+}
+
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Initialize Gemini for Search Grounding lazily
 let aiClient: GoogleGenAI | null = null;
@@ -139,7 +184,7 @@ function getAiClient() {
 function getGroqClient() {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey || apiKey === "YOUR_API_KEY_HERE") return null;
-  return new Groq({ apiKey });
+  return new Groq({ apiKey, timeout: 15000, maxRetries: 0 });
 }
 
 function isValidOpenRouterModelId(model?: string | null): boolean {
@@ -161,7 +206,7 @@ function getActiveOpenRouterModel(): string {
   return "openrouter/free";
 }
 
-async function callOpenRouter(messages: any[], modelOrModels?: string | string[], responseFormat?: string) {
+async function callOpenRouter(messages: any[], modelOrModels?: string | string[], responseFormat?: string, signal?: AbortSignal) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey || apiKey === "YOUR_API_KEY_HERE" || apiKey.trim() === "") return null;
 
@@ -212,7 +257,8 @@ async function callOpenRouter(messages: any[], modelOrModels?: string | string[]
         "HTTP-Referer": process.env.APP_URL || "https://ai.studio/build",
         "X-Title": "Property Information Pack"
       },
-      body: JSON.stringify(bodyPayload)
+      body: JSON.stringify(bodyPayload),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000)
     });
 
     if (response.ok) {
@@ -242,7 +288,8 @@ async function callOpenRouter(messages: any[], modelOrModels?: string | string[]
               "HTTP-Referer": process.env.APP_URL || "https://ai.studio/build",
               "X-Title": "Property Information Pack"
             },
-            body: JSON.stringify(fbPayload)
+            body: JSON.stringify(fbPayload),
+            signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000)
           });
           if (fbRes.ok) {
             const fbData = await fbRes.json();
@@ -301,12 +348,13 @@ function cleanSummaryText(rawText: string): string {
   return rawText.replace(/<br\s*\/?>/gi, '\n');
 }
 
-async function generateSummary(propertyData: any, retries = 3) {
+async function generateSummary(propertyData: any, retries = 3, signal?: AbortSignal) {
   const groq = getGroqClient();
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   
   for (let i = 0; i <= retries; i++) {
     try {
+      if (signal?.aborted) throw new Error('AI summary generation timed out');
       // Prune data to reduce token usage
       const prunedData = {
         address: propertyData.address,
@@ -343,9 +391,9 @@ async function generateSummary(propertyData: any, retries = 3) {
         mobileSummary: propertyData.mobileSummary || null,
         schools: propertyData.schools?.map((s: any) => `${s.name} (${s.type}, Ofsted: ${s.ofstedRating}, ${s.distance})`).join('; ') || null,
         healthcare: propertyData.healthcare ? {
-          nearestGp: propertyData.healthcare.gpSurgeries?.[0] ? `${propertyData.healthcare.gpSurgeries[0].name} (${propertyData.healthcare.gpSurgeries[0].distance}, CQC: ${propertyData.healthcare.gpSurgeries[0].cqcRating || 'Good'}, Accepting Patients: ${propertyData.healthcare.gpSurgeries[0].isAcceptingNewPatients ? 'Yes' : 'No'})` : null,
+          nearestGp: propertyData.healthcare.gpSurgeries?.[0] ? `${propertyData.healthcare.gpSurgeries[0].name} (${propertyData.healthcare.gpSurgeries[0].distance}, CQC: ${propertyData.healthcare.gpSurgeries[0].cqcRating || 'Not rated'}; registration must be checked directly)` : null,
           gpCount: propertyData.healthcare.gpSurgeries?.length || 0,
-          dentist: propertyData.healthcare.dentists?.[0] ? `${propertyData.healthcare.dentists[0].name} (${propertyData.healthcare.dentists[0].distance}, NHS Patients: ${propertyData.healthcare.dentists[0].isAcceptingNhsPatients ? 'Yes' : 'No'})` : null,
+          dentist: propertyData.healthcare.dentists?.[0] ? `${propertyData.healthcare.dentists[0].name} (${propertyData.healthcare.dentists[0].distance}; current NHS availability must be checked directly)` : null,
           pharmacy: propertyData.healthcare.pharmacies?.[0] ? `${propertyData.healthcare.pharmacies[0].name} (${propertyData.healthcare.pharmacies[0].distance})` : null
         } : null,
         crime: propertyData.crime ? {
@@ -391,7 +439,7 @@ ${JSON.stringify(prunedData, null, 2)}`;
       if (openRouterKey) {
         const activeModel = getActiveOpenRouterModel();
         console.log(`[OpenRouter] Generating summary using ${activeModel}...`);
-        const summary = await callOpenRouter([{ role: "user", content: prompt }]);
+        const summary = await callOpenRouter([{ role: "user", content: prompt }], undefined, undefined, signal);
         if (summary) return cleanSummaryText(summary);
       }
 
@@ -401,7 +449,7 @@ ${JSON.stringify(prunedData, null, 2)}`;
         const completion = await groq.chat.completions.create({
           messages: [{ role: "user", content: prompt }],
           model: "openai/gpt-oss-120b",
-        });
+        }, { signal });
         const summary = completion.choices[0].message.content;
         if (summary) return cleanSummaryText(summary);
       }
@@ -415,6 +463,7 @@ ${JSON.stringify(prunedData, null, 2)}`;
 
       return cleanSummaryText(response.text || "Summary could not be generated.");
     } catch (err: any) {
+      if (signal?.aborted) throw err;
       const isQuotaError = err?.message?.includes("429") || err?.message?.includes("RESOURCE_EXHAUSTED");
       const isServiceError = err?.message?.includes("503") || err?.message?.includes("UNAVAILABLE");
       
@@ -852,31 +901,226 @@ async function fetchEpcData(street: string, postcode: string, logs: string[]) {
   }
 }
 
-// Planning History Fetching
-async function fetchPlanningHistory(uprn: string, organisationId?: string) {
-  if (!uprn) return [];
-  const endpoint = 'https://www.planning.data.gov.uk/entity.json';
-  let url = `${endpoint}?dataset=planning-application&limit=10&q=${uprn}`;
-  if (organisationId) {
-    url += `&organisation-entity=${organisationId}`;
+// Planning applications and constraints from the official Planning Data API and PlanIt.
+// These sources are complementary: Planning Data is authoritative for constraints, while
+// PlanIt provides broader application coverage across local authority portals.
+const PLANNING_CONSTRAINT_DATASETS = [
+  'conservation-area',
+  'listed-building',
+  'green-belt',
+  'flood-risk-zone',
+  'article-4-direction-area',
+  'tree-preservation-zone'
+];
+
+function planningDateYearsAgo(years: number): string {
+  const date = new Date();
+  date.setUTCFullYear(date.getUTCFullYear() - years);
+  return date.toISOString().slice(0, 10);
+}
+
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const radians = (value: number) => value * Math.PI / 180;
+  const dLat = radians(lat2 - lat1);
+  const dLng = radians(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function normalizedPlanningKey(item: any): string {
+  const reference = String(item.reference || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  if (reference && reference !== 'na' && reference !== 'recorded') return `ref:${reference}`;
+  return `fallback:${[item.application, item.address, item.date]
+    .map(value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
+    .join(':')}`;
+}
+
+function mergePlanningApplications(groups: any[][]): any[] {
+  const merged = new Map<string, any>();
+  for (const item of groups.flat()) {
+    const key = normalizedPlanningKey(item);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, item);
+      continue;
+    }
+    const preferred = Object.values(item).filter(Boolean).length > Object.values(existing).filter(Boolean).length ? item : existing;
+    merged.set(key, {
+      ...existing,
+      ...preferred,
+      source: Array.from(new Set([existing.source, item.source].filter(Boolean))).join(' + ')
+    });
   }
-  
+  return Array.from(merged.values()).sort((a, b) => {
+    const activeDifference = Number(Boolean(b.isActive)) - Number(Boolean(a.isActive));
+    if (activeDifference) return activeDifference;
+    const scale = (value: string) => value === 'Large' ? 2 : value === 'Medium' ? 1 : 0;
+    const scaleDifference = scale(b.applicationSize) - scale(a.applicationSize);
+    if (scaleDifference) return scaleDifference;
+    return String(b.rawDate || '').localeCompare(String(a.rawDate || ''));
+  });
+}
+
+async function fetchPlanningDataApplications(
+  uprn: string,
+  coords: { latitude: number; longitude: number } | null,
+  logs: string[]
+): Promise<any[]> {
+  if (!uprn && !coords) return [];
+  const params = new URLSearchParams({ dataset: 'planning-application', limit: '50' });
+  if (uprn) params.set('q', uprn);
+  else if (coords) {
+    params.set('latitude', String(coords.latitude));
+    params.set('longitude', String(coords.longitude));
+  }
+  params.append('exclude_field', 'geometry');
+
   try {
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return [];
-    const rawData = await res.json();
-    if (!rawData.entities) return [];
-    return rawData.entities.map((entity: any) => ({
-      application: entity.description || entity.name || 'No description available',
-      decision: entity['planning-application-status'] || 'Unknown',
-      date: entity['decision-date'] ? new Date(entity['decision-date']).toLocaleDateString() : (entity['start-date'] ? new Date(entity['start-date']).toLocaleDateString() : 'Unknown'),
-      reference: entity.reference || 'N/A',
-      url: `https://www.planning.data.gov.uk/entity/${entity.entity}`
-    }));
-  } catch (err) {
-    console.error("Planning History fetch error:", err);
+    const res = await fetch(`https://www.planning.data.gov.uk/entity.json?${params}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rawData: any = await res.json();
+    return (rawData.entities || []).map((entity: any) => {
+      const rawDate = String(getEpcField(entity, 'decision-date', 'start-date') || '');
+      const reference = String(getEpcField(entity, 'reference') || 'N/A');
+      const decision = String(getEpcField(entity, 'planning-application-status', 'status') || 'Unknown');
+      return {
+        application: String(getEpcField(entity, 'description', 'name') || 'No description available'),
+        decision,
+        date: rawDate || 'Unknown',
+        rawDate,
+        reference,
+        url: `https://www.planning.data.gov.uk/entity/${getEpcField(entity, 'entity') || ''}`,
+        source: 'Planning Data',
+        isActive: /pending|undecided|consultation|submitted/i.test(decision)
+      };
+    });
+  } catch (err: any) {
+    logs.push(`[PLANNING:Planning Data] Applications unavailable (${err?.message || err})`);
     return [];
   }
+}
+
+async function fetchPlanningConstraints(
+  coords: { latitude: number; longitude: number } | null,
+  logs: string[]
+): Promise<any[]> {
+  if (!coords) return [];
+  const params = new URLSearchParams({
+    latitude: String(coords.latitude),
+    longitude: String(coords.longitude),
+    limit: '100'
+  });
+  PLANNING_CONSTRAINT_DATASETS.forEach(dataset => params.append('dataset', dataset));
+  ['entity', 'dataset', 'name', 'reference', 'quality', 'flood-risk-level', 'listed-building-grade']
+    .forEach(field => params.append('field', field));
+
+  try {
+    const res = await fetch(`https://www.planning.data.gov.uk/entity.json?${params}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rawData: any = await res.json();
+    return (rawData.entities || []).map((entity: any) => ({
+      dataset: String(entity.dataset || 'planning-constraint'),
+      name: String(entity.name || entity.reference || 'Recorded constraint'),
+      reference: String(entity.reference || 'N/A'),
+      quality: String(entity.quality || 'not stated'),
+      detail: entity['listed-building-grade']
+        ? `Grade ${entity['listed-building-grade']}`
+        : entity['flood-risk-level']
+          ? `Flood Risk Zone ${entity['flood-risk-level']}`
+          : undefined,
+      url: `https://www.planning.data.gov.uk/entity/${entity.entity || ''}`
+    }));
+  } catch (err: any) {
+    logs.push(`[PLANNING:Planning Data] Constraints unavailable (${err?.message || err})`);
+    return [];
+  }
+}
+
+async function fetchPlanItApplications(
+  coords: { latitude: number; longitude: number } | null,
+  logs: string[],
+  radiusKm: number,
+  years: number,
+  significantOnly = false
+): Promise<any[]> {
+  if (!coords) return [];
+  const params = new URLSearchParams({
+    lat: String(coords.latitude),
+    lng: String(coords.longitude),
+    krad: String(radiusKm),
+    start_date: planningDateYearsAgo(years),
+    end_date: new Date().toISOString().slice(0, 10),
+    pg_sz: '50',
+    sort: '-start_date',
+    select: 'name,uid,description,address,postcode,url,app_size,app_state,app_type,start_date,decided_date,other_fields,link,location',
+    compress: 'on'
+  });
+  if (significantOnly) params.set('app_size', 'Large,Medium');
+
+  try {
+    const res = await fetch(`https://www.planit.org.uk/api/applics/json?${params}`, {
+      headers: { Accept: 'application/json', 'User-Agent': 'HomePack/1.0 planning due-diligence lookup' },
+      signal: AbortSignal.timeout(7000)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rawData: any = await res.json();
+    if (rawData.error) throw new Error(String(rawData.error));
+    return (rawData.records || []).map((record: any) => {
+      const decision = String(record.other_fields?.decision || record.app_state || record.other_fields?.status || 'Unknown');
+      const rawDate = String(record.decided_date || record.start_date || '');
+      const point = record.location?.coordinates;
+      const calculatedDistance = Array.isArray(point) && point.length >= 2
+        ? distanceKm(coords.latitude, coords.longitude, Number(point[1]), Number(point[0]))
+        : undefined;
+      return {
+        application: String(record.description || 'No description available'),
+        decision,
+        date: rawDate || 'Unknown',
+        rawDate,
+        reference: String(record.uid || record.reference || record.name || 'N/A'),
+        url: String(record.url || record.link || ''),
+        address: record.address ? String(record.address) : undefined,
+        distanceKm: calculatedDistance === undefined ? undefined : Number(calculatedDistance.toFixed(2)),
+        applicationType: record.app_type ? String(record.app_type) : undefined,
+        applicationSize: record.app_size ? String(record.app_size) : undefined,
+        source: 'PlanIt',
+        isActive: /pending|undecided|consultation|submitted/i.test(String(record.app_state || record.other_fields?.status || ''))
+      };
+    });
+  } catch (err: any) {
+    logs.push(`[PLANNING:PlanIt] ${radiusKm}km search unavailable (${err?.message || err})`);
+    return [];
+  }
+}
+
+async function fetchPlanningHistory(
+  uprn: string,
+  coords: { latitude: number; longitude: number } | null,
+  logs: string[]
+) {
+  const [officialApplications, constraints, recentApplications, significantApplications] = await Promise.all([
+    trackTiming('Planning Data applications', logs, () => fetchPlanningDataApplications(uprn, coords, logs)),
+    trackTiming('Planning Data constraints', logs, () => fetchPlanningConstraints(coords, logs)),
+    trackTiming('PlanIt nearby applications', logs, () => fetchPlanItApplications(coords, logs, 0.5, 2)),
+    trackTiming('PlanIt significant applications', logs, () => fetchPlanItApplications(coords, logs, 1, 5, true))
+  ]);
+  const applications = mergePlanningApplications([officialApplications, recentApplications, significantApplications]);
+  logs.push(`[PLANNING] ${applications.length} unique applications and ${constraints.length} point constraints found`);
+  return {
+    applications,
+    constraints,
+    coverage: {
+      applications: 'Planning Data UPRN/point search plus PlanIt within 500m over 2 years and significant schemes within 1km over 5 years',
+      constraints: 'Planning Data point intersection; absence of a result does not guarantee no constraint exists'
+    }
+  };
 }
 
 // Land Registry Fetching
@@ -1025,6 +1269,24 @@ async function fetchCoordinates(postcode: string) {
   }
 }
 
+async function fetchCanonicalPropertyCoordinates(postcode: string, uprn?: string | number | null) {
+  if (uprn) {
+    try {
+      const response = await fetch(`https://api.postcodes.io/uprns/${encodeURIComponent(String(uprn))}`, { signal: AbortSignal.timeout(3500) });
+      if (response.ok) {
+        const data: any = await response.json();
+        if (data?.status === 200 && Number.isFinite(data.result?.latitude) && Number.isFinite(data.result?.longitude)) {
+          return { eastings: data.result.eastings, northings: data.result.northings, latitude: data.result.latitude, longitude: data.result.longitude, source: 'Postcodes.io UPRN point', uprn: String(uprn) };
+        }
+      }
+    } catch (error) {
+      console.warn('[Coordinates] UPRN lookup failed; using postcode centroid:', error);
+    }
+  }
+  const postcodeCoordinates = await fetchCoordinates(postcode);
+  return postcodeCoordinates ? { ...postcodeCoordinates, source: 'Postcodes.io postcode centroid' } : null;
+}
+
 function parseAddress(addressText: string) {
   const parts = addressText.split(',').map(p => p.trim());
   const firstPart = parts[0] || "";
@@ -1063,10 +1325,10 @@ async function scrapeOfcomMobile(houseNumber: string, street: string, postcode: 
   }
 }
 
-async function scrapeOfcomBroadband(houseNumber: string, street: string, postcode: string) {
+async function scrapeOfcomBroadband(houseNumber: string, street: string, postcode: string, signal?: AbortSignal) {
   console.log(`[Scraper] Starting Ofcom broadband scrape for: ${houseNumber} ${street}, ${postcode}`);
   try {
-    const result = await lookupOfcomBroadband(houseNumber, street, postcode);
+    const result = await lookupOfcomBroadband(houseNumber, street, postcode, "lookup", signal);
     if (result.success) {
       console.log(`[Scraper] Success! Found broadband for ${result.address}`);
       return result;
@@ -1323,13 +1585,19 @@ async function fetchCouncilTaxDirectly(houseNumber: string, street: string, post
 
     const threshold = cleanHouseNumber ? 8 : 4;
 
-    if (bestMatch && bestMatch.score > threshold) {
+    const bestAddress = normalizeText(bestMatch?.address || '');
+    const exactHouseMatch = !targetHouse || new RegExp(`(^|\\s)${targetHouse}(\\s|$)`).test(bestAddress);
+    if (bestMatch && bestMatch.score > threshold && exactHouseMatch) {
+      const resolvedAuthority = bestMatch.authority && bestMatch.authority !== 'Local Authority'
+        ? bestMatch.authority
+        : await resolveBillingAuthority(normalizedPostcode) || 'Local Authority';
       return {
         band: bestMatch.band,
-        authority: bestMatch.authority || "Local Authority",
+        authority: resolvedAuthority,
         address: bestMatch.address,
-        annualAmount: calculateCouncilTaxAmount(bestMatch.band, bestMatch.authority),
-        year: "2024/25",
+        annualAmount: calculateCouncilTaxAmount(bestMatch.band, resolvedAuthority),
+        year: getCurrentCouncilTaxYear(),
+        source: resolvedAuthority.toLowerCase().includes('tamworth') ? 'VOA band; Tamworth Borough Council 2026/27 charges' : 'VOA band; local authority charge table',
         allResults: uniqueCandidates.map(c => ({ address: c.address, band: c.band }))
       };
     }
@@ -1433,7 +1701,7 @@ If not explicitly found, return {"band": null, "authority": "${authorityName}"}.
                 authority: auth,
                 address: targetAddress,
                 annualAmount: calculateCouncilTaxAmount(band, auth),
-                year: "2024/25",
+                year: getCurrentCouncilTaxYear(),
                 source: "Grounded Web Verification"
               };
             }
@@ -1454,7 +1722,7 @@ If not explicitly found, return {"band": null, "authority": "${authorityName}"}.
       logs.push(`[Gemini-Grounding] Falling back to Gemini Search tool...`);
 
       const prompt = `Find the official Council Tax band for "${targetAddress}" on GOV.UK.
-      Return ONLY JSON: { "band": "string", "annualAmount": "string", "authority": "string", "year": "2024/25" }`;
+      Return ONLY JSON: { "band": "string", "annualAmount": "string", "authority": "string", "year": "${getCurrentCouncilTaxYear()}" }`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.8-flash",
@@ -1477,7 +1745,7 @@ If not explicitly found, return {"band": null, "authority": "${authorityName}"}.
             authority: auth,
             address: targetAddress,
             annualAmount: calculateCouncilTaxAmount(band, auth),
-            year: "2024/25",
+            year: getCurrentCouncilTaxYear(),
             source: "Gemini Search Grounding"
           };
         }
@@ -1506,7 +1774,7 @@ If not explicitly found, return {"band": null, "authority": "${authorityName}"}.
         authority: authorityName,
         address: targetAddress,
         annualAmount: calculateCouncilTaxAmount(estimatedBand, authorityName),
-        year: "2024/25",
+        year: getCurrentCouncilTaxYear(),
         isEstimate: true,
         source: "Estimated from EPC Floor Area & Valuation Office"
       };
@@ -1522,7 +1790,7 @@ If not explicitly found, return {"band": null, "authority": "${authorityName}"}.
     authority: authorityName,
     address: targetAddress,
     annualAmount: calculateCouncilTaxAmount("D", authorityName),
-    year: "2024/25",
+    year: getCurrentCouncilTaxYear(),
     isEstimate: true,
     source: "Estimated Reference Band"
   };
@@ -1544,7 +1812,7 @@ async function getOfcomUprnForAddress(houseNumber: string, street: string, postc
   const houseMatch = addresses.find(a => a.address.toLowerCase().startsWith(houseNumber.toLowerCase()));
   if (houseMatch) return houseMatch.id;
 
-  return addresses[0].id; // Fallback to first one if we have to
+  return null; // Never silently use a neighbouring property's UPRN.
 }
 
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -1575,7 +1843,8 @@ function filterAndVerifySchools(rawList: any[], propLat?: number, propLng?: numb
     return {
       name: s.name,
       type: s.type === 'Secondary' ? 'Secondary' : 'Primary',
-      ofstedRating: s.ofstedRating || 'Good',
+      ofstedRating: s.ofstedRating || 'Not verified',
+      inspectionDate: s.inspectionDate || undefined,
       distance: distStr,
       distMiles: dist,
       location: s.location || (propLat && propLng ? { lat: propLat, lng: propLng } : undefined)
@@ -1585,9 +1854,110 @@ function filterAndVerifySchools(rawList: any[], propLat?: number, propLng?: numb
   .sort((a, b) => (a.distMiles || 0) - (b.distMiles || 0));
 }
 
+type OfstedSchoolRecord = Record<string, string>;
+let ofstedCache: { loadedAt: number; publicationLabel: string; records: OfstedSchoolRecord[] } | null = null;
+
+function parseCsvRows(csv: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let value = '';
+  let quoted = false;
+  for (let i = 0; i < csv.length; i += 1) {
+    const char = csv[i];
+    if (char === '"') {
+      if (quoted && csv[i + 1] === '"') { value += '"'; i += 1; } else quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      row.push(value); value = '';
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && csv[i + 1] === '\n') i += 1;
+      row.push(value); value = '';
+      if (row.some(cell => cell.length > 0)) rows.push(row);
+      row = [];
+    } else value += char;
+  }
+  if (value || row.length) { row.push(value); rows.push(row); }
+  return rows;
+}
+
+async function loadLatestOfstedRecords(): Promise<{ publicationLabel: string; records: OfstedSchoolRecord[] }> {
+  if (ofstedCache && Date.now() - ofstedCache.loadedAt < 24 * 60 * 60 * 1000) return ofstedCache;
+  const page = await fetch('https://www.gov.uk/government/statistical-data-sets/monthly-management-information-ofsteds-school-inspections-outcomes', { signal: AbortSignal.timeout(8000) });
+  if (!page.ok) throw new Error(`Ofsted catalogue returned HTTP ${page.status}`);
+  const html = await page.text();
+  const matches = [...html.matchAll(/"name":\s*"Management information - state-funded schools - latest inspections as at ([^"]+)"[\s\S]{0,300}?"contentUrl":\s*"([^"]+\.csv)"/g)];
+  const latest = matches[matches.length - 1];
+  if (!latest) throw new Error('Latest Ofsted CSV link not found');
+  const response = await fetch(latest[2], { signal: AbortSignal.timeout(20000) });
+  if (!response.ok) throw new Error(`Ofsted CSV returned HTTP ${response.status}`);
+  const rows = parseCsvRows(await response.text());
+  const headers = rows.shift() || [];
+  const records = rows.map(row => Object.fromEntries(headers.map((header, index) => [header.replace(/^\uFEFF/, ''), row[index] || ''])));
+  ofstedCache = { loadedAt: Date.now(), publicationLabel: latest[1], records };
+  return ofstedCache;
+}
+
+function ofstedGrade(value: string): string {
+  return ({ '1': 'Outstanding', '2': 'Good', '3': 'Requires improvement', '4': 'Inadequate' } as Record<string, string>)[String(value).trim()] || 'No previous single-word grade';
+}
+
+async function fetchOfficialOfstedSchools(postcode: string, coords: { latitude: number; longitude: number }, logs?: string[]): Promise<any[]> {
+  const { publicationLabel, records } = await loadLatestOfstedRecords();
+  const outcode = postcode.trim().toUpperCase().split(/\s+/)[0];
+  const outcodeMatch = outcode.match(/^([A-Z]+)(\d+)/);
+  const neighbouringOutcodes = new Set([outcode]);
+  if (outcodeMatch) {
+    const district = Number(outcodeMatch[2]);
+    if (district > 0) neighbouringOutcodes.add(`${outcodeMatch[1]}${district - 1}`);
+    neighbouringOutcodes.add(`${outcodeMatch[1]}${district + 1}`);
+  }
+  const candidates = records.filter(record => neighbouringOutcodes.has(String(record.Postcode || '').toUpperCase().split(/\s+/)[0]));
+  const uniquePostcodes = [...new Set(candidates.map(record => record.Postcode?.trim()).filter(Boolean))];
+  const locations = new Map<string, any>();
+  for (let index = 0; index < uniquePostcodes.length; index += 100) {
+    const geoResponse = await fetch('https://api.postcodes.io/postcodes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postcodes: uniquePostcodes.slice(index, index + 100) }), signal: AbortSignal.timeout(8000)
+    });
+    if (!geoResponse.ok) throw new Error(`Postcodes.io school batch returned HTTP ${geoResponse.status}`);
+    const geoData: any = await geoResponse.json();
+    (geoData.result || []).forEach((item: any) => locations.set(String(item.query).replace(/\s+/g, '').toUpperCase(), item.result));
+  }
+  const schools = candidates.map(record => {
+    const location: any = locations.get(String(record.Postcode).replace(/\s+/g, '').toUpperCase());
+    if (!location) return null;
+    const distance = calculateHaversineDistance(coords.latitude, coords.longitude, location.latitude, location.longitude);
+    const phase = /secondary/i.test(record['Ofsted phase']) ? 'Secondary' : /primary/i.test(record['Ofsted phase']) ? 'Primary' : null;
+    if (!phase || distance > 3) return null;
+    const newFrameworkOutcomes = ['Safeguarding standards', 'Inclusion', 'Curriculum and teaching', 'Achievement', 'Attendance and behaviour', 'Personal development and wellbeing', 'Leadership and governance']
+      .map(key => record[key] && record[key] !== 'NULL' ? `${key}: ${record[key]}` : null).filter(Boolean);
+    const inspectionDateRaw = record['Inspection start date of latest OEIF graded inspection'] || record['Inspection start date'] || '';
+    const dateMatch = inspectionDateRaw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return {
+      name: record['School name'], type: phase,
+      ofstedRating: ofstedGrade(record['Latest OEIF overall effectiveness']),
+      inspectionDate: dateMatch ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}` : inspectionDateRaw || undefined,
+      reportCardOutcome: newFrameworkOutcomes.join('; ') || undefined,
+      distance: `${distance.toFixed(1)} miles away`, distMiles: distance,
+      location: { lat: location.latitude, lng: location.longitude }, urn: record.URN,
+      ofstedPublication: publicationLabel
+    };
+  }).filter(Boolean).sort((a: any, b: any) => a.distMiles - b.distMiles);
+  const result = [...schools.filter((school: any) => school.type === 'Primary').slice(0, 3), ...schools.filter((school: any) => school.type === 'Secondary').slice(0, 2)];
+  logs?.push(`[Schools] Ofsted ${publicationLabel}: ${result.length} nearest schools resolved from canonical coordinates`);
+  return result;
+}
+
 async function fetchCatchmentSchools(postcode: string, address: string, coords?: { latitude: number; longitude: number } | null, logs?: string[]): Promise<any[]> {
   const normalizedPostcode = postcode.toUpperCase().replace(/\s+/g, '');
   console.log(`[Schools] Fetching catchment schools for ${postcode} (${address})...`);
+
+  if (coords) {
+    try {
+      const officialSchools = await fetchOfficialOfstedSchools(postcode, coords, logs);
+      if (officialSchools.length > 0) return officialSchools;
+    } catch (error: any) {
+      logs?.push(`[Schools] Official Ofsted lookup error: ${error?.message || error}`);
+    }
+  }
 
   // Grounded local catchment schools for DE72 3UA (Elvaston parish / South Derbyshire)
   if (normalizedPostcode === 'DE723UA' || normalizedPostcode.startsWith('DE723')) {
@@ -1666,7 +2036,8 @@ CRITICAL CATCHMENT RULES:
 6. For each school, provide:
    - name: full official school name
    - type: "Primary" or "Secondary"
-   - ofstedRating: "Outstanding", "Good", "Requires Improvement", or "Inadequate"
+   - ofstedRating: the latest published overall grade, or "No current single-word grade"
+   - inspectionDate: the inspection date in YYYY-MM-DD format; do not invent a date
    - distance: approximate walking/driving distance in miles e.g. "0.8 miles away"
    - location: exact { "lat": number, "lng": number }
 
@@ -1714,77 +2085,156 @@ Return ONLY a valid JSON array of objects.`;
   return [];
 }
 
-async function fetchGroundedLocalData(houseNumber: string, street: string, town: string, postcode: string, logs: string[], coords?: { latitude: number; longitude: number } | null, retries = 3) {
+async function fetchGroundedLocalData(
+  houseNumber: string,
+  street: string,
+  town: string,
+  postcode: string,
+  logs: string[],
+  coords?: { latitude: number; longitude: number } | null,
+  propertyUprn?: string,
+  retries = 3,
+  onStepProgress?: (stepId: string, status: 'in_progress' | 'completed' | 'failed', detail?: string) => void
+) {
   const groq = getGroqClient();
   const fullAddress = `${houseNumber} ${street}, ${town}`.trim();
+
+  const fallbackAiData = {
+    councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: getCurrentCouncilTaxYear() },
+    radonRisk: { riskLevel: "Unknown", percentage: "N/A", description: "Automated radon lookup unavailable; check the official UKradon map." },
+    coalMining: { isReportingArea: false, isHighRiskArea: false, description: "Automated Coal Authority check unavailable; no risk conclusion has been inferred." },
+    broadband: { superfastAvailable: false, ultrafastAvailable: false, standardAvailable: false, maxDownloadSpeed: "Not available from Ofcom lookup", maxUploadSpeed: "Not available from Ofcom lookup" },
+    mobile: [],
+    mobileSummary: "Operator-level measurements were not available; check the Ofcom coverage checker.",
+    schools: []
+  };
+
+  const councilTaxPromise = trackTiming('Council tax lookup', logs, () =>
+    withTimeout(fetchGroundedCouncilTax(houseNumber, street, postcode, logs), 15000, null)
+  ).then(result => {
+    onStepProgress?.('council_tax', 'completed', result?.band ? `Band ${result.band}` : 'VOA Checked');
+    return result;
+  });
+
+  const aiDataPromise = trackTiming('AI local-data fallback', logs, async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    return fetchAILocalData(fullAddress, postcode, groq, retries, controller.signal)
+      .finally(() => clearTimeout(timeoutId));
+  }).catch(() => fallbackAiData);
+
+  const ofcomPromise = trackTiming('Ofcom broadband lookup', logs, async () => {
+    try {
+      const connectedNations = await fetchOfcomConnectedNations(postcode, propertyUprn, fullAddress, logs);
+      if (connectedNations) return connectedNations;
+      const uprn = await withTimeout(getOfcomUprnForAddress(houseNumber, street, postcode), 4000, null);
+      if (uprn) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const data = await fetchOfcomBroadband(uprn, postcode, fullAddress, controller.signal)
+          .catch(() => null)
+          .finally(() => clearTimeout(timeoutId));
+        if (data) logs.push(`[Ofcom] Successfully retrieved real connectivity data for UPRN: ${uprn}`);
+        return data;
+      }
+    } catch (err: any) {
+      logs.push(`[Ofcom] Standard profile active: ${err?.message || err}`);
+    }
+    return null;
+  });
+
+  const siginfoPromise = trackTiming('Siginfo mobile lookup', logs, async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    return scrapeSiginfoCoverage(postcode, houseNumber, controller.signal)
+      .finally(() => clearTimeout(timeoutId));
+  }).catch((err) => {
+    logs.push(`[Siginfo] Cellular telemetry fallback active: ${err?.message || err}`);
+    return null;
+  });
+
+  const connectivityPromise = Promise.all([ofcomPromise, siginfoPromise]).then(([ofcom, siginfo]) => {
+    const speed = fastestBroadbandSpeed(ofcom?.broadband || [], 'downloadSpeed');
+    const networkCount = siginfo?.operators?.length || 0;
+    const verifiedSpeed = speed === 'Not available from Ofcom lookup' ? null : speed;
+    const ofcomMobileCount = ofcom?.mobile?.length || 0;
+    const detail = [
+      verifiedSpeed,
+      ofcomMobileCount ? `${ofcomMobileCount} mobile networks` : networkCount ? `${networkCount} mobile networks` : null
+    ].filter(Boolean).join(' • ') || 'Ofcom lookup completed';
+    onStepProgress?.('connectivity', 'completed', detail);
+    return { ofcom, siginfo };
+  });
+
+  const schoolsPromise = trackTiming('Catchment schools lookup', logs, async () => {
+    logs.push(`[Schools] Resolving local authority catchment schools within 1.5 miles...`);
+    return withTimeout(fetchCatchmentSchools(postcode, fullAddress, coords, logs), 12000, []);
+  }).then(schools => {
+    onStepProgress?.('schools', 'completed', schools.length ? `${schools.length} Catchment schools` : 'Local area checked');
+    return schools;
+  }).catch((err: any) => {
+    console.warn(`[Schools] Error resolving catchment schools:`, err?.message || err);
+    onStepProgress?.('schools', 'completed', 'Local area checked');
+    return [];
+  });
 
   // Run independent data lookups in parallel for maximum performance
   const [
     verifiedCouncilTax,
     aiData,
-    ofcomData,
-    siginfoData,
+    connectivityData,
     catchmentSchools
   ] = await Promise.all([
-    fetchGroundedCouncilTax(houseNumber, street, postcode, logs).catch(() => null),
-    fetchAILocalData(fullAddress, postcode, groq, retries).catch(() => ({
-      councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: "2025/26" },
-      radonRisk: { riskLevel: "Low", percentage: "< 1%", description: "Standard UK radon advisory." },
-      coalMining: { isReportingArea: false, isHighRiskArea: false, description: "Not in a designated coal mining reporting area." },
-      broadband: { superfastAvailable: true, ultrafastAvailable: true, standardAvailable: true, maxDownloadSpeed: "1000 Mbps", maxUploadSpeed: "220 Mbps" },
-      mobile: [],
-      mobileSummary: "Standard 4G/5G mobile coverage available.",
-      schools: []
-    })),
-    (async () => {
-      try {
-        const uprn = await withTimeout(getOfcomUprnForAddress(houseNumber, street, postcode), 4000, null);
-        if (uprn) {
-          const data = await withTimeout(fetchOfcomBroadband(uprn, postcode, fullAddress), 4500, null);
-          if (data) {
-            logs.push(`[Ofcom] Successfully retrieved real connectivity data for UPRN: ${uprn}`);
-          }
-          return data;
-        }
-      } catch (err: any) {
-        logs.push(`[Ofcom] Standard profile active: ${err?.message || err}`);
-      }
-      return null;
-    })(),
-    withTimeout(scrapeSiginfoCoverage(postcode, houseNumber), 4000, null).catch((err) => {
-      logs.push(`[Siginfo] Cellular telemetry fallback active: ${err?.message || err}`);
-      return null;
-    }),
-    (async () => {
-      try {
-        logs.push(`[Schools] Resolving local authority catchment schools within 1.5 miles...`);
-        const schools = await fetchCatchmentSchools(postcode, fullAddress, coords, logs);
-        if (schools && schools.length > 0) {
-          logs.push(`[Schools] Successfully identified ${schools.length} catchment schools within 1.5 miles`);
-          return schools;
-        }
-      } catch (sErr: any) {
-        console.warn(`[Schools] Error resolving catchment schools:`, sErr?.message || sErr);
-      }
-      return [];
-    })()
+    councilTaxPromise,
+    aiDataPromise,
+    connectivityPromise,
+    schoolsPromise
   ]);
+
+  const { ofcom: ofcomData, siginfo: siginfoData } = connectivityData;
+
+  // These datasets are not available from a verified free machine-readable source in this flow.
+  // Never turn an AI estimate or a boolean fallback into a property-specific risk conclusion.
+  aiData.radonRisk = {
+    riskLevel: "Unknown",
+    percentage: "N/A",
+    description: "Not assessed by an official property-level source. Check the UKradon map."
+  };
+  aiData.coalMining = {
+    isReportingArea: false,
+    isHighRiskArea: false,
+    description: "Not assessed by an official property-level source. Obtain a Coal Authority search where relevant."
+  };
+  aiData.broadband = {
+    superfastAvailable: false,
+    ultrafastAvailable: false,
+    standardAvailable: false,
+    maxDownloadSpeed: "Not available from Ofcom lookup",
+    maxUploadSpeed: "Not available from Ofcom lookup"
+  };
 
   // Merge Ofcom broadband data into aiData if available
   if (ofcomData) {
+    const broadbandResults = Array.isArray(ofcomData.broadband) ? ofcomData.broadband : [];
+    const maxDownloadMbps = speedMbps(fastestBroadbandSpeed(broadbandResults, 'downloadSpeed'));
     aiData.broadband = {
-      superfastAvailable: ofcomData.broadband.some((b: any) => b.type === 'Superfast' && b.available),
-      ultrafastAvailable: ofcomData.broadband.some((b: any) => b.type === 'Ultrafast' && b.available),
-      standardAvailable: ofcomData.broadband.some((b: any) => b.type === 'Standard' && b.available),
-      maxDownloadSpeed: ofcomData.broadband.find((b: any) => b.available)?.downloadSpeed || "Unknown",
-      maxUploadSpeed: ofcomData.broadband.find((b: any) => b.available)?.uploadSpeed || "Unknown",
-      results: ofcomData.broadband,
-      networks: ofcomData.networks
+      superfastAvailable: maxDownloadMbps !== null && maxDownloadMbps >= 30,
+      ultrafastAvailable: maxDownloadMbps !== null && maxDownloadMbps >= 300,
+      standardAvailable: maxDownloadMbps !== null && maxDownloadMbps > 0,
+      maxDownloadSpeed: fastestBroadbandSpeed(broadbandResults, 'downloadSpeed'),
+      maxUploadSpeed: fastestBroadbandSpeed(broadbandResults, 'uploadSpeed'),
+      results: broadbandResults,
+      networks: (ofcomData.networks || [])
+        .map((network: any) => typeof network === 'string' ? network : network?.name)
+        .filter(Boolean)
     };
   }
 
   // Mobile Coverage assignment: use siginfo if populated, otherwise call fetchMobileCoverageData
-  if (siginfoData && siginfoData.operators && siginfoData.operators.length > 0) {
+  if (ofcomData?.mobile && ofcomData.mobile.length > 0) {
+    aiData.mobile = ofcomData.mobile;
+    aiData.mobileSummary = ofcomData.mobileSummary || 'Ofcom Connected Nations postcode coverage.';
+  } else if (siginfoData && siginfoData.operators && siginfoData.operators.length > 0) {
     aiData.mobile = siginfoData.operators;
     aiData.mobileSummary = siginfoData.summary;
   } else {
@@ -1827,7 +2277,7 @@ async function fetchGroundedLocalData(houseNumber: string, street: string, town:
   };
 }
 
-async function fetchAILocalData(address: string, postcode: string, groq: any, retries: number) {
+async function fetchAILocalData(address: string, postcode: string, groq: any, retries: number, signal?: AbortSignal) {
   console.log(`[AI-Estimate] Fetching data for ${address}, ${postcode}...`);
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   
@@ -1855,7 +2305,7 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
           role: "user",
           content: `Provide estimated data for the property at ${address}, ${postcode}. Include at least 4 nearby schools (2 primary, 2 secondary).`
         }
-      ], undefined, "json_object");
+      ], undefined, "json_object", signal);
 
       if (content) {
         let cleaned = content.trim();
@@ -1867,10 +2317,10 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
           if (groqData.councilTax || groqData.schools) {
             console.log(`[OpenRouter] Successfully retrieved primary data (Schools found: ${groqData.schools?.length || 0})`);
             return {
-              councilTax: groqData.councilTax || { band: "Unknown", annualAmount: "Unknown", authority: "Unknown", year: "2024/25" },
+              councilTax: groqData.councilTax || { band: "Unknown", annualAmount: "Unknown", authority: "Unknown", year: getCurrentCouncilTaxYear() },
               radonRisk: groqData.radonRisk || { riskLevel: "Unknown", percentage: "N/A", description: "Data provided by AI estimate." },
               coalMining: groqData.coalMining || { isReportingArea: false, isHighRiskArea: false, description: "Data provided by AI estimate." },
-              broadband: groqData.broadband || { superfastAvailable: true, ultrafastAvailable: false, standardAvailable: true, maxDownloadSpeed: "Unknown", maxUploadSpeed: "Unknown" },
+              broadband: groqData.broadband || { superfastAvailable: false, ultrafastAvailable: false, standardAvailable: false, maxDownloadSpeed: "Not available from Ofcom lookup", maxUploadSpeed: "Not available from Ofcom lookup" },
               schools: groqData.schools || []
             };
           }
@@ -1886,6 +2336,7 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
   // 2. Try Groq second
   if (groq) {
     try {
+      if (signal?.aborted) throw new Error('AI local-data lookup timed out');
       console.log(`[Groq] Fetching secondary local data using model: openai/gpt-oss-120b...`);
       const completion = await groq.chat.completions.create({
         messages: [
@@ -1910,7 +2361,7 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
         ],
         model: "openai/gpt-oss-120b",
         response_format: { type: "json_object" }
-      });
+      }, { signal });
       
       const content = completion.choices[0].message.content || "{}";
       const groqData = JSON.parse(content);
@@ -1918,10 +2369,10 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
       if (groqData.councilTax || groqData.schools) {
         console.log(`[Groq] Successfully retrieved secondary data (Schools found: ${groqData.schools?.length || 0})`);
         return {
-          councilTax: groqData.councilTax || { band: "Unknown", annualAmount: "Unknown", authority: "Unknown", year: "2024/25" },
+          councilTax: groqData.councilTax || { band: "Unknown", annualAmount: "Unknown", authority: "Unknown", year: getCurrentCouncilTaxYear() },
           radonRisk: groqData.radonRisk || { riskLevel: "Unknown", percentage: "N/A", description: "Data provided by AI estimate." },
           coalMining: groqData.coalMining || { isReportingArea: false, isHighRiskArea: false, description: "Data provided by AI estimate." },
-          broadband: groqData.broadband || { superfastAvailable: true, ultrafastAvailable: false, standardAvailable: true, maxDownloadSpeed: "Unknown", maxUploadSpeed: "Unknown" },
+          broadband: groqData.broadband || { superfastAvailable: false, ultrafastAvailable: false, standardAvailable: false, maxDownloadSpeed: "Not available from Ofcom lookup", maxUploadSpeed: "Not available from Ofcom lookup" },
           schools: groqData.schools || []
         };
       }
@@ -1933,6 +2384,7 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
   // 3. Fallback to Gemini third
   for (let i = 0; i <= retries; i++) {
     try {
+      if (signal?.aborted) break;
       const ai = getAiClient();
       console.log(`[Gemini] Attempting grounding as fallback (Attempt ${i + 1})...`);
       const prompt = `Find the following specific information for the property at ${address}, ${postcode}:
@@ -1996,6 +2448,7 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
                     name: { type: Type.STRING },
                     type: { type: Type.STRING, enum: ["Primary", "Secondary"] },
                     ofstedRating: { type: Type.STRING },
+                    inspectionDate: { type: Type.STRING },
                     distance: { type: Type.STRING },
                     location: {
                       type: Type.OBJECT,
@@ -2026,18 +2479,51 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
   }
 
   return {
-    councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: "2024/25" },
+    councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: getCurrentCouncilTaxYear() },
     radonRisk: { riskLevel: "Unknown", percentage: "N/A", description: "Data temporarily unavailable." },
     coalMining: { isReportingArea: false, isHighRiskArea: false, description: "Data temporarily unavailable." },
-    broadband: { superfastAvailable: true, ultrafastAvailable: false, standardAvailable: true, maxDownloadSpeed: "Unknown", maxUploadSpeed: "Unknown" },
+    broadband: { superfastAvailable: false, ultrafastAvailable: false, standardAvailable: false, maxDownloadSpeed: "Not available from Ofcom lookup", maxUploadSpeed: "Not available from Ofcom lookup" },
     schools: []
   };
 }
 
+function floodBandFromFeature(feature: any): string | null {
+  const values = Object.values(feature?.properties || {}).map(value => String(value).trim()).filter(Boolean);
+  const explicit = values.find(value => /^(very low|low|medium|high)$/i.test(value));
+  if (explicit) return explicit.replace(/\b\w/g, character => character.toUpperCase());
+  const joined = values.join(' ');
+  if (/very\s*low/i.test(joined)) return 'Very Low';
+  if (/medium/i.test(joined)) return 'Medium';
+  if (/high/i.test(joined)) return 'High';
+  if (/low/i.test(joined)) return 'Low';
+  return null;
+}
+
+async function queryEnvironmentAgencyFloodWms(
+  endpoint: string,
+  layer: string,
+  eastings?: number,
+  northings?: number
+): Promise<string | null> {
+  if (!Number.isFinite(eastings) || !Number.isFinite(northings)) return null;
+  const radius = 50;
+  const params = new URLSearchParams({
+    SERVICE: 'WMS', VERSION: '1.3.0', REQUEST: 'GetFeatureInfo',
+    LAYERS: layer, QUERY_LAYERS: layer, CRS: 'EPSG:27700',
+    BBOX: `${Number(eastings) - radius},${Number(northings) - radius},${Number(eastings) + radius},${Number(northings) + radius}`,
+    WIDTH: '101', HEIGHT: '101', I: '50', J: '50',
+    INFO_FORMAT: 'application/json', FEATURE_COUNT: '10'
+  });
+  const response = await fetch(`${endpoint}?${params}`, { signal: AbortSignal.timeout(5000) });
+  if (!response.ok) throw new Error(`EA WMS returned HTTP ${response.status}`);
+  const data: any = await response.json();
+  const features = Array.isArray(data?.features) ? data.features : [];
+  if (features.length === 0) return 'Very Low (outside mapped risk extent)';
+  return features.map(floodBandFromFeature).find(Boolean) || 'Mapped risk area';
+}
+
 // Flood Risk Fetching (Real Data Integration)
-async function fetchFloodRiskData(postcode: string, logs: string[]) {
-  // 1. Get real coordinates from Postcodes.io
-  const coords = await fetchCoordinates(postcode);
+async function fetchFloodRiskData(postcode: string, logs: string[], coords?: { eastings?: number; northings?: number; latitude: number; longitude: number } | null) {
   
   // 2. Check for active flood warnings from Environment Agency (Real-time)
   let activeWarnings = "No active warnings";
@@ -2055,18 +2541,21 @@ async function fetchFloodRiskData(postcode: string, logs: string[]) {
     logs.push(`[FLOOD] Warning fetch error: ${err}`);
   }
 
-  const normalizedPostcode = postcode.toUpperCase().replace(/\s/g, '');
-  let riversSeaRisk = "Check GOV.UK";
-  let surfaceWaterRisk = "Very Low";
-  let groundwaterRisk = "Negligible";
-  let reservoirRisk = "None";
-  
-  if (normalizedPostcode === 'DE723UA') {
-    riversSeaRisk = "Very Low";
-    surfaceWaterRisk = "Very Low";
-  } else {
-    riversSeaRisk = activeWarnings === "No active warnings" ? "Low (Estimated)" : "Active Warnings";
+  let riversSeaRisk = "Environment Agency data unavailable";
+  let surfaceWaterRisk = "Environment Agency data unavailable";
+  try {
+    const [riversSea, surfaceWater] = await Promise.all([
+      queryEnvironmentAgencyFloodWms('https://environment.data.gov.uk/spatialdata/nafra2-risk-of-flooding-from-rivers-and-sea/wms', 'rofrs_4band', coords?.eastings, coords?.northings),
+      queryEnvironmentAgencyFloodWms('https://environment.data.gov.uk/spatialdata/nafra2-risk-of-flooding-from-surface-water/wms', 'rofsw', coords?.eastings, coords?.northings)
+    ]);
+    if (riversSea) riversSeaRisk = riversSea;
+    if (surfaceWater) surfaceWaterRisk = surfaceWater;
+    logs.push(`[FLOOD] EA defended risk at canonical point: rivers/sea=${riversSeaRisk}; surface water=${surfaceWaterRisk}`);
+  } catch (error: any) {
+    logs.push(`[FLOOD] EA risk-layer query error: ${error?.message || error}`);
   }
+  const groundwaterRisk = "Not assessed by this source";
+  const reservoirRisk = "Check Environment Agency map";
 
   return {
     postcode,
@@ -2174,8 +2663,8 @@ async function fetchFallbackAddresses(postcode: string): Promise<{ id: string; a
     }
   })();
 
-  // 2. Council Tax Direct Scraper (returns registered residential properties)
-  const ctPromise = (async () => {
+  // 2. Council Tax Direct Scraper, used only if the faster address registers return nothing.
+  const fetchCouncilTaxAddresses = async () => {
     try {
       const ctResult = await fetchCouncilTaxDirectly("", "", normalizedPostcode, []);
       if (ctResult && 'results' in ctResult && Array.isArray((ctResult as any).results)) {
@@ -2188,7 +2677,7 @@ async function fetchFallbackAddresses(postcode: string): Promise<{ id: string; a
       console.warn(`[Fallback] Council tax address fetch failed:`, err.message);
     }
     return [];
-  })();
+  };
 
   // 3. EPC Open Data
   const epcPromise = (async () => {
@@ -2199,7 +2688,8 @@ async function fetchFallbackAddresses(postcode: string): Promise<{ id: string; a
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${epcToken.trim()}`
-          }
+          },
+          signal: AbortSignal.timeout(4000)
         });
         if (epcRes.ok) {
           const epcData = await epcRes.json();
@@ -2218,7 +2708,10 @@ async function fetchFallbackAddresses(postcode: string): Promise<{ id: string; a
     return [];
   })();
 
-  const [lrAddrs, ctAddrs, epcAddrs] = await Promise.all([lrPromise, ctPromise, epcPromise]);
+  const [lrAddrs, epcAddrs] = await Promise.all([lrPromise, epcPromise]);
+  const ctAddrs = lrAddrs.length === 0 && epcAddrs.length === 0
+    ? await fetchCouncilTaxAddresses()
+    : [];
   const allAddresses = [...lrAddrs, ...ctAddrs, ...epcAddrs];
 
   allAddresses.forEach((fullAddr: string) => {
@@ -2336,6 +2829,25 @@ async function fetchMobileCoverageData(postcode: string, addressText?: string) {
   const compactPostcode = normalizedPostcode.replace(/\s+/g, '');
   const { houseNumber, street } = parseAddress(addressText || "");
   console.log(`[Mobile] Fetching mobile coverage for: ${houseNumber} ${street}, ${normalizedPostcode}`);
+
+  try {
+    const live = await lookupOfcomMobile(houseNumber, street, normalizedPostcode);
+    if (live?.success && Array.isArray(live.mobile) && live.mobile.length > 0) {
+      return {
+        summary: `Operator-specific coverage returned by the Ofcom checker for ${normalizedPostcode}.`,
+        operators: live.mobile,
+        source: 'Ofcom mobile coverage checker'
+      };
+    }
+  } catch (err: any) {
+    console.warn('[Mobile] Ofcom checker unavailable:', err?.message || err);
+  }
+
+  return {
+    summary: `Live operator-specific coverage was unavailable for ${normalizedPostcode}. Check each operator before relying on mobile service at the property.`,
+    operators: [],
+    source: 'Ofcom lookup unavailable'
+  };
 
   // Grounded infrastructure: DE72 3UA is situated near active Vodafone and EE 5G transmitters
   if (compactPostcode === 'DE723UA' || compactPostcode.startsWith('DE723')) {
@@ -2616,13 +3128,81 @@ Return JSON with this EXACT structure:
   };
 }
 
-async function fetchOfcomBroadband(uprn: string, postcode: string, addressText?: string) {
+function ofcomCoverageLabel(value: unknown): string {
+  const score = Number(value);
+  return ({ 0: 'No predicted signal', 1: 'Reliable signal unlikely', 2: 'May experience connectivity problems', 3: 'Good coverage likely', 4: 'Enhanced coverage likely' } as Record<number, string>)[score] || 'Not reported';
+}
+
+async function fetchOfcomConnectedNations(postcode: string, uprn: string | undefined, addressText: string, logs: string[]) {
+  const sharedApiKey = process.env.OFCOM_API_KEY;
+  const broadbandApiKey = process.env.OFCOM_BROADBAND_API_KEY || sharedApiKey;
+  const mobileApiKey = process.env.OFCOM_MOBILE_API_KEY || sharedApiKey;
+  if (!broadbandApiKey && !mobileApiKey) {
+    logs.push('[Ofcom API] No Connected Nations API keys are configured; direct lookup skipped.');
+    return null;
+  }
+  const compactPostcode = postcode.replace(/\s+/g, '').toUpperCase();
+  const [broadbandResponse, mobileResponse] = await Promise.all([
+    broadbandApiKey
+      ? fetch(`https://api-proxy.ofcom.org.uk/broadband/coverage/${encodeURIComponent(compactPostcode)}`, {
+          headers: { 'Ocp-Apim-Subscription-Key': broadbandApiKey, Accept: 'application/json' },
+          signal: AbortSignal.timeout(8000)
+        })
+      : null,
+    mobileApiKey
+      ? fetch(`https://api-proxy.ofcom.org.uk/mobile/coverage/${encodeURIComponent(compactPostcode)}`, {
+          headers: { 'Ocp-Apim-Subscription-Key': mobileApiKey, Accept: 'application/json' },
+          signal: AbortSignal.timeout(8000)
+        })
+      : null
+  ]);
+  const broadbandStatus = broadbandResponse?.status ?? 'not configured';
+  const mobileStatus = mobileResponse?.status ?? 'not configured';
+  if (!broadbandResponse?.ok && !mobileResponse?.ok) {
+    throw new Error(`Connected Nations API returned broadband ${broadbandStatus}, mobile ${mobileStatus}`);
+  }
+  if (!broadbandResponse?.ok) logs.push(`[Ofcom API] Broadband request returned HTTP ${broadbandStatus}.`);
+  if (!mobileResponse?.ok) logs.push(`[Ofcom API] Mobile request returned HTTP ${mobileStatus}.`);
+  const broadbandJson: any = broadbandResponse?.ok ? await broadbandResponse.json() : null;
+  const mobileJson: any = mobileResponse?.ok ? await mobileResponse.json() : null;
+  const chooseAddress = (items: any[]) => {
+    const exactUprn = uprn ? items.find(item => String(item.UPRN) === String(uprn)) : null;
+    if (exactUprn) return exactUprn;
+    const house = addressText.trim().match(/^([^,\s]+)/)?.[1]?.toLowerCase();
+    return items.find(item => house && String(item.AddressShortDescription || '').toLowerCase().match(new RegExp(`^${house}(?:,|\\s)`))) || null;
+  };
+  const broadbandAddress = chooseAddress(broadbandJson?.Availability || []);
+  const mobileAddress = chooseAddress(mobileJson?.Availability || []);
+  const broadband = broadbandAddress ? [
+    { type: 'Basic', available: Number(broadbandAddress.MaxBbPredictedDown) > 0, downloadSpeed: `${broadbandAddress.MaxBbPredictedDown} Mbps`, uploadSpeed: `${broadbandAddress.MaxBbPredictedUp} Mbps` },
+    { type: 'Superfast', available: Number(broadbandAddress.MaxSfbbPredictedDown) > 0, downloadSpeed: `${broadbandAddress.MaxSfbbPredictedDown} Mbps`, uploadSpeed: `${broadbandAddress.MaxSfbbPredictedUp} Mbps` },
+    { type: 'Ultrafast', available: Number(broadbandAddress.MaxUfbbPredictedDown) > 0, downloadSpeed: `${broadbandAddress.MaxUfbbPredictedDown} Mbps`, uploadSpeed: `${broadbandAddress.MaxUfbbPredictedUp} Mbps` },
+    { type: 'Maximum predicted', available: Number(broadbandAddress.MaxPredictedDown) > 0, downloadSpeed: `${broadbandAddress.MaxPredictedDown} Mbps`, uploadSpeed: `${broadbandAddress.MaxPredictedUp} Mbps` }
+  ] : [];
+  const operators = [
+    { operator: 'EE', prefix: 'EE' }, { operator: 'Three', prefix: 'H3' },
+    { operator: 'O2', prefix: 'TF' }, { operator: 'Vodafone', prefix: 'VO' }
+  ];
+  const mobile = mobileAddress ? operators.map(({ operator, prefix }) => ({
+    operator,
+    voice: `Indoor: ${ofcomCoverageLabel(mobileAddress[`${prefix}VoiceIndoor`])}; Outdoor: ${ofcomCoverageLabel(mobileAddress[`${prefix}VoiceOutdoor`])}`,
+    data: `Indoor: ${ofcomCoverageLabel(mobileAddress[`${prefix}DataIndoor`])}; Outdoor: ${ofcomCoverageLabel(mobileAddress[`${prefix}DataOutdoor`])}`,
+    data4g: ofcomCoverageLabel(mobileAddress[`${prefix}DataOutdoor`]),
+    indoor: ofcomCoverageLabel(mobileAddress[`${prefix}DataIndoor`]),
+    outdoor: ofcomCoverageLabel(mobileAddress[`${prefix}DataOutdoor`]),
+    overall: ofcomCoverageLabel(Math.max(Number(mobileAddress[`${prefix}VoiceOutdoor`]) || 0, Number(mobileAddress[`${prefix}DataOutdoor`]) || 0))
+  })) : [];
+  logs.push(`[Ofcom API] Connected Nations matched ${broadbandAddress ? 'broadband' : 'no broadband'} and ${mobileAddress ? 'mobile' : 'no mobile'} address records.`);
+  return { address: broadbandAddress?.AddressShortDescription || mobileAddress?.AddressShortDescription || addressText, postcode: compactPostcode, broadband, networks: [], mobile, mobileSummary: mobile.length ? 'Official Ofcom Connected Nations indoor and outdoor predictions.' : '' };
+}
+
+async function fetchOfcomBroadband(uprn: string, postcode: string, addressText?: string, signal?: AbortSignal) {
   try {
     const normalizedPostcode = postcode.toUpperCase().replace(/\s+/g, '');
     console.log(`[Ofcom] Fetching broadband for: ${addressText} in ${normalizedPostcode}`);
     
     const { houseNumber, street } = parseAddress(addressText || "");
-    const bbResult = await scrapeOfcomBroadband(houseNumber, street, normalizedPostcode);
+    const bbResult = await scrapeOfcomBroadband(houseNumber, street, normalizedPostcode, signal);
 
     if (bbResult && bbResult.success && !(bbResult as any).isRecaptcha) {
       return {
@@ -2635,30 +3215,8 @@ async function fetchOfcomBroadband(uprn: string, postcode: string, addressText?:
       } as any;
     }
 
-    // Grounded fallback using Openreach infrastructure metrics
-    try {
-      const grounded = await generateGroundedBroadband(addressText || `${houseNumber} ${street}`, normalizedPostcode);
-      if (grounded && grounded.broadband && grounded.broadband.length > 0) {
-        return grounded;
-      }
-    } catch {}
-
-    // Return standard UK broadband infrastructure estimate gracefully
-    return {
-      address: addressText || `${houseNumber} ${street}, ${normalizedPostcode}`,
-      postcode: normalizedPostcode,
-      broadband: [
-        { type: "Standard", name: "Standard", available: true, speed: "16 Mbps", downloadSpeed: "16 Mbps", uploadSpeed: "1 Mbps" },
-        { type: "Superfast", name: "Superfast", available: true, speed: "80 Mbps", downloadSpeed: "80 Mbps", uploadSpeed: "20 Mbps" },
-        { type: "Ultrafast", name: "Ultrafast", available: true, speed: "330 Mbps", downloadSpeed: "330 Mbps", uploadSpeed: "50 Mbps" },
-        { type: "Gigabit", name: "Gigabit", available: true, speed: "1,000 Mbps", downloadSpeed: "1,000 Mbps", uploadSpeed: "220 Mbps" }
-      ],
-      networks: [
-        { name: "Openreach", available: true, type: "FTTC / FTTP" }
-      ],
-      mobile: [],
-      mobileSummary: ""
-    } as any;
+    console.warn(`[Ofcom] No address-level broadband result for ${addressText || normalizedPostcode}; no speed has been inferred.`);
+    return null;
   } catch (err: any) {
     console.log(`[Ofcom] Broadband lookup note: ${err.message}`);
     return null;
@@ -2760,7 +3318,8 @@ app.post('/api/check-band', async (req, res) => {
             band: directResult.band,
             authority: directResult.authority,
             annualAmount: directResult.annualAmount,
-            year: directResult.year
+            year: directResult.year,
+            source: directResult.source
           } 
         });
       } else if ('results' in directResult && Array.isArray(directResult.results) && directResult.results.length > 0) {
@@ -2777,7 +3336,7 @@ app.post('/api/check-band', async (req, res) => {
           band: groundedResult.band,
           authority: groundedResult.authority || "Local Authority",
           annualAmount: groundedResult.annualAmount || calculateCouncilTaxAmount(groundedResult.band, groundedResult.authority || ""),
-          year: groundedResult.year || "2024/25",
+          year: groundedResult.year || getCurrentCouncilTaxYear(),
           source: groundedResult.source || "VOA Grounded Verification"
         }
       });
@@ -2847,44 +3406,9 @@ async function generateHomePackDossier(
   onStepProgress?.('schools', 'in_progress');
   onStepProgress?.('healthcare', 'in_progress');
   onStepProgress?.('crime', 'in_progress');
+  onStepProgress?.('planning', 'in_progress');
 
-  const coordsPromise = fetchCoordinates(postcode).catch(() => null);
-
-  const crimePromise = coordsPromise.then(async (coords) => {
-    if (!coords) return null;
-    return getCrimeDataForCoordinates(coords.latitude, coords.longitude, { logs });
-  })
-    .then(res => {
-      const detail = res ? `${res.totalLast12Months} crimes • ${res.benchmarks?.safetyRating || 'Verified'}` : 'Police.uk Checked';
-      onStepProgress?.('crime', 'completed', detail);
-      return res;
-    })
-    .catch(err => {
-      logs.push(`[Police.uk] Notice: ${err?.message || err}`);
-      onStepProgress?.('crime', 'completed', 'Standard Local Profile');
-      return null;
-    });
-
-  const healthcarePromise = coordsPromise.then((coords) => {
-    return getHealthcareAccessData(postcode, {
-      nhsApiKey: process.env.NHS_API_KEY,
-      cqcApiKey: process.env.CQC_API_KEY,
-      logs,
-      coords: coords ? { lat: coords.latitude, lng: coords.longitude } : null
-    });
-  })
-    .then(res => {
-      const detail = res?.gpSurgeries?.length ? `${res.gpSurgeries.length} Surgeries (CQC Checked)` : 'Registers Checked';
-      onStepProgress?.('healthcare', 'completed', detail);
-      return res;
-    })
-    .catch(err => {
-      logs.push(`[Healthcare] Notice: ${err?.message || err}`);
-      onStepProgress?.('healthcare', 'completed', 'Primary Care Checked');
-      return null;
-    });
-
-  const landRegistryPromise = fetchLandRegistryData(fullStreet, postcode, logs)
+  const landRegistryPromise = trackTiming('HM Land Registry lookup', logs, () => fetchLandRegistryData(fullStreet, postcode, logs))
     .then(res => {
       const detail = res && res.length > 0 
         ? `${res[0].estateType || 'Registered'} (${res.length} recs)` 
@@ -2897,7 +3421,7 @@ async function generateHomePackDossier(
       return [];
     });
 
-  const epcPromise = fetchEpcData(fullStreet, postcode, logs)
+  const epcPromise = trackTiming('EPC lookup', logs, () => fetchEpcData(fullStreet, postcode, logs))
     .then(res => {
       const detail = res?.rating ? `Band ${res.rating}` : 'Search complete';
       onStepProgress?.('epc', 'completed', detail);
@@ -2908,67 +3432,112 @@ async function generateHomePackDossier(
       return null;
     });
 
-  const floodRiskPromise = fetchFloodRiskData(postcode, logs)
+  const coordsPromise = epcPromise.then((epc) => trackTiming('Canonical property coordinates', logs, () =>
+    fetchCanonicalPropertyCoordinates(postcode, epc?.uprn)
+  )).then((coords) => {
+    if (coords) logs.push(`[Coordinates] ${coords.source}: ${coords.latitude}, ${coords.longitude}${coords.uprn ? ` (UPRN ${coords.uprn})` : ''}`);
+    return coords;
+  }).catch(() => null);
+
+  const crimePromise = trackTiming('Police.uk crime profile', logs, () => coordsPromise.then(async (coords) => {
+    if (!coords) return null;
+    return getCrimeDataForCoordinates(coords.latitude, coords.longitude, { logs });
+  })).then(res => {
+    const detail = res ? `${res.totalLast12Months} crimes • ${res.benchmarks?.safetyRating || 'Verified'}` : 'Police.uk checked';
+    onStepProgress?.('crime', 'completed', detail);
+    return res;
+  }).catch(err => {
+    logs.push(`[Police.uk] Notice: ${err?.message || err}`);
+    onStepProgress?.('crime', 'completed', 'Police.uk checked');
+    return null;
+  });
+
+  const healthcarePromise = trackTiming('NHS and CQC healthcare lookup', logs, () => coordsPromise.then((coords) => getHealthcareAccessData(postcode, {
+    nhsApiKey: process.env.NHS_API_KEY,
+    nhsApiBaseUrl: process.env.NHS_API_BASE_URL,
+    cqcApiKey: process.env.CQC_API_KEY,
+    logs,
+    coords: coords ? { lat: coords.latitude, lng: coords.longitude } : null
+  }))).then(res => {
+    onStepProgress?.('healthcare', 'completed', res?.gpSurgeries?.length ? `${res.gpSurgeries.length} surgeries` : 'Registers checked');
+    return res;
+  }).catch(err => {
+    logs.push(`[Healthcare] Notice: ${err?.message || err}`);
+    onStepProgress?.('healthcare', 'completed', 'Primary care checked');
+    return null;
+  });
+
+  const planningPromise = Promise.all([epcPromise, coordsPromise])
+    .then(([epcResult, coords]) => trackTiming(
+      'Combined planning lookup',
+      logs,
+      () => fetchPlanningHistory(epcResult?.uprn || '', coords, logs)
+    ))
+    .then(result => {
+      onStepProgress?.('planning', 'completed', `${result.applications.length} applications • ${result.constraints.length} constraints`);
+      return result;
+    })
+    .catch(() => {
+      onStepProgress?.('planning', 'completed', 'Registers checked');
+      return { applications: [], constraints: [], coverage: undefined };
+    });
+
+  const floodRiskPromise = trackTiming('Environment Agency flood lookup', logs, () => coordsPromise.then(coords => fetchFloodRiskData(postcode, logs, coords)))
     .then(res => {
-      const detail = res?.riskOfFloodingFromRiversAndSea || 'Low Risk';
+      const detail = res?.riskOfFloodingFromRiversAndSea || 'Long-term risk not assessed';
       onStepProgress?.('flood', 'completed', detail);
       return res;
     })
     .catch(() => {
-      onStepProgress?.('flood', 'completed', 'Low Risk');
+      onStepProgress?.('flood', 'completed', 'Long-term risk not assessed');
       return {
         postcode,
-        riskOfFloodingFromRiversAndSea: "Low (Estimated)",
-        riskOfFloodingFromSurfaceWater: "Very Low",
-        riskOfFloodingFromGroundwater: "Negligible",
-        riskOfFloodingFromReservoirs: "None",
+        riskOfFloodingFromRiversAndSea: "Not assessed by this source",
+        riskOfFloodingFromSurfaceWater: "Not assessed by this source",
+        riskOfFloodingFromGroundwater: "Not assessed by this source",
+        riskOfFloodingFromReservoirs: "Check Environment Agency map",
         activeWarnings: "No active warnings"
       };
     });
 
   const groundedPromise = (async () => {
-    const coords = await coordsPromise;
-    return fetchGroundedLocalData(houseNumber || '', street || '', town || '', postcode, logs, coords)
-      .then(res => {
-        onStepProgress?.('council_tax', 'completed', res.councilTax?.band ? `Band ${res.councilTax.band}` : 'VOA Checked');
-        onStepProgress?.('connectivity', 'completed', res.broadband?.maxDownloadSpeed ? `${res.broadband.maxDownloadSpeed} • 4G/5G` : 'Verified');
-        onStepProgress?.('schools', 'completed', res.schools?.length ? `${res.schools.length} Catchment schools` : 'Local schools identified');
-        return res;
-      })
+    const [coords, epc] = await Promise.all([coordsPromise, epcPromise]);
+    return fetchGroundedLocalData(houseNumber || '', street || '', town || '', postcode, logs, coords, epc?.uprn, 3, onStepProgress)
       .catch(err => {
         onStepProgress?.('council_tax', 'completed', 'VOA Checked');
         onStepProgress?.('connectivity', 'completed', 'Standard profile');
         onStepProgress?.('schools', 'completed', 'Local area checked');
         return {
-          councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: "2025/26" },
-          radonRisk: { riskLevel: "Low", percentage: "< 1%", description: "Standard UK radon advisory." },
-          coalMining: { isReportingArea: false, isHighRiskArea: false, description: "Not in a designated coal mining reporting area." },
-          broadband: { superfastAvailable: true, ultrafastAvailable: true, standardAvailable: true, maxDownloadSpeed: "1000 Mbps", maxUploadSpeed: "220 Mbps" },
+          councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: getCurrentCouncilTaxYear() },
+          radonRisk: { riskLevel: "Unknown", percentage: "N/A", description: "Automated radon lookup unavailable; check the official UKradon map." },
+          coalMining: { isReportingArea: false, isHighRiskArea: false, description: "Automated Coal Authority check unavailable; no risk conclusion has been inferred." },
+          broadband: { superfastAvailable: false, ultrafastAvailable: false, standardAvailable: false, maxDownloadSpeed: "Not available from Ofcom lookup", maxUploadSpeed: "Not available from Ofcom lookup" },
           mobile: [],
-          mobileSummary: "Standard 4G/5G mobile coverage available.",
+          mobileSummary: "Operator-level measurements were not available; check the Ofcom coverage checker.",
           schools: []
         };
       });
   })();
 
-  const [landRegistry, epc, floodRisk, coords, groundedData, healthcare, crime] = await Promise.all([
+  const [landRegistry, epc, floodRisk, coords, groundedData, healthcare, crime, planningData] = await Promise.all([
     landRegistryPromise,
     epcPromise,
     floodRiskPromise,
     coordsPromise,
     groundedPromise,
     healthcarePromise,
-    crimePromise
+    crimePromise,
+    planningPromise
   ]);
-
-  const planningHistory = await fetchPlanningHistory(epc?.uprn || '', epc?.localAuthority).catch(() => []);
 
   const propertyData = {
     address: landRegistry && landRegistry.length > 0 ? landRegistry[0].addressString : `${street || ''}, ${town || ''}, ${postcode}`.replace(/^,\s*/, ''),
     landRegistry: landRegistry || [],
     epc,
     floodRisk,
-    planningHistory: planningHistory || [],
+    planningHistory: planningData.applications || [],
+    planningConstraints: planningData.constraints || [],
+    planningCoverage: planningData.coverage,
     councilTax: groundedData.councilTax,
     radonRisk: groundedData.radonRisk,
     coalMining: groundedData.coalMining,
@@ -2984,11 +3553,17 @@ async function generateHomePackDossier(
   onStepProgress?.('synthesis', 'in_progress', 'Synthesizing executive summary...');
   let summary = "";
   try {
-    summary = await generateSummary(propertyData);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      summary = await trackTiming('AI report synthesis', logs, () => generateSummary(propertyData, 1, controller.signal));
+    } finally {
+      clearTimeout(timeoutId);
+    }
     onStepProgress?.('synthesis', 'completed', 'Dossier ready');
   } catch (sumErr: any) {
     logs.push(`[Summary] Generator note: ${sumErr?.message}`);
-    summary = `**Property Address:** ${propertyData.address}\n\n- **Energy efficiency:** ${propertyData.epc ? `Rating ${propertyData.epc.rating}` : 'Consult EPC Register'}\n- **Flood risk:** Rivers/Sea: ${propertyData.floodRisk?.riskOfFloodingFromRiversAndSea || 'Low'}\n- **Running costs:** Council Tax Band ${propertyData.councilTax?.band || 'TBC'}\n- **Broadband connectivity:** Superfast & Ultrafast available\n- **Catchment schools:** Comprehensive primary and secondary schools nearby\n- **Key take-away:** Property profile generated with available national datasets.`;
+    summary = `**Property Address:** ${propertyData.address}\n\n- **Energy efficiency:** ${propertyData.epc ? `Rating ${propertyData.epc.rating}` : 'EPC not returned'}\n- **Flood risk:** Rivers/Sea: ${propertyData.floodRisk?.riskOfFloodingFromRiversAndSea || 'not returned'}; Surface water: ${propertyData.floodRisk?.riskOfFloodingFromSurfaceWater || 'not returned'}\n- **Running costs:** Council Tax ${propertyData.councilTax?.band ? `Band ${propertyData.councilTax.band}` : 'band not matched'}\n- **Broadband connectivity:** ${propertyData.broadband?.maxDownloadSpeed || 'address-level result not returned'}\n- **Nearby schools:** ${(propertyData.schools || []).map((school: any) => school.name).join(', ') || 'none returned'}\n- **Key take-away:** Property profile compiled from the official-source results shown above.`;
     onStepProgress?.('synthesis', 'completed', 'Dossier ready');
   }
 
@@ -3045,6 +3620,7 @@ app.post('/api/homepack/start', (req, res) => {
     { id: 'schools', label: 'Ofsted Catchment Schools & Ratings', status: 'pending' },
     { id: 'healthcare', label: 'NHS Primary Care & CQC Inspection Ratings', status: 'pending' },
     { id: 'crime', label: 'Police.uk Street Crime & 12-Month Safety Trends', status: 'pending' },
+    { id: 'planning', label: 'Planning Constraints & Nearby Applications', status: 'pending' },
     { id: 'synthesis', label: 'Executive Property Dossier Synthesis', status: 'pending' },
   ];
 
@@ -3087,6 +3663,7 @@ app.post('/api/healthcare/lookup', async (req, res) => {
   try {
     const data = await getHealthcareAccessData(postcode, {
       nhsApiKey: process.env.NHS_API_KEY,
+      nhsApiBaseUrl: process.env.NHS_API_BASE_URL,
       cqcApiKey: process.env.CQC_API_KEY
     });
     res.json({ result: data });
@@ -3106,6 +3683,7 @@ app.get('/api/healthcare/:postcode', async (req, res) => {
   try {
     const data = await getHealthcareAccessData(postcode, {
       nhsApiKey: process.env.NHS_API_KEY,
+      nhsApiBaseUrl: process.env.NHS_API_BASE_URL,
       cqcApiKey: process.env.CQC_API_KEY
     });
     res.json({ result: data });

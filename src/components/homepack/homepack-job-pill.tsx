@@ -25,7 +25,7 @@ export function HomePackJobHeaderPill() {
             openModal();
           }
         }}
-        className={`group flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 shadow-xs ${
+        className={`group flex min-w-0 items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 shadow-xs ${
           isCompleted
             ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
             : "bg-primary/10 hover:bg-primary/15 text-primary border-primary/25 animate-pulse"
@@ -37,12 +37,12 @@ export function HomePackJobHeaderPill() {
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
         )}
 
-        <span className="truncate max-w-[130px] sm:max-w-[170px]">
-          {isCompleted ? `Ready: ${addrLabel}` : `${addrLabel} (${activeJob.progress}%)`}
+        <span className="truncate max-w-[92px] sm:max-w-[150px] lg:max-w-[190px]">
+          {isCompleted ? addrLabel : `${addrLabel} (${activeJob.progress}%)`}
         </span>
 
         <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-background/60 text-foreground/80 shrink-0">
-          {isCompleted ? "View" : "Details"}
+          {isCompleted ? "Ready - view" : "Details"}
         </span>
       </button>
 
