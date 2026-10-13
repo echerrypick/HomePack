@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { Address, HomePackJob, ReportResult } from '@/types';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { authenticatedFetch } from '@/lib/billing-client';
+import { useAuth } from './AuthContext';
 
 const ACTIVE_JOB_KEY = 'homepack_active_job_id';
 const RECENT_REPORTS_KEY = 'homepack_recent_reports';
@@ -50,6 +52,15 @@ export function useHomePackJob() {
 }
 
 export function HomePackJobProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="p-10">Loading…</div>;
+  return <AccountJobs key={user?.uid || 'guest'}>{children}</AccountJobs>;
+}
+
+function AccountJobs({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const ACTIVE_JOB_KEY = `homepack_active_job_id:${user?.uid || 'guest'}`;
+  const RECENT_REPORTS_KEY = `homepack_recent_reports:${user?.uid || 'guest'}`;
   const [activeJob, setActiveJob] = useState<HomePackJob | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [recentReports, setRecentReports] = useState<SavedReportSummary[]>(() => {
@@ -92,7 +103,7 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
   // Poll a job by ID
   const pollJob = useCallback(async (jobId: string) => {
     try {
-      const res = await fetch(`/api/homepack/job/${jobId}`);
+      const res = await authenticatedFetch(`/api/homepack/job/${jobId}`);
       if (!res.ok) {
         if (res.status === 404) {
           // Job expired or not found on server
@@ -116,7 +127,7 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
         saveRecentReport(updatedJob);
 
         const addrLabel = `${updatedJob.address.houseNumber} ${updatedJob.address.street}`.trim() || updatedJob.address.postcode;
-        toast.success('Your HomePack is ready', {
+        toast.success('Your UK Property HomePack Report is ready', {
           id: `homepack-complete-${updatedJob.id}`,
           description: `${addrLabel} has finished compiling and is ready to review.`,
           duration: 6500,
@@ -134,7 +145,7 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
           clearInterval(pollTimerRef.current);
           pollTimerRef.current = null;
         }
-        toast.error(`HomePack generation failed`, {
+        toast.error(`Property report generation failed`, {
           description: updatedJob.error || 'An unexpected error occurred while compiling registers.'
         });
       }
@@ -175,7 +186,7 @@ export function HomePackJobProvider({ children }: { children: React.ReactNode })
   }, [activeJob?.id, activeJob?.status, pollJob]);
 
   const startJob = async (address: Address): Promise<string> => {
-    const res = await fetch('/api/homepack/start', {
+    const res = await authenticatedFetch('/api/homepack/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(address)

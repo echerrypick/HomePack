@@ -7,17 +7,33 @@ import Groq from "groq-sdk";
 import * as cheerio from 'cheerio';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { existsSync } from 'node:fs';
 import { lookupOfcomMobile, lookupOfcomBroadband, ensurePlaywrightChromium } from './src/lib/ofcomScraper';
 import { scrapeCoverage as scrapeSiginfoCoverage } from './src/lib/siginfoScraper';
 import { getHealthcareAccessData } from './src/services/healthcareService';
 import { getCrimeDataForCoordinates } from './src/services/crimeService';
+import { authenticate, requireProperty, requireBusiness, registerBillingRoutes, registerPaymentWebhook } from './server/billing';
+import { PLANNING_RADIUS_KM, PLANNING_RADIUS_MILES, isWithinPlanningRadius } from './server/planning-radius';
+import { filterPlanningApplicationsForScope, type PlanningScope } from './server/planning-scope';
+import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-registry-match';
 
 const execPromise = promisify(exec);
 
 // Ensure Playwright Chromium binary is available in background
 ensurePlaywrightChromium().catch((err) => console.warn('[Playwright] Init check:', err.message));
 
-dotenv.config();
+const dotenvResult = dotenv.config();
+
+// A placeholder exported in the shell otherwise takes precedence over the valid
+// local .env value and causes Firebase Admin to fail only when the first request
+// reaches Firestore. Recover from that stale local setting without overriding
+// genuine deployment environment variables.
+const inheritedCredentialPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const localCredentialPath = dotenvResult.parsed?.GOOGLE_APPLICATION_CREDENTIALS;
+if (inheritedCredentialPath && !existsSync(inheritedCredentialPath) && localCredentialPath && existsSync(localCredentialPath)) {
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = localCredentialPath;
+  console.warn('[SERVER START] Ignored an invalid inherited GOOGLE_APPLICATION_CREDENTIALS path and used the valid path from .env.');
+}
 
 const apiKeyRaw = process.env.GEMINI_API_KEY;
 if (apiKeyRaw) {
@@ -30,50 +46,112 @@ if (apiKeyRaw) {
   console.error("[SERVER START] GEMINI_API_KEY is MISSING from process.env");
 }
 
-const COUNCIL_TAX_RATES: Record<string, Record<string, number>> = {
-  "Tamworth": {
-    "A": 1533.83, "B": 1789.48, "C": 2045.12, "D": 2300.76,
-    "E": 2812.04, "F": 3323.33, "G": 3834.59, "H": 4601.52
-  },
-  "Three Rivers": {
-    "A": 1455.33, "B": 1697.89, "C": 1940.44, "D": 2183.00, "E": 2668.11, "F": 3153.22, "G": 3638.33, "H": 4366.00
-  },
-  "Watford": {
-    "A": 1492.45, "B": 1741.19, "C": 1989.93, "D": 2238.67, "E": 2736.15, "F": 3233.63, "G": 3731.12, "H": 4477.34
-  },
-  "Hertsmere": {
-    "A": 1442.12, "B": 1682.47, "C": 1922.83, "D": 2163.18, "E": 2643.89, "F": 3124.59, "G": 3605.30, "H": 4326.36
-  },
-  "St Albans": {
-    "A": 1461.34, "B": 1704.90, "C": 1948.45, "D": 2192.01, "E": 2679.12, "F": 3166.23, "G": 3653.35, "H": 4384.02
-  },
-  "Dacorum": {
-    "A": 1448.56, "B": 1689.99, "C": 1931.41, "D": 2172.84, "E": 2655.69, "F": 3138.55, "G": 3621.40, "H": 4345.68
-  },
-  "Barnet": {
-    "A": 1290.87, "B": 1506.02, "C": 1721.16, "D": 1936.31, "E": 2366.60, "F": 2796.89, "G": 3227.18, "H": 3872.62
-  },
-  "Harrow": {
-    "A": 1442.12, "B": 1682.47, "C": 1922.83, "D": 2163.18, "E": 2643.89, "F": 3124.59, "G": 3605.30, "H": 4326.36
-  },
-  "Hillingdon": {
-    "A": 1241.34, "B": 1448.23, "C": 1655.12, "D": 1862.01, "E": 2275.79, "F": 2689.57, "G": 3103.35, "H": 3724.02
-  }
+const COUNCIL_TAX_BANDS_BASE_URL = "https://counciltaxbands.com";
+const councilTaxRateCache = new Map<string, { expiresAt: number; result: CouncilTaxRateResult }>();
+
+type CouncilTaxRateResult = {
+  amount: string;
+  source: string;
+  sourceUrl?: string;
+  chargeNote?: string;
 };
 
-function calculateCouncilTaxAmount(band: string, authority: string): string {
-  if (!band || band === "Unknown" || band === "Not Available") return "Unknown";
-  
-  const normalizedAuthority = authority.replace(/District Council|Borough Council|City Council/i, "").trim();
-  const matchedAuthority = Object.keys(COUNCIL_TAX_RATES).find(name => normalizedAuthority.toLowerCase().includes(name.toLowerCase()));
-  const rates = matchedAuthority ? COUNCIL_TAX_RATES[matchedAuthority] : undefined;
-  
-  const amount = rates?.[band.toUpperCase()];
-  if (amount) {
-    return `£${amount.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function normalizeCouncilName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\b(the|council|district|borough|city|county|metropolitan|royal|london)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchCouncilTaxAnnualCharge(
+  band: string,
+  authority: string,
+  parish: string | null,
+  logs: string[]
+): Promise<CouncilTaxRateResult> {
+  const normalizedBand = band.toUpperCase();
+  const normalizedAuthority = normalizeCouncilName(authority);
+  if (!/^[A-I]$/.test(normalizedBand) || !normalizedAuthority) {
+    return { amount: "Not available", source: "A verified council and band were not available" };
   }
-  
-  return "Check local authority";
+
+  const taxYear = getCurrentCouncilTaxYear();
+  const cacheKey = `${normalizedAuthority}:${normalizeCouncilName(parish || '')}:${normalizedBand}:${taxYear}`;
+  const cached = councilTaxRateCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+  const unavailable = (source: string): CouncilTaxRateResult => ({ amount: "Not available", source });
+  try {
+    const indexResponse = await fetch(`${COUNCIL_TAX_BANDS_BASE_URL}/councils/`, {
+      headers: { "User-Agent": "UKHomePack/1.0 (+https://UKHomePack.com)" },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!indexResponse.ok) throw new Error(`council index returned HTTP ${indexResponse.status}`);
+
+    const index = cheerio.load(await indexResponse.text());
+    const matches = index('a[href^="/councils/"]')
+      .map((_, element) => ({
+        name: index(element).text().replace(/\s+/g, ' ').trim(),
+        href: index(element).attr('href') || ''
+      }))
+      .get()
+      .filter(item => item.href.split('/').filter(Boolean).length === 2)
+      .filter(item => normalizeCouncilName(item.name) === normalizedAuthority);
+
+    const uniqueMatches = [...new Map(matches.map(item => [item.href, item])).values()];
+    if (uniqueMatches.length !== 1) {
+      const result = unavailable("No unique council charge table matched the verified billing authority");
+      councilTaxRateCache.set(cacheKey, { expiresAt: Date.now() + 60 * 60 * 1000, result });
+      return result;
+    }
+
+    const councilUrl = new URL(uniqueMatches[0].href, COUNCIL_TAX_BANDS_BASE_URL).toString();
+    const councilResponse = await fetch(councilUrl, {
+      headers: { "User-Agent": "UKHomePack/1.0 (+https://UKHomePack.com)" },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!councilResponse.ok) throw new Error(`council page returned HTTP ${councilResponse.status}`);
+
+    const councilPage = cheerio.load(await councilResponse.text());
+    const heading = councilPage('h1').first().text().replace(/\s+/g, ' ').trim();
+    if (!heading.includes(taxYear) || !normalizeCouncilName(heading).includes(normalizedAuthority)) {
+      const result = unavailable(`The council charge table did not exactly match ${authority} and ${taxYear}`);
+      councilTaxRateCache.set(cacheKey, { expiresAt: Date.now() + 60 * 60 * 1000, result });
+      return result;
+    }
+
+    // Table 9 is the published billing-authority area charge. A parish or town
+    // council can add a separate local precept, so retain the verified area
+    // figure but label its scope instead of presenting it as the final bill.
+    const preceptingParishesText = councilPage('[data-fact="precepting-parishes"]').first().text().trim();
+    const preceptingParishes = Number(preceptingParishesText.replace(/[^0-9]/g, ''));
+    const parishPreceptMayApply = Boolean(preceptingParishesText) && Number.isFinite(preceptingParishes) && preceptingParishes > 0;
+
+    const amount = councilPage(`[data-fact="band-${normalizedBand.toLowerCase()}-rate"]`).first().text().trim();
+    if (!/^£\d{1,3}(?:,\d{3})*\.\d{2}$/.test(amount)) {
+      const result = unavailable(`No verified Band ${normalizedBand} charge was published for ${taxYear}`);
+      councilTaxRateCache.set(cacheKey, { expiresAt: Date.now() + 60 * 60 * 1000, result });
+      return result;
+    }
+
+    const result: CouncilTaxRateResult = {
+      amount,
+      source: `VOA band; CouncilTaxBands.com ${taxYear} area charge compiled from published government schedules`,
+      sourceUrl: councilUrl,
+      chargeNote: parishPreceptMayApply
+        ? `This is the published ${uniqueMatches[0].name} area charge. ${parish ? `${parish} parish` : 'A parish or town council'} may add a separate local precept.`
+        : undefined
+    };
+    councilTaxRateCache.set(cacheKey, { expiresAt: Date.now() + 24 * 60 * 60 * 1000, result });
+    logs.push(`[CouncilTax] Matched ${authority} Band ${normalizedBand} to the ${taxYear} published charge table.`);
+    return result;
+  } catch (error: any) {
+    logs.push(`[CouncilTax] Annual charge lookup unavailable: ${error?.message || error}`);
+    return unavailable("Verified annual charge table was unavailable; no estimate was used");
+  }
 }
 
 function getCurrentCouncilTaxYear(date = new Date()): string {
@@ -82,17 +160,31 @@ function getCurrentCouncilTaxYear(date = new Date()): string {
   return `${startYear}/${String(startYear + 1).slice(-2)}`;
 }
 
-async function resolveBillingAuthority(postcode: string): Promise<string | null> {
+type BillingAuthorityContext = {
+  authority: string | null;
+  parish: string | null;
+  authorityCode: string | null;
+};
+
+async function resolveBillingContext(postcode: string): Promise<BillingAuthorityContext> {
   try {
     const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode.trim())}`, {
       signal: AbortSignal.timeout(3000)
     });
-    if (!response.ok) return null;
+    if (!response.ok) return { authority: null, parish: null, authorityCode: null };
     const data = await response.json();
-    return data?.result?.admin_district || null;
+    return {
+      authority: data?.result?.admin_district || null,
+      parish: data?.result?.parish || null,
+      authorityCode: data?.result?.codes?.admin_district || null
+    };
   } catch {
-    return null;
+    return { authority: null, parish: null, authorityCode: null };
   }
+}
+
+async function resolveBillingAuthority(postcode: string): Promise<string | null> {
+  return (await resolveBillingContext(postcode)).authority;
 }
 
 function speedMbps(value: unknown): number | null {
@@ -481,7 +573,9 @@ ${JSON.stringify(prunedData, null, 2)}`;
   return "AI summary could not be generated after multiple attempts.";
 }
 
+registerPaymentWebhook(app);
 app.use(express.json({ limit: '50mb' }));
+registerBillingRoutes(app);
 
 // EPC Data Helper: Extracts a field from certificate or candidate matching various casing conventions
 function getEpcField(obj: any, ...keys: string[]): string | null {
@@ -989,12 +1083,14 @@ async function fetchPlanningDataApplications(
       const decision = String(getEpcField(entity, 'planning-application-status', 'status') || 'Unknown');
       return {
         application: String(getEpcField(entity, 'description', 'name') || 'No description available'),
+        address: String(getEpcField(entity, 'site-address', 'address', 'location') || '').trim() || undefined,
         decision,
         date: rawDate || 'Unknown',
         rawDate,
         reference,
         url: `https://www.planning.data.gov.uk/entity/${getEpcField(entity, 'entity') || ''}`,
         source: 'Planning Data',
+        distanceKm: 0,
         isActive: /pending|undecided|consultation|submitted/i.test(decision)
       };
     });
@@ -1066,19 +1162,29 @@ async function fetchPlanItApplications(
 
   try {
     const res = await fetch(`https://www.planit.org.uk/api/applics/json?${params}`, {
-      headers: { Accept: 'application/json', 'User-Agent': 'HomePack/1.0 planning due-diligence lookup' },
+      headers: { Accept: 'application/json', 'User-Agent': 'UKHomePack.com/1.0 property-report lookup' },
       signal: AbortSignal.timeout(7000)
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const rawData: any = await res.json();
     if (rawData.error) throw new Error(String(rawData.error));
-    return (rawData.records || []).map((record: any) => {
+    const records = (rawData.records || []).map((record: any) => {
       const decision = String(record.other_fields?.decision || record.app_state || record.other_fields?.status || 'Unknown');
       const rawDate = String(record.decided_date || record.start_date || '');
       const point = record.location?.coordinates;
       const calculatedDistance = Array.isArray(point) && point.length >= 2
         ? distanceKm(coords.latitude, coords.longitude, Number(point[1]), Number(point[0]))
         : undefined;
+      const addressCandidates = [
+        record.address,
+        record.other_fields?.site_address,
+        record.other_fields?.siteAddress,
+        record.other_fields?.address,
+        record.other_fields?.location_address
+      ];
+      const applicationAddress = addressCandidates
+        .map(value => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '')
+        .find(Boolean);
       return {
         application: String(record.description || 'No description available'),
         decision,
@@ -1086,14 +1192,19 @@ async function fetchPlanItApplications(
         rawDate,
         reference: String(record.uid || record.reference || record.name || 'N/A'),
         url: String(record.url || record.link || ''),
-        address: record.address ? String(record.address) : undefined,
-        distanceKm: calculatedDistance === undefined ? undefined : Number(calculatedDistance.toFixed(2)),
+        address: applicationAddress || undefined,
+        distanceKm: calculatedDistance,
         applicationType: record.app_type ? String(record.app_type) : undefined,
         applicationSize: record.app_size ? String(record.app_size) : undefined,
         source: 'PlanIt',
         isActive: /pending|undecided|consultation|submitted/i.test(String(record.app_state || record.other_fields?.status || ''))
       };
     });
+    const withinRadius = records.filter((record: any) => isWithinPlanningRadius(record.distanceKm));
+    if (withinRadius.length !== records.length) {
+      logs.push(`[PLANNING:PlanIt] Excluded ${records.length - withinRadius.length} records outside the verified ${PLANNING_RADIUS_MILES}-mile radius or without coordinates`);
+    }
+    return withinRadius;
   } catch (err: any) {
     logs.push(`[PLANNING:PlanIt] ${radiusKm}km search unavailable (${err?.message || err})`);
     return [];
@@ -1103,41 +1214,41 @@ async function fetchPlanItApplications(
 async function fetchPlanningHistory(
   uprn: string,
   coords: { latitude: number; longitude: number } | null,
+  street: string,
+  scope: PlanningScope,
   logs: string[]
 ) {
   const [officialApplications, constraints, recentApplications, significantApplications] = await Promise.all([
     trackTiming('Planning Data applications', logs, () => fetchPlanningDataApplications(uprn, coords, logs)),
     trackTiming('Planning Data constraints', logs, () => fetchPlanningConstraints(coords, logs)),
-    trackTiming('PlanIt nearby applications', logs, () => fetchPlanItApplications(coords, logs, 0.5, 2)),
-    trackTiming('PlanIt significant applications', logs, () => fetchPlanItApplications(coords, logs, 1, 5, true))
+    trackTiming('PlanIt nearby applications', logs, () => fetchPlanItApplications(coords, logs, PLANNING_RADIUS_KM, 2)),
+    trackTiming('PlanIt significant applications', logs, () => fetchPlanItApplications(coords, logs, PLANNING_RADIUS_KM, 5, true))
   ]);
-  const applications = mergePlanningApplications([officialApplications, recentApplications, significantApplications]);
-  logs.push(`[PLANNING] ${applications.length} unique applications and ${constraints.length} point constraints found`);
+  const allApplications = mergePlanningApplications([officialApplications, recentApplications, significantApplications]);
+  const applications = filterPlanningApplicationsForScope(allApplications, scope, street);
+  const scopeDescription = scope === 'radius'
+    ? `within ${PLANNING_RADIUS_MILES} miles`
+    : `linked to the property or recorded on ${street || 'the same street'}`;
+  logs.push(`[PLANNING] ${applications.length} unique applications ${scopeDescription}; ${constraints.length} point constraints found`);
   return {
     applications,
     constraints,
     coverage: {
-      applications: 'Planning Data UPRN/point search plus PlanIt within 500m over 2 years and significant schemes within 1km over 5 years',
+      scope,
+      radiusMiles: scope === 'radius' ? PLANNING_RADIUS_MILES : undefined,
+      applications: scope === 'radius'
+        ? `property-linked Planning Data records plus all verified PlanIt applications within ${PLANNING_RADIUS_MILES} miles; recent applications cover 2 years and significant schemes cover 5 years`
+        : `property-linked Planning Data records plus verified PlanIt applications recorded on ${street || 'the property street'}; recent applications cover 2 years and significant schemes cover 5 years`,
       constraints: 'Planning Data point intersection; absence of a result does not guarantee no constraint exists'
     }
   };
 }
 
 // Land Registry Fetching
-async function fetchLandRegistryData(streetInput: string, postcode: string, logs: string[]) {
+async function fetchLandRegistryData(houseNumberOrName: string, street: string, postcode: string, logs: string[]) {
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
-  
-  let paon = ''; 
-  let street = '';
-  const paonMatch = streetInput.match(/^(\d+[a-zA-Z]?(-\d+[a-zA-Z]?)?)\s+/);
-  if (paonMatch) {
-    paon = paonMatch[1];
-    street = streetInput.substring(paonMatch[0].length).trim();
-  } else {
-    street = streetInput;
-  }
 
-  logs.push(`[LR] Searching for PAON: ${paon}, Street: ${street}, Postcode: ${postcode}`);
+  logs.push(`[LR] Searching exact address: ${houseNumberOrName} ${street}, ${postcode}`);
 
   const cleanedPostcode = postcode.trim().toUpperCase().replace(/\s+/g, ' ');
   const compactPostcode = cleanedPostcode.replace(/\s+/g, '');
@@ -1151,7 +1262,7 @@ async function fetchLandRegistryData(streetInput: string, postcode: string, logs
     PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-    SELECT ?pricePaid ?transactionDate ?estateType ?paon ?saon ?street ?postcode ?town ?locality ?district ?county
+    SELECT ?pricePaid ?transactionDate ?estateType ?propertyTypeURI ?transactionCategoryURI ?newBuild ?paon ?saon ?street ?postcode ?town ?locality ?district ?county
     WHERE {
       VALUES ?postcode { "${formattedPostcode}" "${cleanedPostcode}" "${compactPostcode}" }
       ?addrURI lrcommon:postcode ?postcode .
@@ -1170,6 +1281,9 @@ async function fetchLandRegistryData(streetInput: string, postcode: string, logs
         ?transx lrppi:estateType ?estateTypeURI .
         ?estateTypeURI rdfs:label ?estateType .
       }
+      OPTIONAL { ?transx lrppi:propertyType ?propertyTypeURI . }
+      OPTIONAL { ?transx lrppi:transactionCategory ?transactionCategoryURI . }
+      OPTIONAL { ?transx lrppi:newBuild ?newBuild . }
     }
     ORDER BY DESC(?transactionDate)
     LIMIT 50
@@ -1208,6 +1322,10 @@ async function fetchLandRegistryData(streetInput: string, postcode: string, logs
         pricePaid: r.pricePaid?.value,
         transactionDate: r.transactionDate?.value,
         estateType: r.estateType?.value,
+        propertyType: landRegistryUriLabel(r.propertyTypeURI?.value),
+        transactionCategory: landRegistryUriLabel(r.transactionCategoryURI?.value)
+          .replace(/ Transaction$/i, ''),
+        newBuild: r.newBuild?.value === 'true',
         paon: r.paon?.value || '',
         saon: r.saon?.value || '',
         street: r.street?.value || '',
@@ -1226,23 +1344,135 @@ async function fetchLandRegistryData(streetInput: string, postcode: string, logs
       }
     }
 
-    // If a house number / PAON is specified, filter or prioritize it
-    let matchingRecords = deduplicatedRecords;
-    if (paon) {
-      const exactPaonMatches = deduplicatedRecords.filter(r => 
-        r.paon.toLowerCase() === paon.toLowerCase() ||
-        r.saon.toLowerCase() === paon.toLowerCase() ||
-        r.addressString.toLowerCase().startsWith(paon.toLowerCase())
-      );
-      if (exactPaonMatches.length > 0) {
-        matchingRecords = exactPaonMatches;
-      }
+    // Never substitute another property from the postcode when the exact address is absent.
+    const matchingRecords = deduplicatedRecords.filter(record =>
+      isExactLandRegistryAddress(record, houseNumberOrName, street)
+    );
+
+    if (matchingRecords.length === 0) {
+      logs.push(`[LR] No exact PAON/SAON and street match found; postcode-level records were discarded.`);
+      return [];
     }
 
     logs.push(`[LR] Found ${matchingRecords.length} unique transactions (total in postcode: ${deduplicatedRecords.length}).`);
     return matchingRecords.slice(0, 15);
   } catch (err: any) {
     logs.push(`[LR] Note: Land Registry fetch skipped or timed out (${err?.message || 'timeout'})`);
+    return [];
+  }
+}
+
+function escapeSparqlLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ').trim();
+}
+
+async function fetchRecentStreetSales(
+  houseNumberOrName: string,
+  streetName: string,
+  townOrCity: string,
+  postcode: string,
+  logs: string[]
+) {
+  const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
+  const street = escapeSparqlLiteral(streetName.toUpperCase());
+  const town = escapeSparqlLiteral(townOrCity.toUpperCase());
+  const outwardCode = escapeSparqlLiteral(postcode.replace(/\s+/g, '').slice(0, -3).toUpperCase());
+
+  if (!street) return [];
+
+  const locationPattern = town
+    ? `?addrURI lrcommon:town ?town .
+      VALUES ?town { "${town}" }`
+    : outwardCode
+      ? `OPTIONAL { ?addrURI lrcommon:town ?town . }
+      FILTER(STRSTARTS(REPLACE(UCASE(STR(?postcode)), " ", ""), "${outwardCode}"))`
+      : '';
+
+  const sparqlQuery = `
+    PREFIX lrppi: <http://landregistry.data.gov.uk/def/ppi/>
+    PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+    SELECT ?pricePaid ?transactionDate ?estateType ?propertyTypeURI ?transactionCategoryURI ?newBuild ?paon ?saon ?street ?postcode ?town ?locality ?district ?county
+    WHERE {
+      ?transx a lrppi:TransactionRecord ;
+              lrppi:pricePaid ?pricePaid ;
+              lrppi:transactionDate ?transactionDate ;
+              lrppi:propertyAddress ?addrURI .
+      ?addrURI lrcommon:street ?street ;
+               lrcommon:postcode ?postcode .
+      VALUES ?street { "${street}" }
+      ${locationPattern}
+      OPTIONAL { ?addrURI lrcommon:paon ?paon . }
+      OPTIONAL { ?addrURI lrcommon:saon ?saon . }
+      OPTIONAL { ?addrURI lrcommon:locality ?locality . }
+      OPTIONAL { ?addrURI lrcommon:district ?district . }
+      OPTIONAL { ?addrURI lrcommon:county ?county . }
+      OPTIONAL {
+        ?transx lrppi:estateType ?estateTypeURI .
+        ?estateTypeURI rdfs:label ?estateType .
+      }
+      OPTIONAL { ?transx lrppi:propertyType ?propertyTypeURI . }
+      OPTIONAL { ?transx lrppi:transactionCategory ?transactionCategoryURI . }
+      OPTIONAL { ?transx lrppi:newBuild ?newBuild . }
+    }
+    ORDER BY DESC(?transactionDate)
+    LIMIT 50
+  `;
+
+  logs.push(`[LR Street] Searching recent recorded sales on ${streetName}${townOrCity ? `, ${townOrCity}` : ''}.`);
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/sparql-results+json',
+      },
+      body: `query=${encodeURIComponent(sparqlQuery)}`,
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!res.ok) {
+      logs.push(`[LR Street] Warning: API returned status ${res.status}.`);
+      return [];
+    }
+
+    const data = await res.json();
+    const bindings = data.results?.bindings || [];
+    const seen = new Set<string>();
+    const records = bindings.map((r: any) => ({
+      pricePaid: r.pricePaid?.value || '',
+      transactionDate: r.transactionDate?.value || '',
+      estateType: r.estateType?.value || '',
+      propertyType: landRegistryUriLabel(r.propertyTypeURI?.value),
+      transactionCategory: landRegistryUriLabel(r.transactionCategoryURI?.value).replace(/ Transaction$/i, ''),
+      newBuild: r.newBuild?.value === 'true',
+      paon: r.paon?.value || '',
+      saon: r.saon?.value || '',
+      street: r.street?.value || '',
+      addressString: [
+        r.saon?.value,
+        r.paon?.value,
+        r.street?.value,
+        r.town?.value,
+        r.locality?.value,
+        r.district?.value,
+        r.county?.value,
+        r.postcode?.value,
+      ].filter(Boolean).join(', '),
+    })).filter((record: any) => {
+      if (!record.pricePaid || !record.transactionDate || isExactLandRegistryAddress(record, houseNumberOrName, streetName)) return false;
+      const key = `${record.transactionDate}_${record.pricePaid}_${record.saon}_${record.paon}_${record.street}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    logs.push(`[LR Street] Found ${records.length} neighbouring recorded transactions; returning the latest 10.`);
+    return records.slice(0, 10);
+  } catch (err: any) {
+    logs.push(`[LR Street] Lookup skipped or timed out (${err?.message || 'timeout'}).`);
     return [];
   }
 }
@@ -1476,41 +1706,56 @@ async function fetchCouncilTaxDirectly(houseNumber: string, street: string, post
 
     const candidates: { address: string; band: string; authority: string; score: number }[] = [];
 
-    // 1. Try to parse the table structure specifically
-    const table = $("table.govuk-table");
-    if (table.length > 0) {
-      console.log("[CouncilTax] Found govuk-table, parsing rows...");
+    const appendTableCandidates = (document: cheerio.CheerioAPI) => {
+      const table = document("table.govuk-table");
+      if (!table.length) return;
       const rows = table.find("tbody tr");
-
       let addressIdx = 0;
       let bandIdx = 1;
-      let authorityIdx = 2;
-
+      let authorityIdx = -1;
       const headersEl = table.find("thead th");
       headersEl.each((i, el) => {
-        const headerText = $(el).text().toLowerCase();
+        const headerText = document(el).text().toLowerCase();
         if (headerText.includes("address")) addressIdx = i;
         if (headerText.includes("band")) bandIdx = i;
         if (headerText.includes("authority")) authorityIdx = i;
       });
-
       rows.each((_, row) => {
-        const cells = $(row).find("td, th");
+        const cells = document(row).find("td, th");
         if (cells.length >= 2) {
           const address = cells.eq(addressIdx).text().replace(/\s+/g, ' ').trim();
           let band = cells.eq(bandIdx).text().trim().toUpperCase();
-          const authority = cells.eq(authorityIdx).text().trim();
-
-          const bandMatch = band.match(/\b([A-H])\b/);
+          const authority = authorityIdx >= 0 ? cells.eq(authorityIdx).text().trim() : '';
+          const bandMatch = band.match(/\b([A-I])\b/);
           if (bandMatch) {
             band = bandMatch[1];
-            candidates.push({ address, band, authority, score: 0 });
+            candidates.push({ address, band, authority: authority || 'Local Authority', score: 0 });
           }
         }
       });
+    };
+
+    // Parse every official results page so an address beyond the first 20 rows
+    // can still be matched exactly. Never replace it with the closest row.
+    console.log("[CouncilTax] Found govuk-table, parsing official result pages...");
+    appendTableCandidates($);
+    const pageHrefs = [...new Set(
+      $('a[href*="page="]').map((_, element) => $(element).attr('href')).get().filter(Boolean)
+    )].filter(href => !/[?&]page=0(?:&|$)/.test(href)).slice(0, 20);
+    for (const href of pageHrefs) {
+      try {
+        const pageUrl = new URL(href, postRes.url).toString();
+        const pageRes = await fetch(pageUrl, {
+          headers: { ...headers, Cookie: cookies, Referer: postRes.url },
+          signal: AbortSignal.timeout(5000)
+        });
+        if (pageRes.ok) appendTableCandidates(cheerio.load(await pageRes.text()));
+      } catch (pageError: any) {
+        logs.push(`[Direct-Scrape] VOA pagination notice: ${pageError?.message || pageError}`);
+      }
     }
 
-    // 2. Fallback to general selectors if table parsing didn't find much
+    // Fallback to general selectors only when the official result did not use a table.
     if (candidates.length === 0) {
       console.log("[CouncilTax] Table parsing found nothing, trying general selectors...");
       const selectors = [
@@ -1524,12 +1769,12 @@ async function fetchCouncilTaxDirectly(houseNumber: string, street: string, post
         const text = $(el).text().replace(/\s+/g, ' ').trim();
         if (!text || text.length < 5) return;
 
-        const bandMatch = text.match(/\bBand\s*:?\s*([A-H])\b/i);
+        const bandMatch = text.match(/\bBand\s*:?\s*([A-I])\b/i);
         if (bandMatch) {
           const band = bandMatch[1].toUpperCase();
-          let addressPart = text.split(/Band\s*:?\s*[A-H]/i)[0]?.trim() || "";
+          let addressPart = text.split(/Band\s*:?\s*[A-I]/i)[0]?.trim() || "";
           addressPart = addressPart.replace(/,\s*$/, "").trim();
-          const authorityPart = text.split(/Band\s*:?\s*[A-H]/i)[1]?.trim() || "Local Authority";
+          const authorityPart = text.split(/Band\s*:?\s*[A-I]/i)[1]?.trim() || "Local Authority";
 
           if (addressPart && addressPart.length > 3) {
             candidates.push({ address: addressPart, band, authority: authorityPart, score: 0 });
@@ -1588,16 +1833,22 @@ async function fetchCouncilTaxDirectly(houseNumber: string, street: string, post
     const bestAddress = normalizeText(bestMatch?.address || '');
     const exactHouseMatch = !targetHouse || new RegExp(`(^|\\s)${targetHouse}(\\s|$)`).test(bestAddress);
     if (bestMatch && bestMatch.score > threshold && exactHouseMatch) {
-      const resolvedAuthority = bestMatch.authority && bestMatch.authority !== 'Local Authority'
-        ? bestMatch.authority
-        : await resolveBillingAuthority(normalizedPostcode) || 'Local Authority';
+      const postcodeContext = await resolveBillingContext(normalizedPostcode);
+      const resolvedAuthority = postcodeContext.authority || (
+        bestMatch.authority && bestMatch.authority !== 'Local Authority'
+          ? bestMatch.authority
+          : 'Local Authority'
+      );
+      const annualCharge = await fetchCouncilTaxAnnualCharge(bestMatch.band, resolvedAuthority, postcodeContext.parish, logs);
       return {
         band: bestMatch.band,
         authority: resolvedAuthority,
         address: bestMatch.address,
-        annualAmount: calculateCouncilTaxAmount(bestMatch.band, resolvedAuthority),
+        annualAmount: annualCharge.amount,
         year: getCurrentCouncilTaxYear(),
-        source: resolvedAuthority.toLowerCase().includes('tamworth') ? 'VOA band; Tamworth Borough Council 2026/27 charges' : 'VOA band; local authority charge table',
+        source: annualCharge.source,
+        sourceUrl: annualCharge.sourceUrl,
+        chargeNote: annualCharge.chargeNote,
         allResults: uniqueCandidates.map(c => ({ address: c.address, band: c.band }))
       };
     }
@@ -1618,9 +1869,11 @@ async function fetchGroundedCouncilTax(houseNumber: string, street: string, post
   const cleanStreet = (street || '').trim();
   const targetAddress = `${cleanHouse} ${cleanStreet}, ${cleanPostcode}`.trim();
 
-  logs.push(`[Grounding] Starting Council Tax lookup for ${targetAddress}`);
+  logs.push(`[CouncilTax] Starting official Council Tax lookup for ${targetAddress}`);
 
-  // 1. Try Direct Scrape (Primary - Costs zero quota)
+  // Council Tax bands must come from the official VOA lookup. Never infer a
+  // band from search snippets, AI, EPC floor area, neighbouring properties or
+  // a default Band D assumption.
   const directResult = await fetchCouncilTaxDirectly(cleanHouse, cleanStreet, cleanPostcode, logs);
   if (directResult && 'band' in directResult && directResult.band) {
     logs.push(`[Direct-Scrape] Success. Found Band ${directResult.band} for ${directResult.address}`);
@@ -1628,171 +1881,19 @@ async function fetchGroundedCouncilTax(houseNumber: string, street: string, post
   }
 
   if (directResult && 'results' in directResult && Array.isArray(directResult.results)) {
-    logs.push(`[Direct-Scrape] Found multiple properties (${directResult.results.length}) on street.`);
+    logs.push(`[Direct-Scrape] The VOA returned ${directResult.results.length} candidates but no exact address match; none was selected.`);
   }
 
-  // 2. Resolve billing authority via official postcodes.io
-  let authorityName = "Local Authority";
-  try {
-    const pcRes = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(cleanPostcode)}`, {
-      signal: AbortSignal.timeout(3000)
-    });
-    if (pcRes.ok) {
-      const pcData = await pcRes.json();
-      if (pcData?.result?.admin_district) {
-        authorityName = pcData.result.admin_district;
-        logs.push(`[Authority-Lookup] Resolved billing authority: ${authorityName}`);
-      }
-    }
-  } catch (pcErr: any) {
-    // Non-fatal
-  }
-
-  // 3. Fallback: Brave Search API Grounding
-  if (process.env.BRAVE_API_KEY) {
-    try {
-      logs.push(`[Brave-Search] Querying Brave Search for Council Tax banding...`);
-      const query = `"${cleanPostcode}" "${cleanHouse}" council tax band`;
-      const searchData = await braveSearch(query);
-      const results = searchData?.web?.results || [];
-
-      if (results.length > 0) {
-        const parsePrompt = `You are a UK property specialist. Extract the Council Tax band and billing authority for "${targetAddress}" from these search snippets.
-        
-Search Results:
-${JSON.stringify(results.slice(0, 5))}
-
-Billing Authority identified from postcode: ${authorityName}
-
-Return ONLY a JSON object:
-{ "band": "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H", "authority": "string" }
-If not explicitly found, return {"band": null, "authority": "${authorityName}"}.`;
-
-        let parsedText = "";
-        const groq = getGroqClient();
-        if (groq) {
-          const completion = await groq.chat.completions.create({
-            messages: [{ role: "user", content: parsePrompt }],
-            model: "openai/gpt-oss-120b",
-            response_format: { type: "json_object" }
-          });
-          parsedText = completion.choices[0]?.message?.content || "";
-        } else if (process.env.OPENROUTER_API_KEY) {
-          parsedText = await callOpenRouter([{ role: "user", content: parsePrompt }], undefined, "json_object") || "";
-        } else if (process.env.GEMINI_API_KEY) {
-          const ai = getAiClient();
-          const parseResponse = await ai.models.generateContent({
-            model: "gemini-3.8-flash",
-            contents: parsePrompt,
-            config: { responseMimeType: "application/json" }
-          });
-          parsedText = parseResponse.text || "";
-        }
-
-        if (parsedText) {
-          try {
-            const data = JSON.parse(parsedText);
-            if (data && data.band && /^[A-H]$/i.test(data.band)) {
-              const band = data.band.toUpperCase();
-              const auth = data.authority || authorityName;
-              logs.push(`[Brave-Search] Success. Identified Band ${band} (${auth})`);
-              return {
-                band,
-                authority: auth,
-                address: targetAddress,
-                annualAmount: calculateCouncilTaxAmount(band, auth),
-                year: getCurrentCouncilTaxYear(),
-                source: "Grounded Web Verification"
-              };
-            }
-          } catch (pErr) {
-            // Non-fatal parse error
-          }
-        }
-      }
-    } catch (err: any) {
-      logs.push(`[Brave-Search] Note: ${err.message}`);
-    }
-  }
-
-  // 4. Fallback: Gemini Search Grounding
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const ai = getAiClient();
-      logs.push(`[Gemini-Grounding] Falling back to Gemini Search tool...`);
-
-      const prompt = `Find the official Council Tax band for "${targetAddress}" on GOV.UK.
-      Return ONLY JSON: { "band": "string", "annualAmount": "string", "authority": "string", "year": "${getCurrentCouncilTaxYear()}" }`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }]
-        }
-      });
-
-      const text = response.text || "";
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const data = JSON.parse(jsonMatch[0]);
-        if (data && data.band && data.band !== "Not Available" && /^[A-H]$/i.test(data.band)) {
-          const band = data.band.toUpperCase();
-          const auth = data.authority || authorityName;
-          logs.push(`[Gemini-Grounding] Success. Result: Band ${band}`);
-          return {
-            band,
-            authority: auth,
-            address: targetAddress,
-            annualAmount: calculateCouncilTaxAmount(band, auth),
-            year: getCurrentCouncilTaxYear(),
-            source: "Gemini Search Grounding"
-          };
-        }
-      }
-    } catch (err: any) {
-      logs.push(`[Gemini-Grounding] Note: ${err.message}`);
-    }
-  }
-
-  // 5. Fallback: EPC Data Floor Area Correlation
-  try {
-    const epcData = await fetchEpcData(cleanStreet, cleanPostcode, []);
-    if (epcData) {
-      const floorArea = epcData.totalFloorArea ? parseFloat(String(epcData.totalFloorArea)) : 85;
-      let estimatedBand = "D";
-      if (floorArea < 50) estimatedBand = "A";
-      else if (floorArea < 75) estimatedBand = "B";
-      else if (floorArea < 100) estimatedBand = "C";
-      else if (floorArea < 140) estimatedBand = "D";
-      else if (floorArea < 180) estimatedBand = "E";
-      else estimatedBand = "F";
-
-      logs.push(`[EPC-Estimate] Estimated Band ${estimatedBand} based on ${floorArea}m² floor area (${authorityName})`);
-      return {
-        band: estimatedBand,
-        authority: authorityName,
-        address: targetAddress,
-        annualAmount: calculateCouncilTaxAmount(estimatedBand, authorityName),
-        year: getCurrentCouncilTaxYear(),
-        isEstimate: true,
-        source: "Estimated from EPC Floor Area & Valuation Office"
-      };
-    }
-  } catch (epcErr) {
-    // Non-fatal
-  }
-
-  // 6. Fallback: Standard Reference Band D for billing authority
-  logs.push(`[Authority-Estimate] Applying standard reference Band D for ${authorityName}`);
+  const authorityName = await resolveBillingAuthority(cleanPostcode) || "Not confirmed";
+  logs.push(`[CouncilTax] No exact official VOA band was available. No estimate has been substituted.`);
   return {
-    band: "D",
+    band: "Not available",
     authority: authorityName,
     address: targetAddress,
-    annualAmount: calculateCouncilTaxAmount("D", authorityName),
+    annualAmount: "Not available",
     year: getCurrentCouncilTaxYear(),
-    isEstimate: true,
-    source: "Estimated Reference Band"
+    unavailable: true,
+    source: "Official VOA lookup did not return an exact property match"
   };
 }
 
@@ -2100,7 +2201,7 @@ async function fetchGroundedLocalData(
   const fullAddress = `${houseNumber} ${street}, ${town}`.trim();
 
   const fallbackAiData = {
-    councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: getCurrentCouncilTaxYear() },
+    councilTax: { band: "Not available", annualAmount: "Not available", authority: "Not confirmed", year: getCurrentCouncilTaxYear(), source: "Official VOA lookup unavailable" },
     radonRisk: { riskLevel: "Unknown", percentage: "N/A", description: "Automated radon lookup unavailable; check the official UKradon map." },
     coalMining: { isReportingArea: false, isHighRiskArea: false, description: "Automated Coal Authority check unavailable; no risk conclusion has been inferred." },
     broadband: { superfastAvailable: false, ultrafastAvailable: false, standardAvailable: false, maxDownloadSpeed: "Not available from Ofcom lookup", maxUploadSpeed: "Not available from Ofcom lookup" },
@@ -2112,7 +2213,8 @@ async function fetchGroundedLocalData(
   const councilTaxPromise = trackTiming('Council tax lookup', logs, () =>
     withTimeout(fetchGroundedCouncilTax(houseNumber, street, postcode, logs), 15000, null)
   ).then(result => {
-    onStepProgress?.('council_tax', 'completed', result?.band ? `Band ${result.band}` : 'VOA Checked');
+    const verifiedBand = /^[A-I]$/i.test(String(result?.band || ''));
+    onStepProgress?.('council_tax', 'completed', verifiedBand ? `Band ${result.band}` : 'Official band unavailable');
     return result;
   });
 
@@ -2256,19 +2358,11 @@ async function fetchGroundedLocalData(
     aiData.schools = catchmentSchools;
   }
 
-  // If grounding returned "Not Available" or a valid result, we use it.
-  let finalCouncilTax = (verifiedCouncilTax && verifiedCouncilTax.band !== "Not Available") 
-    ? verifiedCouncilTax 
-    : (verifiedCouncilTax || aiData.councilTax);
-
-  if (finalCouncilTax && finalCouncilTax.band && (!finalCouncilTax.annualAmount || finalCouncilTax.annualAmount === "Unknown")) {
-    finalCouncilTax.annualAmount = calculateCouncilTaxAmount(finalCouncilTax.band, finalCouncilTax.authority || "");
-  }
-
-  if (verifiedCouncilTax && verifiedCouncilTax.band === "Not Available") {
-    logs.push(`[Grounding] Property not found in search. Using 'Not Available' status.`);
-  } else if (!verifiedCouncilTax) {
-    logs.push(`[Grounding] Grounding failed or returned null. Falling back to AI estimate.`);
+  // Never take Council Tax from the general AI response. Only the strict VOA
+  // result may populate a band; otherwise retain an explicit unavailable state.
+  const finalCouncilTax = verifiedCouncilTax || fallbackAiData.councilTax;
+  if (!verifiedCouncilTax || !/^[A-I]$/i.test(String(verifiedCouncilTax.band || ''))) {
+    logs.push(`[CouncilTax] Exact official band unavailable; no estimate was used.`);
   }
 
   return {
@@ -2479,7 +2573,7 @@ async function fetchAILocalData(address: string, postcode: string, groq: any, re
   }
 
   return {
-    councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: getCurrentCouncilTaxYear() },
+    councilTax: { band: "Not available", annualAmount: "Not available", authority: "Not confirmed", year: getCurrentCouncilTaxYear(), source: "Official VOA lookup unavailable" },
     radonRisk: { riskLevel: "Unknown", percentage: "N/A", description: "Data temporarily unavailable." },
     coalMining: { isReportingArea: false, isHighRiskArea: false, description: "Data temporarily unavailable." },
     broadband: { superfastAvailable: false, ultrafastAvailable: false, standardAvailable: false, maxDownloadSpeed: "Not available from Ofcom lookup", maxUploadSpeed: "Not available from Ofcom lookup" },
@@ -2573,7 +2667,7 @@ async function fetchFloodRiskData(postcode: string, logs: string[], coords?: { e
   };
 }
 
-app.post('/api/generate-summary', async (req, res) => {
+app.post('/api/generate-summary', authenticate, async (req, res) => {
   const { propertyData } = req.body;
   console.log(`[API] /api/generate-summary called for address: ${propertyData?.address || 'unknown'}`);
   try {
@@ -2585,7 +2679,7 @@ app.post('/api/generate-summary', async (req, res) => {
   }
 });
 
-app.post('/api/generate-condition-report', async (req, res) => {
+app.post('/api/generate-condition-report', authenticate, requireBusiness, async (req, res) => {
   const { photoDataUris } = req.body;
   console.log(`[API] /api/generate-condition-report called with ${photoDataUris?.length || 0} images`);
   
@@ -3319,7 +3413,9 @@ app.post('/api/check-band', async (req, res) => {
             authority: directResult.authority,
             annualAmount: directResult.annualAmount,
             year: directResult.year,
-            source: directResult.source
+            source: directResult.source,
+            sourceUrl: directResult.sourceUrl,
+            chargeNote: directResult.chargeNote
           } 
         });
       } else if ('results' in directResult && Array.isArray(directResult.results) && directResult.results.length > 0) {
@@ -3327,22 +3423,8 @@ app.post('/api/check-band', async (req, res) => {
       }
     }
 
-    // 2. Second attempt: Resilient grounded lookup (Brave / Groq / Postcodes.io Authority / EPC correlation)
-    const groundedResult: any = await fetchGroundedCouncilTax(houseNumber, street, cleanPostcode, logs);
-    if (groundedResult && groundedResult.band && groundedResult.band !== "Not Available") {
-      return res.json({
-        result: {
-          address: groundedResult.address || `${houseNumber} ${street}, ${cleanPostcode}`.trim(),
-          band: groundedResult.band,
-          authority: groundedResult.authority || "Local Authority",
-          annualAmount: groundedResult.annualAmount || calculateCouncilTaxAmount(groundedResult.band, groundedResult.authority || ""),
-          year: groundedResult.year || getCurrentCouncilTaxYear(),
-          source: groundedResult.source || "VOA Grounded Verification"
-        }
-      });
-    }
-
-    // 3. Fallback error message if no property data could be extracted
+    // Never substitute an AI result, EPC-based inference, neighbouring band or
+    // default Band D when the exact official address cannot be matched.
     if (directResult && 'error' in directResult && !directResult.isNetworkError) {
       return res.json({ error: directResult.error });
     }
@@ -3370,6 +3452,7 @@ interface HomePackJob {
   progress: number;
   currentStep: string;
   steps: HomePackJobStep[];
+  planningScope?: PlanningScope;
   result?: any;
   error?: string | null;
   createdAt: number;
@@ -3385,13 +3468,15 @@ setInterval(() => {
   for (const [id, job] of homePackJobs.entries()) {
     if (now - job.createdAt > 4 * 60 * 60 * 1000) {
       homePackJobs.delete(id);
+      jobOwners.delete(id);
     }
   }
 }, 15 * 60 * 1000);
 
 async function generateHomePackDossier(
   address: { houseNumber?: string; street?: string; town?: string; postcode: string },
-  onStepProgress?: (stepId: string, status: 'in_progress' | 'completed' | 'failed', detail?: string) => void
+  onStepProgress?: (stepId: string, status: 'in_progress' | 'completed' | 'failed', detail?: string) => void,
+  options: { planningScope?: PlanningScope } = {}
 ) {
   const { houseNumber, street, town, postcode } = address;
   const logs: string[] = [];
@@ -3408,7 +3493,7 @@ async function generateHomePackDossier(
   onStepProgress?.('crime', 'in_progress');
   onStepProgress?.('planning', 'in_progress');
 
-  const landRegistryPromise = trackTiming('HM Land Registry lookup', logs, () => fetchLandRegistryData(fullStreet, postcode, logs))
+  const landRegistryPromise = trackTiming('HM Land Registry lookup', logs, () => fetchLandRegistryData(houseNumber || '', street || '', postcode, logs))
     .then(res => {
       const detail = res && res.length > 0 
         ? `${res[0].estateType || 'Registered'} (${res.length} recs)` 
@@ -3420,6 +3505,10 @@ async function generateHomePackDossier(
       onStepProgress?.('land_registry', 'completed', 'Standard Register');
       return [];
     });
+
+  const recentStreetSalesPromise = trackTiming('HM Land Registry street sales lookup', logs, () =>
+    fetchRecentStreetSales(houseNumber || '', street || '', town || '', postcode, logs)
+  ).catch(() => []);
 
   const epcPromise = trackTiming('EPC lookup', logs, () => fetchEpcData(fullStreet, postcode, logs))
     .then(res => {
@@ -3471,7 +3560,7 @@ async function generateHomePackDossier(
     .then(([epcResult, coords]) => trackTiming(
       'Combined planning lookup',
       logs,
-      () => fetchPlanningHistory(epcResult?.uprn || '', coords, logs)
+      () => fetchPlanningHistory(epcResult?.uprn || '', coords, street || '', options.planningScope || 'street', logs)
     ))
     .then(result => {
       onStepProgress?.('planning', 'completed', `${result.applications.length} applications • ${result.constraints.length} constraints`);
@@ -3508,7 +3597,7 @@ async function generateHomePackDossier(
         onStepProgress?.('connectivity', 'completed', 'Standard profile');
         onStepProgress?.('schools', 'completed', 'Local area checked');
         return {
-          councilTax: { band: "Check VOA", annualAmount: "Contact Authority", authority: "Local Authority", year: getCurrentCouncilTaxYear() },
+          councilTax: { band: "Not available", annualAmount: "Not available", authority: "Not confirmed", year: getCurrentCouncilTaxYear(), source: "Official VOA lookup unavailable" },
           radonRisk: { riskLevel: "Unknown", percentage: "N/A", description: "Automated radon lookup unavailable; check the official UKradon map." },
           coalMining: { isReportingArea: false, isHighRiskArea: false, description: "Automated Coal Authority check unavailable; no risk conclusion has been inferred." },
           broadband: { superfastAvailable: false, ultrafastAvailable: false, standardAvailable: false, maxDownloadSpeed: "Not available from Ofcom lookup", maxUploadSpeed: "Not available from Ofcom lookup" },
@@ -3519,8 +3608,9 @@ async function generateHomePackDossier(
       });
   })();
 
-  const [landRegistry, epc, floodRisk, coords, groundedData, healthcare, crime, planningData] = await Promise.all([
+  const [landRegistry, recentStreetSales, epc, floodRisk, coords, groundedData, healthcare, crime, planningData] = await Promise.all([
     landRegistryPromise,
+    recentStreetSalesPromise,
     epcPromise,
     floodRiskPromise,
     coordsPromise,
@@ -3533,6 +3623,7 @@ async function generateHomePackDossier(
   const propertyData = {
     address: landRegistry && landRegistry.length > 0 ? landRegistry[0].addressString : `${street || ''}, ${town || ''}, ${postcode}`.replace(/^,\s*/, ''),
     landRegistry: landRegistry || [],
+    recentStreetSales: recentStreetSales || [],
     epc,
     floodRisk,
     planningHistory: planningData.applications || [],
@@ -3563,7 +3654,10 @@ async function generateHomePackDossier(
     onStepProgress?.('synthesis', 'completed', 'Dossier ready');
   } catch (sumErr: any) {
     logs.push(`[Summary] Generator note: ${sumErr?.message}`);
-    summary = `**Property Address:** ${propertyData.address}\n\n- **Energy efficiency:** ${propertyData.epc ? `Rating ${propertyData.epc.rating}` : 'EPC not returned'}\n- **Flood risk:** Rivers/Sea: ${propertyData.floodRisk?.riskOfFloodingFromRiversAndSea || 'not returned'}; Surface water: ${propertyData.floodRisk?.riskOfFloodingFromSurfaceWater || 'not returned'}\n- **Running costs:** Council Tax ${propertyData.councilTax?.band ? `Band ${propertyData.councilTax.band}` : 'band not matched'}\n- **Broadband connectivity:** ${propertyData.broadband?.maxDownloadSpeed || 'address-level result not returned'}\n- **Nearby schools:** ${(propertyData.schools || []).map((school: any) => school.name).join(', ') || 'none returned'}\n- **Key take-away:** Property profile compiled from the official-source results shown above.`;
+    const councilTaxBand = /^[A-I]$/i.test(String(propertyData.councilTax?.band || ''))
+      ? `Band ${propertyData.councilTax.band}`
+      : 'official band not available';
+    summary = `**Property Address:** ${propertyData.address}\n\n- **Energy efficiency:** ${propertyData.epc ? `Rating ${propertyData.epc.rating}` : 'EPC not returned'}\n- **Flood risk:** Rivers/Sea: ${propertyData.floodRisk?.riskOfFloodingFromRiversAndSea || 'not returned'}; Surface water: ${propertyData.floodRisk?.riskOfFloodingFromSurfaceWater || 'not returned'}\n- **Running costs:** Council Tax ${councilTaxBand}\n- **Broadband connectivity:** ${propertyData.broadband?.maxDownloadSpeed || 'address-level result not returned'}\n- **Nearby schools:** ${(propertyData.schools || []).map((school: any) => school.name).join(', ') || 'none returned'}\n- **Key take-away:** Property profile compiled from the official-source results shown above.`;
     onStepProgress?.('synthesis', 'completed', 'Dossier ready');
   }
 
@@ -3587,7 +3681,7 @@ async function runHomePackJob(job: HomePackJob) {
   };
 
   try {
-    const result = await generateHomePackDossier(job.address, onStepProgress);
+    const result = await generateHomePackDossier(job.address, onStepProgress, { planningScope: job.planningScope || 'street' });
     job.status = 'completed';
     job.progress = 100;
     job.currentStep = 'Complete';
@@ -3603,7 +3697,8 @@ async function runHomePackJob(job: HomePackJob) {
 }
 
 // Start background HomePack generation job
-app.post('/api/homepack/start', (req, res) => {
+const jobOwners = new Map<string, string>();
+app.post('/api/homepack/start', authenticate, requireProperty, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   const { houseNumber, street, town, postcode } = req.body || {};
   if (!postcode) {
@@ -3631,11 +3726,15 @@ app.post('/api/homepack/start', (req, res) => {
     progress: 5,
     currentStep: 'Initializing national registers...',
     steps: initialSteps,
+    planningScope: res.locals.hasBusinessAccess && res.locals.profile?.reportSettings?.includeNearbyPlanning
+      ? 'radius'
+      : 'street',
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
 
   homePackJobs.set(jobId, job);
+  jobOwners.set(jobId, res.locals.uid);
   // Launch asynchronous execution in background
   runHomePackJob(job).catch(err => console.error("Unhandled job runner error:", err));
 
@@ -3643,11 +3742,11 @@ app.post('/api/homepack/start', (req, res) => {
 });
 
 // Poll status of background HomePack generation job
-app.get('/api/homepack/job/:jobId', (req, res) => {
+app.get('/api/homepack/job/:jobId', authenticate, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   const { jobId } = req.params;
   const job = homePackJobs.get(jobId);
-  if (!job) {
+  if (!job || jobOwners.get(jobId) !== res.locals.uid) {
     return res.status(404).json({ error: "Job not found" });
   }
   res.json({ job });
@@ -3741,7 +3840,7 @@ app.get('/api/crime/:postcode', async (req, res) => {
   }
 });
 
-app.post('/api/get-property-report', async (req, res) => {
+app.post('/api/get-property-report', authenticate, requireProperty, async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   const { houseNumber, street, town, postcode } = req.body || {};
   
@@ -3750,7 +3849,10 @@ app.post('/api/get-property-report', async (req, res) => {
   }
 
   try {
-    const result = await generateHomePackDossier({ houseNumber, street, town, postcode });
+    const planningScope: PlanningScope = res.locals.hasBusinessAccess && res.locals.profile?.reportSettings?.includeNearbyPlanning
+      ? 'radius'
+      : 'street';
+    const result = await generateHomePackDossier({ houseNumber, street, town, postcode }, undefined, { planningScope });
     res.json(result);
   } catch (error: any) {
     console.error("Report generation error:", error);

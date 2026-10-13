@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero';
 import React, { useState, FormEvent } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -121,9 +122,9 @@ export default function BroadbandPage() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       
-      <main className="flex-grow container mx-auto px-4 py-12 md:py-20">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-12">
+      <main className="site-main flex-grow container mx-auto px-4 py-12 md:py-20">
+        <div className="max-w-5xl mx-auto">
+          <PageHero eyebrow="Connected living" illustration="property" icon={<Wifi />}>
             <motion.div 
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -135,7 +136,7 @@ export default function BroadbandPage() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-4xl md:text-5xl font-bold font-serif tracking-tight text-[#2d4a77] mb-4"
+              className="site-page-heading text-3xl font-bold tracking-tight mb-3"
             >
               Broadband & Mobile Checker
             </motion.h1>
@@ -143,27 +144,28 @@ export default function BroadbandPage() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-lg text-muted-foreground max-w-xl mx-auto"
+              className="text-lg text-muted-foreground max-w-xl"
             >
               Check official Ofcom coverage data for your property. See available speeds and network providers.
             </motion.p>
-          </div>
+          </PageHero>
 
-          <Card className="shadow-xl border-border/50 overflow-hidden mb-8">
-            <CardContent className="p-8">
+          <Card className="shadow-sm border-border overflow-hidden mb-8">
+            <CardContent className="p-5 md:p-7">
               <form onSubmit={handlePostcodeSearch} className="space-y-6">
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-grow relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
-                      placeholder="Enter Postcode (e.g. WD25 7NE)"
+                      aria-label="Property postcode"
+                      placeholder="e.g. WD25 7NE"
                       value={postcode}
                       onChange={(e) => setPostcode(e.target.value.toUpperCase())}
-                      className="pl-10 h-12 text-lg uppercase"
+                      className="pl-10 h-12 text-base uppercase placeholder:normal-case"
                       required
                     />
                   </div>
-                  <Button type="submit" size="lg" disabled={loading} className="h-12 px-8 rounded-md">
+                  <Button type="submit" size="lg" disabled={loading} className="h-12 px-8 rounded-2xl">
                     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Find Addresses"}
                   </Button>
                 </div>
@@ -227,7 +229,7 @@ export default function BroadbandPage() {
                   <CardHeader className="bg-primary/5 border-b border-primary/10">
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-2xl font-serif text-[#2d4a77]">{result.address}</CardTitle>
+                        <CardTitle className="text-2xl font-sans text-primary">{result.address}</CardTitle>
                         <CardDescription className="text-base mt-1">{result.postcode}</CardDescription>
                       </div>
                       <Badge variant="outline" className="bg-white">Ofcom Verified</Badge>
@@ -242,7 +244,7 @@ export default function BroadbandPage() {
                               <Zap className="h-6 w-6" />
                             </div>
                             <div>
-                              <h3 className="text-xl font-bold text-[#2d4a77]">{bb.type}</h3>
+                              <h3 className="text-xl font-bold text-primary">{bb.type}</h3>
                               <p className="text-sm text-muted-foreground">Broadband Service</p>
                             </div>
                           </div>
@@ -308,7 +310,7 @@ export default function BroadbandPage() {
                           result.mobile.map((m, idx) => (
                             <div key={idx} className="flex justify-between items-center text-sm border-b border-border pb-2 last:border-0 last:pb-0">
                               <div className="flex flex-col">
-                                <span className="font-bold text-[#2d4a77]">{m.operator}</span>
+                                <span className="font-bold text-primary">{m.operator}</span>
                                 <span className="text-[10px] text-muted-foreground uppercase">Voice: {m.voice || 'Check operator'} | Data: {m.data || 'Check operator'}</span>
                               </div>
                               <Badge className={m.fiveG === 'Available' ? 'bg-green-600' : 'bg-muted text-muted-foreground'}>
@@ -351,7 +353,7 @@ export default function BroadbandPage() {
                 <Info className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h4 className="font-bold text-[#2d4a77] mb-1">About Ofcom Data</h4>
+                <h4 className="font-bold text-primary mb-1">About Ofcom Data</h4>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   The speeds indicated are the fastest estimated speeds predicted by the network operator(s) providing services in this area. Actual service availability at a property or speeds received may be different.
                 </p>

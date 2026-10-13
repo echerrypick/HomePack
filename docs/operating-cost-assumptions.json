@@ -1,0 +1,130 @@
+{
+  "as_of": "2026-10-13",
+  "usd_to_gbp_budget": 0.8,
+  "ai_per_generation": 0.05,
+  "supplier_tax_allowance": 0.2,
+  "technical_contingency": 0.25,
+  "refund_reserve_rate": 0.02,
+  "scenarios": [
+    {
+      "scenario": "Pilot",
+      "visits": 500,
+      "payg": 10,
+      "pro": 0,
+      "agency": 0,
+      "generations": 12.0,
+      "receipts": 99.9,
+      "fixed": 21,
+      "components": [
+        12,
+        1,
+        5,
+        3,
+        0
+      ],
+      "ai": 0.6000000000000001,
+      "stripe": 3.4985,
+      "allowance": 9.72,
+      "refund_reserve": 1.9980000000000002,
+      "total": 36.8165,
+      "low": 36.29449999999999,
+      "high": 39.4265
+    },
+    {
+      "scenario": "Launch",
+      "visits": 2000,
+      "payg": 50,
+      "pro": 5,
+      "agency": 2,
+      "generations": 276.0,
+      "receipts": 902.5,
+      "fixed": 30,
+      "components": [
+        12,
+        3,
+        8,
+        3,
+        4
+      ],
+      "ai": 13.8,
+      "stripe": 27.7585,
+      "allowance": 19.71,
+      "refund_reserve": 18.05,
+      "total": 109.31849999999999,
+      "low": 97.3125,
+      "high": 169.34850000000003
+    },
+    {
+      "scenario": "Growth",
+      "visits": 10000,
+      "payg": 250,
+      "pro": 25,
+      "agency": 10,
+      "generations": 1380.0,
+      "receipts": 4512.5,
+      "fixed": 65,
+      "components": [
+        40,
+        8,
+        10,
+        3,
+        4
+      ],
+      "ai": 69.0,
+      "stripe": 138.7925,
+      "allowance": 60.300000000000004,
+      "refund_reserve": 90.25,
+      "total": 423.34250000000003,
+      "low": 363.3125,
+      "high": 723.4925
+    },
+    {
+      "scenario": "Established",
+      "visits": 50000,
+      "payg": 1000,
+      "pro": 100,
+      "agency": 40,
+      "generations": 5520.0,
+      "receipts": 18050.0,
+      "fixed": 150,
+      "components": [
+        90,
+        25,
+        20,
+        3,
+        12
+      ],
+      "ai": 276.0,
+      "stripe": 555.17,
+      "allowance": 191.70000000000002,
+      "refund_reserve": 361.0,
+      "total": 1533.87,
+      "low": 1293.75,
+      "high": 2734.47
+    },
+    {
+      "scenario": "Busy",
+      "visits": 200000,
+      "payg": 5000,
+      "pro": 500,
+      "agency": 200,
+      "generations": 27600.0,
+      "receipts": 90250.0,
+      "fixed": 450,
+      "components": [
+        280,
+        90,
+        35,
+        3,
+        42
+      ],
+      "ai": 1380.0,
+      "stripe": 2775.85,
+      "allowance": 823.5,
+      "refund_reserve": 1805.0,
+      "total": 7234.35,
+      "low": 6033.75,
+      "high": 13237.35
+    }
+  ]
+}

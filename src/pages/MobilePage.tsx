@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero';
 import React, { useState, FormEvent } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -133,13 +134,13 @@ export default function MobilePage() {
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <Header />
       
-      <main className="flex-grow container mx-auto px-4 py-12 md:py-20">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
+      <main className="site-main flex-grow container mx-auto px-4 py-12 md:py-20">
+        <div className="max-w-5xl mx-auto">
+          <PageHero eyebrow="Coverage where it matters" illustration="property" icon={<Smartphone />}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="inline-flex items-center justify-center p-4 bg-primary/10 rounded-3xl mb-6 shadow-inner"
+              className="inline-flex items-center justify-center p-4 bg-primary/10 rounded-2xl mb-6 shadow-sm"
             >
               <Smartphone className="h-10 w-10 text-primary" />
             </motion.div>
@@ -147,7 +148,7 @@ export default function MobilePage() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-4xl md:text-6xl font-bold font-serif tracking-tight text-[#2d4a77] mb-4"
+              className="site-page-heading text-3xl font-bold tracking-tight mb-3"
             >
               Mobile Coverage Checker
             </motion.h1>
@@ -155,27 +156,28 @@ export default function MobilePage() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
+              className="text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed"
             >
               Check official Ofcom mobile coverage for your property. See 4G, 5G, and voice availability across all major UK networks.
             </motion.p>
-          </div>
+          </PageHero>
 
-          <Card className="shadow-2xl border-primary/10 overflow-hidden mb-12 bg-card/50 backdrop-blur-sm">
-            <CardContent className="p-8 md:p-12">
+          <Card className="shadow-sm border-border overflow-hidden mb-8 bg-card">
+            <CardContent className="p-5 md:p-7">
               <form onSubmit={handlePostcodeSearch} className="space-y-6">
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-grow relative group">
                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
-                      placeholder="Enter Postcode (e.g. WD25 7NE)"
+                      aria-label="Property postcode"
+                      placeholder="e.g. WD25 7NE"
                       value={postcode}
                       onChange={(e) => setPostcode(e.target.value.toUpperCase())}
-                      className="pl-12 h-14 text-xl uppercase font-medium bg-background/80 border-2 focus-visible:ring-primary/20"
+                      className="pl-12 h-12 text-base uppercase placeholder:normal-case bg-card"
                       required
                     />
                   </div>
-                  <Button type="submit" size="lg" disabled={loading} className="h-14 px-10 text-lg font-bold rounded-xl shadow-lg shadow-primary/20">
+                  <Button type="submit" size="lg" disabled={loading} className="h-12 px-8 rounded-2xl">
                     {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Find Addresses"}
                   </Button>
                 </div>
@@ -229,7 +231,7 @@ export default function MobilePage() {
                 <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto" />
                 <Smartphone className="h-6 w-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
               </div>
-              <p className="text-xl font-medium text-muted-foreground animate-pulse">Retrieving live mobile coverage from Ofcom...</p>
+              <p className="text-xl font-medium text-muted-foreground animate-pulse">Retrieving the latest available mobile coverage from Ofcom…</p>
             </div>
           )}
 
@@ -240,10 +242,10 @@ export default function MobilePage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-10"
               >
-                <div className="bg-primary/5 border border-primary/10 rounded-3xl p-8 md:p-10 shadow-sm">
+                <div className="bg-primary/5 border border-primary/10 rounded-2xl p-8 md:p-10 shadow-sm">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
-                      <h2 className="text-3xl font-serif font-bold text-[#2d4a77] mb-2">{result.address}</h2>
+                      <h2 className="text-3xl font-sans font-bold text-primary mb-2">{result.address}</h2>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <MapPin className="h-4 w-4" />
                         <span className="text-lg font-medium">{result.postcode}</span>
@@ -269,10 +271,10 @@ export default function MobilePage() {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: idx * 0.1 }}
                     >
-                      <Card className="h-full border-border/50 hover:border-primary/30 hover:shadow-xl transition-all duration-300 overflow-hidden group">
+                      <Card className="h-full border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-300 overflow-hidden group">
                         <CardHeader className="bg-muted/30 border-b border-border/50 p-6">
                           <div className="flex justify-between items-center">
-                            <CardTitle className="text-2xl font-bold text-[#2d4a77] group-hover:text-primary transition-colors">
+                            <CardTitle className="text-2xl font-bold text-primary group-hover:text-primary transition-colors">
                               {m.operator}
                             </CardTitle>
                             <div className="flex items-center gap-2">
@@ -371,7 +373,7 @@ export default function MobilePage() {
                     <p className="text-xl text-muted-foreground font-medium mb-6">No detailed mobile coverage data found for this specific address.</p>
                     <div className="max-w-md mx-auto p-6 bg-primary/5 rounded-2xl border border-primary/10">
                       <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                        Sometimes Ofcom's real-time API can't provide detailed results for specific addresses. You can check the official Map Your Mobile tool directly:
+                        Sometimes the Ofcom lookup cannot return detailed results for a specific address. You can check the official Map Your Mobile tool directly:
                       </p>
                       <a 
                         href="https://checker.ofcom.org.uk/en-gb/mobile-coverage" 
@@ -400,11 +402,11 @@ export default function MobilePage() {
               <SignalHigh className="h-32 w-32" />
             </div>
             <div className="flex flex-col md:flex-row items-start gap-8 relative z-10">
-              <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+              <div className="p-4 bg-primary/10 rounded-2xl shadow-sm">
                 <Info className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h4 className="text-2xl font-bold text-[#2d4a77] mb-4">About Mobile Coverage Data</h4>
+                <h4 className="text-2xl font-bold text-primary mb-4">About Mobile Coverage Data</h4>
                 <p className="text-lg text-muted-foreground leading-relaxed mb-6">
                   Ofcom's mobile coverage data provides an estimate of the signal strength you can expect at a specific location. These predictions are based on computer models and reflect the best estimates from the mobile network operators.
                 </p>

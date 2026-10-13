@@ -2,7 +2,7 @@ import React from 'react';
 import { Home } from 'lucide-react';
 import { Address } from '@/types';
 import { PropertyMap } from '@/components/homepack/property-map';
-import { formatAnnualCost, formatCo2Tonnes, dataOrNA, formatSchoolDistance } from '@/components/homepack/report-display';
+import { formatAnnualCost, formatCo2Tonnes, dataOrNA, formatSchoolDistance, formatSchoolGrade } from '@/components/homepack/report-display';
 
 interface HomePackPdfTemplateProps {
   pdfTemplateRef: React.RefObject<HTMLDivElement>;
@@ -26,6 +26,7 @@ interface HomePackPdfTemplateProps {
   branding?: any;
   profile?: any;
   primaryTransaction?: any;
+  isSample?: boolean;
 }
 
 export function HomePackPdfTemplate({
@@ -50,10 +51,13 @@ export function HomePackPdfTemplate({
   branding,
   profile,
   primaryTransaction,
+  isSample = false,
 }: HomePackPdfTemplateProps) {
   const healthcareData = healthcare || propertyData?.healthcare;
   const crimeData = crime || propertyData?.crime;
+  const recentStreetSales = propertyData?.recentStreetSales || [];
   const allPlanning = planningHistory || propertyData?.planningHistory || propertyData?.planning || [];
+  const planningCoverage = propertyData?.planningCoverage;
   const allPlanningConstraints = propertyData?.planningConstraints || [];
   const floodPlanningConstraint = allPlanningConstraints.find((constraint: any) => constraint?.dataset === 'flood-risk-zone');
   const floodPlanningLabel = floodPlanningConstraint?.detail || floodPlanningConstraint?.name || '';
@@ -75,7 +79,7 @@ export function HomePackPdfTemplate({
   const buyerName = (() => {
     const candidate = String(profile?.displayName || '').trim();
     const looksLikeUsername = /\d/.test(candidate) || (!candidate.includes(' ') && candidate.length > 16);
-    return candidate && !looksLikeUsername ? candidate : 'HomePack customer';
+    return candidate && !looksLikeUsername ? candidate : 'UKHomePack.com customer';
   })();
   const schoolsForPdf = React.useMemo(() => {
     const schools = Array.isArray(propertyData?.schools) ? propertyData.schools : [];
@@ -93,7 +97,7 @@ export function HomePackPdfTemplate({
   };
   const councilTaxAmount = (() => {
     const amount = Number(String(councilTax?.annualAmount || '').replace(/[^0-9.]/g, ''));
-    return Number.isFinite(amount) && amount > 0 ? `£${amount.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : 'Check local authority';
+    return Number.isFinite(amount) && amount > 0 ? `£${amount.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : 'Not available';
   })();
 
   // Calculate price per m² if both price and floor area exist
@@ -136,6 +140,7 @@ export function HomePackPdfTemplate({
             style={{ width: '794px', height: '1123px', minHeight: '1123px', maxHeight: '1123px', boxSizing: 'border-box', overflow: 'hidden' }}
           >
             <div className="flex flex-col items-center justify-center text-center mt-6">
+              {isSample && <p className="text-red-700 font-bold border border-red-300 p-3 mb-3">ILLUSTRATIVE SAMPLE — unverified demonstration data. Do not rely on this report for property decisions.</p>}
               <div className="mb-6">
                 {brandLogo ? (
                   <img src={brandLogo} alt="Agency Logo" className="max-h-20 max-w-[260px] object-contain mx-auto" />
@@ -147,10 +152,10 @@ export function HomePackPdfTemplate({
               </div>
               
               <h1 className="text-4xl font-serif font-bold mb-2 tracking-tight" style={{ color: brandPrimary }}>
-                {isWhiteLabel && (branding?.companyTagline || profile?.company) ? (profile?.company || 'Property Intelligence') : 'HomePackAI'}
+                {isWhiteLabel && (branding?.companyTagline || profile?.company) ? (profile?.company || 'Property Intelligence') : 'UKHomePack.com'}
               </h1>
               <p className="text-sm font-sans text-muted-foreground mb-8 uppercase tracking-[0.25em] font-semibold">
-                {isWhiteLabel && branding?.companyTagline ? branding.companyTagline : 'Property Information Report'}
+                {isWhiteLabel && branding?.companyTagline ? branding.companyTagline : 'UK Property HomePack Report'}
               </p>
               
               <div className="w-full max-w-xl bg-[#f8fafc] p-8 rounded-lg border space-y-4" style={{ borderColor: brandAccent, borderTop: `4px solid ${brandPrimary}` }}>
@@ -192,7 +197,7 @@ export function HomePackPdfTemplate({
             </div>
             
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 1 of 10</span>
             </div>
           </div>
@@ -237,7 +242,7 @@ export function HomePackPdfTemplate({
             </div>
             
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 2 of 10</span>
             </div>
           </div>
@@ -302,7 +307,7 @@ export function HomePackPdfTemplate({
                 </div>
                 <div className="p-4">
                   <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Council Tax Band</p>
-                  <p className="text-2xl font-serif font-bold text-[#b45309]">{councilTax?.band || 'Band C'}</p>
+                  <p className="text-2xl font-serif font-bold text-[#b45309]">{councilTax?.band || 'Not available'}</p>
                 </div>
               </div>
 
@@ -332,7 +337,7 @@ export function HomePackPdfTemplate({
             </div>
             
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 3 of 10</span>
             </div>
           </div>
@@ -367,27 +372,29 @@ export function HomePackPdfTemplate({
 
               {/* Nearest Educational Institutions */}
               <div className="mb-3">
-                <h3 className="text-xs font-serif font-bold text-[#2d4a77] border-b pb-1 mb-2">Nearest Educational Institutions (Ofsted Rated)</h3>
+                <h3 className="text-xs font-serif font-bold text-[#2d4a77] border-b pb-1 mb-2">Nearest Educational Institutions</h3>
                 <div className="space-y-1.5">
-                  {schoolsForPdf.map((school: any, idx: number) => (
-                    <div key={idx} className="p-2 bg-[#f0f7ff] rounded border border-[#d1e3f8] flex justify-between items-center text-xs">
+                  {schoolsForPdf.map((school: any, idx: number) => {
+                    const grade = formatSchoolGrade(school.ofstedRating);
+                    const normalizedGrade = grade.label.toLowerCase();
+                    return <div key={idx} className="p-2 bg-[#f0f7ff] rounded border border-[#d1e3f8] flex justify-between items-center text-xs">
                       <div className="min-w-0 pr-3">
                         <p className="font-bold text-[#2d4a77] truncate">{school.name}</p>
                         <p className="text-[10px] text-muted-foreground">{school.type} School • {formatSchoolDistance(school.distance)}{school.inspectionDate ? ` • inspected ${new Date(school.inspectionDate).toLocaleDateString('en-GB')}` : ' • inspection date not verified'}</p>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      {grade.available ? <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Ofsted:</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold text-white ${
-                          school.ofstedRating.toLowerCase().includes('outstanding') ? 'bg-emerald-600' : 
-                          school.ofstedRating.toLowerCase().includes('good') ? 'bg-blue-600' : 
-                          school.ofstedRating.toLowerCase().includes('requires improvement') ? 'bg-amber-500' : 
+                          normalizedGrade.includes('outstanding') ? 'bg-emerald-600' :
+                          normalizedGrade.includes('good') ? 'bg-blue-600' :
+                          normalizedGrade.includes('requires improvement') ? 'bg-amber-500' :
                           'bg-red-500'}
                         `}>
-                          {school.ofstedRating}
+                          {grade.label}
                         </span>
-                      </div>
+                      </div> : <span className="text-[10px] text-muted-foreground shrink-0">{grade.label}</span>}
                     </div>
-                  ))}
+                  })}
                   {(!propertyData.schools || propertyData.schools.length === 0) && (
                     <p className="text-xs text-muted-foreground italic py-1.5">No school data available for this location.</p>
                   )}
@@ -476,7 +483,7 @@ export function HomePackPdfTemplate({
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-3">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 4 of 10</span>
             </div>
           </div>
@@ -496,11 +503,19 @@ export function HomePackPdfTemplate({
 
               <div className="border border-[#e2e8f0] mb-5">
                 <div className="grid grid-cols-3 bg-white text-xs">
-                  <div className="p-3 border-r border-b border-[#e2e8f0] text-muted-foreground">Estate type</div>
+                  <div className="p-3 border-r border-b border-[#e2e8f0] text-muted-foreground">Tenure</div>
                   <div className="p-3 border-r border-b border-[#e2e8f0] font-bold">{primaryTransaction?.estateType || 'Freehold'}</div>
-                  <div className="p-3 border-b border-[#e2e8f0] text-muted-foreground">Latest sale: {primaryTransaction ? new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB') : 'N/A'}</div>
+                  <div className="p-3 border-b border-[#e2e8f0] text-muted-foreground">Latest recorded sale: {primaryTransaction ? new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB') : 'N/A'}</div>
                   
-                  <div className="p-3 border-r border-b border-[#e2e8f0] text-muted-foreground">Latest recorded price</div>
+                  <div className="p-3 border-r border-b border-[#e2e8f0] text-muted-foreground">Property type</div>
+                  <div className="p-3 border-r border-b border-[#e2e8f0] font-bold text-[#2d4a77]">
+                    {primaryTransaction?.propertyType || 'Not recorded'}
+                  </div>
+                  <div className="p-3 border-b border-[#e2e8f0] font-medium text-muted-foreground">
+                    {primaryTransaction?.transactionCategory || 'Category not recorded'}
+                  </div>
+
+                  <div className="p-3 border-r border-b border-[#e2e8f0] text-muted-foreground">Latest price in Price Paid Data</div>
                   <div className="p-3 border-r border-b border-[#e2e8f0] font-bold text-[#2d4a77]">
                     £{primaryTransaction ? parseInt(primaryTransaction.pricePaid, 10).toLocaleString() : 'N/A'}
                   </div>
@@ -517,6 +532,12 @@ export function HomePackPdfTemplate({
                   </div>
                 </div>
               </div>
+
+              {primaryTransaction && (
+                <p className="text-[10px] text-muted-foreground mb-4">
+                  Exact matched record: {primaryTransaction.addressString}. This is the latest sale present in HM Land Registry Price Paid Data, which may not include every transaction, and is not a current valuation.
+                </p>
+              )}
 
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2.5">Full historical sales records</h3>
               <div className="border border-[#e2e8f0] rounded-sm overflow-hidden mb-5">
@@ -545,13 +566,44 @@ export function HomePackPdfTemplate({
                 </table>
               </div>
 
+              <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2.5">Recently recorded sales on this street</h3>
+              <div className="border border-[#e2e8f0] rounded-sm overflow-hidden mb-4">
+                <table className="w-full text-[10px]">
+                  <thead className="bg-[#f0f7ff]">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-bold text-[#2d4a77]">Address</th>
+                      <th className="px-3 py-2 text-left font-bold text-[#2d4a77]">Date</th>
+                      <th className="px-3 py-2 text-right font-bold text-[#2d4a77]">Price paid</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#e2e8f0]">
+                    {recentStreetSales.slice(0, 4).map((sale: any, index: number) => (
+                      <tr key={`${sale.addressString}-${sale.transactionDate}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
+                        <td className="px-3 py-2 max-w-[390px]">{sale.addressString}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{new Date(sale.transactionDate).toLocaleDateString('en-GB')}</td>
+                        <td className="px-3 py-2 text-right font-bold text-[#2d4a77] whitespace-nowrap">£{parseInt(sale.pricePaid, 10).toLocaleString('en-GB')}</td>
+                      </tr>
+                    ))}
+                    {recentStreetSales.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-3 py-3 text-center text-muted-foreground italic">No neighbouring sales were returned for this exact street and town.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-[9px] text-muted-foreground mb-3">
+                Recorded sale prices are not current valuations. Transactions may take time to appear and some transfers are excluded. Contains HM Land Registry data © Crown copyright and database right 2021. Licensed under the Open Government Licence v3.0.
+              </p>
+
               <div className="p-3.5 bg-[#f0f7ff] border border-[#d1e3f8] rounded text-xs text-[#2d4a77]">
                 <span className="font-semibold">Title Deeds & Covenants:</span> Official copies of the title register and filed plan can be obtained directly through your conveyancer to verify easements, rights of access, and statutory boundary covenants.
               </div>
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 5 of 10</span>
             </div>
           </div>
@@ -650,7 +702,7 @@ export function HomePackPdfTemplate({
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 6 of 10</span>
             </div>
           </div>
@@ -673,10 +725,10 @@ export function HomePackPdfTemplate({
                 <div className="grid grid-cols-4 divide-x divide-[#e2e8f0] text-xs">
                   <div className="p-3">
                     <p className="text-muted-foreground mb-1">Valuation Band</p>
-                    <p className="text-xl font-bold text-[#b45309]">{councilTax?.band || 'Band C'}</p>
+                    <p className="text-xl font-bold text-[#b45309]">{councilTax?.band || 'Not available'}</p>
                   </div>
                   <div className="p-3">
-                    <p className="text-muted-foreground mb-1">Est. Annual Charge</p>
+                    <p className="text-muted-foreground mb-1">Standard Annual Charge</p>
                     <p className="text-base font-bold text-[#2d4a77]">
                       {councilTaxAmount}
                     </p>
@@ -691,7 +743,8 @@ export function HomePackPdfTemplate({
                   </div>
                 </div>
               </div>
-              <p className="text-[9px] text-muted-foreground mb-3">Source and data date: {councilTax?.source || `VOA band and ${councilTax?.authority || 'local authority'} charges`} ({councilTax?.year || 'year not recorded'}).</p>
+              <p className="text-[9px] text-muted-foreground mb-1">Source and data date: {councilTax?.source || `VOA band and ${councilTax?.authority || 'local authority'} charges`} ({councilTax?.year || 'year not recorded'}). Standard charge before discounts, exemptions, reductions, premiums or account adjustments.</p>
+              {councilTax?.chargeNote && <p className="text-[9px] text-amber-800 mb-3">{councilTax.chargeNote}</p>}
 
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Multi-source flood risk assessment</h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
@@ -727,7 +780,7 @@ export function HomePackPdfTemplate({
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 7 of 10</span>
             </div>
           </div>
@@ -779,7 +832,9 @@ export function HomePackPdfTemplate({
                 )}
               </div>
 
-              <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Nearby and property-linked planning applications</h3>
+              <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">
+                {planningCoverage?.scope === 'radius' ? 'Planning applications within 0.3 miles' : 'Planning applications at the property and on this street'}
+              </h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
                 {allPlanning.slice(0, 3).map((p: any, i: number) => {
                   const title = p.application || p.proposal || p.description || 'Planning Application';
@@ -792,8 +847,9 @@ export function HomePackPdfTemplate({
                         <span className="font-bold text-[#2d4a77] leading-tight line-clamp-2 pr-2">{title}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-[#f0f7ff] text-[#2d4a77] shrink-0">{decision}</span>
                       </div>
+                      <p className="text-[10px] text-[#4a5568] mb-1 break-words">Site: {p.address || 'Address not published in source record'}</p>
                       <div className="flex justify-between text-muted-foreground text-[11px]">
-                        <span>Ref: {ref}{p.distanceKm !== undefined ? ` - ${(Number(p.distanceKm) * 0.621371).toFixed(1)} miles away` : ''}</span>
+                        <span>Ref: {ref}{p.distanceKm !== undefined ? Number(p.distanceKm) === 0 ? ' - property-linked' : ` - ${(Number(p.distanceKm) * 0.621371).toFixed(2)} miles away` : ''}</span>
                         <span>{date}</span>
                       </div>
                     </div>
@@ -816,7 +872,7 @@ export function HomePackPdfTemplate({
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 8 of 10</span>
             </div>
           </div>
@@ -1067,7 +1123,7 @@ export function HomePackPdfTemplate({
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
-              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+              <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
               <span className="font-bold">Page 9 of 10</span>
             </div>
           </div>
@@ -1154,13 +1210,13 @@ export function HomePackPdfTemplate({
                 </div>
               ) : (
                 <div className="py-3 px-6 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm text-center mb-2">
-                  <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-0.5">HomePackAI Data Compilation Statement</h3>
-                  <p className="text-xs text-[#4a5568] italic">Compiled by HomePackAI from the cited public and official sources. This is not a professional certification, valuation, survey, or legal opinion.</p>
+                  <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-0.5">UKHomePack.com Data Compilation Statement</h3>
+                  <p className="text-xs text-[#4a5568] italic">Compiled by UKHomePack.com from the cited public and official sources. This is not a professional certification, valuation, survey, or legal opinion.</p>
                 </div>
               )}
               
               <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-3">
-                <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'HomePackAI Property Information Report'}</span>
+                <span>{isWhiteLabel && profile?.company ? `${profile.company} Property Due Diligence Report` : 'UKHomePack.com • UK Property HomePack Report'}</span>
                 <span className="font-bold">Page 10 of 10</span>
               </div>
             </div>

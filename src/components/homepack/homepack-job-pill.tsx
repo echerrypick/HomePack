@@ -107,7 +107,7 @@ export function HomePackFloatingPill() {
           <div className="flex flex-col min-w-0 pr-1">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-bold tracking-tight truncate max-w-[170px]">
-                {isCompleted ? "HomePack Complete" : "Compiling HomePack"}
+                {isCompleted ? "Report Complete" : "Compiling Report"}
               </span>
               {!isCompleted && (
                 <span className="text-[11px] font-semibold text-primary">

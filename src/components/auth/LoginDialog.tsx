@@ -84,7 +84,7 @@ export function LoginDialog({ trigger }: LoginDialogProps) {
           <DialogDescription className="text-center">
             {isSignUp 
               ? 'Enter your details to create a new account' 
-              : 'Login to access your HomePack dashboard'}
+              : 'Login to access your UKHomePack.com dashboard'}
           </DialogDescription>
         </DialogHeader>
 

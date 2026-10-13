@@ -1,3 +1,5 @@
+import { FileText } from 'lucide-react';
+import { PageHero } from '@/components/layout/PageHero';
 import React from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -7,46 +9,54 @@ export default function TermsPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-4 py-20 max-w-4xl flex-grow">
-        <h1 className="text-4xl font-extrabold tracking-tight mb-8">Terms of Service</h1>
+      <main className="site-main container mx-auto px-4 py-20 max-w-4xl flex-grow">
+        <PageHero eyebrow="Using UKHomePack" illustration="simple" icon={<FileText />}><h1 className="site-page-heading">Terms of Service</h1><p>Understand report access, payments, subscriptions and the limits of the service.</p></PageHero>
         <div className="prose prose-slate dark:prose-invert max-w-none space-y-6 text-muted-foreground">
-          <p className="text-lg">Last updated: April 1, 2026</p>
+          <p className="text-lg">Last updated: 13 October 2026</p>
+          <section className="space-y-4"><h2 className="text-2xl font-bold text-foreground">Plans, payments and access</h2>
+            <p>Pay-As-You-Go costs £9.99 for one property report and PDF. Each different property requires a separate payment before generation. Access is tied to the complete address, including any flat or unit identifier. Returning to that purchased property does not require another payment.</p>
+            <p>B2B Pro costs £49 per month and Agency White-Label costs £79 per month. Both include unlimited property reports while the subscription is active. Agency White-Label adds your own report branding for one account; team seats are not included.</p>
+            <p>Subscriptions renew monthly until cancelled. Use Manage billing and cancellation in your profile to view invoices, update payment details or cancel. Cancellation stops future renewals; access continues until the paid period ends unless the payment is refunded or reversed.</p>
+            <p>Plan changes are confirmed in Stripe before taking effect. Upgrades are prorated; downgrades take effect at the next renewal.</p>
+            <p>Payments are processed through Stripe. Access is granted only after payment is verified. If report generation fails, you can retry the same purchased property without another charge. Contact support@ukhomepack.com about failed delivery, duplicate payments, cancellation or a refund. Your statutory consumer rights are unaffected.</p>
+            <p>Recent reports are stored in your browser and may be removed when browser storage is cleared. Keep a downloaded copy of reports you need. Purchased property access is recorded in your account while it remains open.</p>
+          </section>
           
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">1. Acceptance of Terms</h2>
-            <p>By accessing or using HomePack UK, you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any part of these terms, you are prohibited from using this site.</p>
+            <p>By accessing or using UKHomePack.com, you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any part of these terms, you are prohibited from using this site.</p>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">2. Use License</h2>
-            <p>Permission is granted to temporarily download one copy of the materials (information or software) on HomePack UK's website for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not:</p>
+            <p>You may download and retain purchased reports for your own property decisions. Business subscribers may use reports in their professional work and share them with clients. Agency White-Label subscribers may apply their own branding, while retaining source attribution and report limitations. You must not:</p>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Modify or copy the materials;</li>
-              <li>Use the materials for any commercial purpose, or for any public display (commercial or non-commercial);</li>
-              <li>Attempt to decompile or reverse engineer any software contained on HomePack UK's website;</li>
-              <li>Remove any copyright or other proprietary notations from the materials; or</li>
-              <li>Transfer the materials to another person or "mirror" the materials on any other server.</li>
+              <li>Misrepresent a report as an official title document, valuation or professional survey;</li>
+              <li>Resell bulk source datasets or use the service to bypass third-party licensing restrictions;</li>
+              <li>Attempt to decompile or reverse engineer any software contained on UKHomePack.com's website;</li>
+              <li>Remove source attribution or material limitations from reports; or</li>
+              <li>Share account credentials or interfere with the operation of the service.</li>
             </ul>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">3. Disclaimer</h2>
-            <p>The materials on HomePack UK's website are provided on an 'as is' basis. HomePack UK makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.</p>
+            <p>The materials on UKHomePack.com's website are provided on an 'as is' basis. UKHomePack.com makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.</p>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">4. Limitations</h2>
-            <p>In no event shall HomePack UK or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the materials on HomePack UK's website, even if HomePack UK or a HomePack UK authorized representative has been notified orally or in writing of the possibility of such damage.</p>
+            <p>Reports support initial research and do not replace conveyancing searches, a valuation, legal advice or a professional building survey. AI observations can be incomplete or incorrect. Nothing in these terms excludes liability or consumer rights that cannot lawfully be excluded.</p>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">5. Accuracy of Materials</h2>
-            <p>The materials appearing on HomePack UK's website could include technical, typographical, or photographic errors. HomePack UK does not warrant that any of the materials on its website are accurate, complete or current. HomePack UK may make changes to the materials contained on its website at any time without notice. However HomePack UK does not make any commitment to update the materials.</p>
+            <p>Reports use the latest available source records at retrieval time. Publication delays, missing records and geographic differences can limit coverage. A missing result is not evidence that a property has no risk. Check source dates and verify significant findings with the relevant authority or professional. Saved reports do not automatically update.</p>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">6. Links</h2>
-            <p>HomePack UK has not reviewed all of the sites linked to its website and is not responsible for the contents of any such linked site. The inclusion of any link does not imply endorsement by HomePack UK of the site. Use of any such linked website is at the user's own risk.</p>
+            <p>UKHomePack.com has not reviewed all of the sites linked to its website and is not responsible for the contents of any such linked site. The inclusion of any link does not imply endorsement by UKHomePack.com of the site. Use of any such linked website is at the user's own risk.</p>
           </section>
 
           <section className="space-y-4">

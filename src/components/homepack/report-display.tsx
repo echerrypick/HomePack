@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink, Search, Lock, Shield, ShieldAlert, Wifi, Coins, Mountain, Info, Home, Smartphone, GraduationCap, School as SchoolIcon, Plus, Stethoscope } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, Landmark, Zap, Waves, ClipboardList, ExternalLink, Search, Lock, Shield, ShieldAlert, Wifi, Coins, Mountain, Info, Home, Smartphone, GraduationCap, School as SchoolIcon, Plus, Stethoscope, MapPin } from 'lucide-react';
 import { AiSummary } from './ai-summary';
 import { ImageUploader } from './image-uploader';
 import { AiConditionReport } from './ai-condition-report';
@@ -18,7 +18,8 @@ import { DATA_TOOLTIPS } from '@/lib/data-tooltips';
 import { Address, PropertyData, LandRegistryResult, EpcData, FloodRiskData, PlanningHistoryItem, PlanningConstraint, ReportResult, CouncilTaxData, RadonRiskData, CoalMiningData, BroadbandData, School, MobileData, HealthcareAccessData, CrimeData } from '@/types';
 import { PropertyMap } from './property-map';
 import { useAuth } from '@/contexts/AuthContext';
-import { purchaseReportForUser } from '@/firebase';
+import { ownsProperty, hasBusinessAccess } from '@/lib/plans';
+import { authenticatedFetch } from '@/lib/billing-client';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
@@ -75,6 +76,14 @@ export function formatSchoolDistance(dist?: string): string {
   return `${trimmed} away`;
 }
 
+export function formatSchoolGrade(value: unknown): { available: boolean; label: string } {
+  const grade = cleanDataValue(value);
+  if (!grade || /no (?:previous )?(?:single-word )?grade|no (?:ofsted )?(?:grade|rating)(?: available)?|grade (?:is )?not available|not available|not (?:yet )?(?:rated|graded|inspected)|ungraded|unknown|inspection date not published/i.test(grade)) {
+    return { available: false, label: 'Grade not available' };
+  }
+  return { available: true, label: grade };
+}
+
 export function formatPercentVal(val: any, fallback = 'Not recorded'): string {
   const clean = cleanDataValue(val);
   if (!clean) return fallback;
@@ -117,10 +126,12 @@ function SchoolsDisplay({ schools, coordinates, address }: { schools: School[] |
         address={address} 
       />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-3.5 mt-4">
         {labeledSchools.map((school, idx) => {
-          const isOutstanding = school.ofstedRating.toLowerCase().includes('outstanding');
-          const isGood = school.ofstedRating.toLowerCase().includes('good');
+          const grade = formatSchoolGrade(school.ofstedRating);
+          const normalizedGrade = grade.label.toLowerCase();
+          const isOutstanding = normalizedGrade.includes('outstanding');
+          const isGood = normalizedGrade.includes('good');
 
           return (
             <div 
@@ -137,18 +148,16 @@ function SchoolsDisplay({ schools, coordinates, address }: { schools: School[] |
                   </span>
                 </div>
 
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex items-start justify-between gap-2 min-w-0">
-                    <p className="font-bold text-sm text-foreground leading-snug break-words min-w-0">{school.name}</p>
-                    <Badge className={`shrink-0 max-w-[13rem] h-auto min-h-5 whitespace-normal text-center leading-tight py-1 ${
+                <div className="min-w-0 flex-1 space-y-2.5">
+                  <p className="font-bold text-base text-foreground leading-snug break-words">{school.name}</p>
+                  {grade.available ? <Badge className={`w-fit max-w-full h-auto min-h-5 whitespace-normal text-left leading-tight py-1 ${
                       isOutstanding ? 'bg-emerald-600 text-white' :
                       isGood ? 'bg-blue-600 text-white' :
-                      school.ofstedRating.toLowerCase().includes('improvement') ? 'bg-amber-500 text-white' :
+                      normalizedGrade.includes('improvement') ? 'bg-amber-500 text-white' :
                       'bg-slate-600 text-white'
                     } border-none text-[10px] px-2 font-semibold shadow-2xs`}>
-                      {school.ofstedRating}
-                    </Badge>
-                  </div>
+                      {grade.label}
+                  </Badge> : <span className="text-xs text-muted-foreground">{grade.label}</span>}
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       {school.isPrimary ? <GraduationCap className="h-3.5 w-3.5 text-blue-600" /> : <SchoolIcon className="h-3.5 w-3.5 text-purple-600" />}
@@ -397,20 +406,22 @@ function FloodRiskDisplay({ floodRiskData, constraints = [], logs, isAdmin }: { 
 
     const getFloodRiskBadge = (level: string) => {
       const l = (level || '').toLowerCase();
-      if (!l || l.includes('not assessed') || l.includes('not available') || l.includes('requires map') || l.includes('check environment')) {
-        return { bg: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700', label: level || 'Not assessed' };
+      if (!l || l.includes('not assessed') || l.includes('not available') || l.includes('requires map')) {
+        return { bg: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700', label: 'Not assessed' };
       }
-      if (l.includes('high')) return { bg: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900', label: level };
-      if (l.includes('medium')) return { bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900', label: level };
-      if (l.includes('low') && !l.includes('very')) return { bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900', label: level };
-      return { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900', label: level || 'Very Low' };
+      if (l.includes('check environment')) return { bg: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700', label: 'Check EA map' };
+      if (l.includes('high')) return { bg: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900', label: 'High' };
+      if (l.includes('medium')) return { bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900', label: 'Medium' };
+      if (l.includes('very') && l.includes('low')) return { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900', label: 'Very low' };
+      if (l.includes('low')) return { bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900', label: 'Low' };
+      return { bg: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700', label: level || 'Not assessed' };
     };
     
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-[10px] py-0 px-2 h-5 bg-emerald-100 text-emerald-800 border-emerald-200 font-medium">
-                <Search className="h-2.5 w-2.5 mr-1" /> Environment Agency Grounded
+                <Search className="h-2.5 w-2.5 mr-1" /> Environment Agency data
               </Badge>
             </div>
 
@@ -423,11 +434,11 @@ function FloodRiskDisplay({ floodRiskData, constraints = [], logs, isAdmin }: { 
               ].map((item, idx) => {
                 const badge = getFloodRiskBadge(item.val);
                 return (
-                  <div key={idx} className="p-3.5 rounded-xl border border-border/80 bg-card space-y-2 shadow-2xs">
+                  <div key={idx} className="p-3.5 rounded-xl border border-border/80 bg-card space-y-2 shadow-2xs min-w-0">
                     <span className="text-xs font-semibold text-muted-foreground block">{item.title}</span>
-                    <Badge variant="outline" className={`text-xs font-bold px-2 py-0.5 ${badge.bg}`}>
+                    <span title={item.val} className={`inline-flex max-w-full rounded-lg border text-xs font-bold px-2 py-1 leading-snug whitespace-normal break-words [overflow-wrap:anywhere] ${badge.bg}`}>
                       {badge.label}
-                    </Badge>
+                    </span>
                   </div>
                 );
               })}
@@ -482,11 +493,10 @@ function FloodRiskDisplay({ floodRiskData, constraints = [], logs, isAdmin }: { 
 function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTaxData, logs: string[], isAdmin: boolean, postcode: string }) {
   if (!data) return <DataItem label="Council Tax" value="Not available" />;
   const councilTaxLogs = logs.filter(log => 
-    log.startsWith('[Gemini-Grounding') || 
-    log.startsWith('[Brave-Search') || 
-    log.startsWith('[Grounding')
+    log.startsWith('[CouncilTax') ||
+    log.startsWith('[Direct-Scrape')
   );
-  const isVerified = councilTaxLogs.some(log => log.includes('Success'));
+  const isVerified = /^[A-I]$/i.test(String(data.band || '')) && !data.unavailable;
   const govUkUrl = `https://www.tax.service.gov.uk/check-council-tax-band/search?postcode=${postcode.replace(/\s+/g, '+')}`;
 
   return (
@@ -495,11 +505,11 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
         <div className="flex items-center gap-2">
           {isVerified ? (
             <Badge variant="secondary" className="text-[10px] py-0 px-2 h-5 bg-emerald-100 text-emerald-800 border-emerald-200 font-medium">
-              <Search className="h-2.5 w-2.5 mr-1" /> VOA Billing Grounded
+              <Search className="h-2.5 w-2.5 mr-1" /> Official VOA band
             </Badge>
           ) : (
             <Badge variant="outline" className="text-[10px] py-0 px-2 h-5 bg-amber-50 text-amber-800 border-amber-200 font-medium">
-              <Info className="h-2.5 w-2.5 mr-1" /> Estimated Banding
+              <Info className="h-2.5 w-2.5 mr-1" /> Official band unavailable
             </Badge>
           )}
         </div>
@@ -517,10 +527,10 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
       {/* Hero Highlight Card */}
       <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Banding & Annual Rate</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Banding & Standard Annual Rate</span>
           <div className="flex items-baseline gap-3">
-            <span className="text-2xl font-serif font-bold text-[#1e3a8a] dark:text-blue-400">Band {data.band}</span>
-            <span className="text-lg font-bold text-foreground">{data.annualAmount || 'Recorded'}</span>
+            <span className="text-2xl font-serif font-bold text-[#1e3a8a] dark:text-blue-400">{isVerified ? `Band ${data.band}` : 'Band not available'}</span>
+            <span className="text-lg font-bold text-foreground">{isVerified ? (data.annualAmount || 'Annual charge not available') : 'Annual charge not available'}</span>
           </div>
         </div>
         <div className="text-left sm:text-right space-y-0.5">
@@ -531,15 +541,32 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
-        <DataItem label="Valuation Band" value={data.band} tooltip={DATA_TOOLTIPS.band} />
-        <DataItem label="Annual Charge" value={data.annualAmount} tooltip={DATA_TOOLTIPS.annualAmount} />
+        <DataItem label="Valuation Band" value={isVerified ? data.band : 'Not available'} tooltip={DATA_TOOLTIPS.band} />
+        <DataItem label="Standard Annual Charge" value={isVerified ? data.annualAmount : 'Not available'} tooltip={DATA_TOOLTIPS.annualAmount} />
         <DataItem label="Local Authority" value={data.authority} tooltip={DATA_TOOLTIPS.authority} />
         <DataItem label="Tax Year" value={data.year} />
       </div>
 
       <p className="text-[10px] text-muted-foreground italic">
-        Source and data date: {data.source || `Valuation Office Agency band / ${data.authority} charge table`} ({data.year || 'year not recorded'})
+        Source and data date:{' '}
+        {data.sourceUrl ? (
+          <a href={data.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+            {data.source || `Valuation Office Agency band / ${data.authority} charge table`}
+          </a>
+        ) : (
+          data.source || `Valuation Office Agency band / ${data.authority} charge table`
+        )}{' '}
+        ({data.year || 'year not recorded'})
       </p>
+      <p className="text-[10px] text-muted-foreground">
+        The published standard charge is before any single-person discount, exemption, reduction, premium or individual account adjustment.
+      </p>
+      {data.chargeNote && (
+        <p className="text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>{data.chargeNote}</span>
+        </p>
+      )}
       
       {isAdmin && (
         <Accordion className="w-full mt-2" data-pdf-ignore>
@@ -820,7 +847,7 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
               {constraints.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {constraints.map((constraint, index) => (
-                    <a key={`${constraint.dataset}-${constraint.reference}-${index}`} href={constraint.url} target="_blank" rel="noopener noreferrer" className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 hover:border-amber-300 transition-colors">
+                    <a key={`${constraint.dataset}-${constraint.reference}-${index}`} href={constraint.url} target="_blank" rel="noopener noreferrer" className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 hover:border-amber-300 transition-colours">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">{constraint.dataset.replace(/-/g, ' ')}</p>
                       <p className="text-sm font-semibold text-foreground mt-0.5">{constraint.detail || constraint.name}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">Ref: {constraint.reference} • {constraint.quality}</p>
@@ -835,7 +862,9 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
             </div>
 
             <div className="flex items-center justify-between gap-2 pt-1">
-              <h3 className="text-sm font-semibold text-foreground">Nearby and property-linked applications</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {coverage?.scope === 'radius' ? 'Planning applications within 0.3 miles' : 'Planning applications at the property and on this street'}
+              </h3>
               <span className="text-[10px] text-muted-foreground">Planning Data + PlanIt</span>
             </div>
 
@@ -845,7 +874,7 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
                         const isApproved = item.decision.toLowerCase().includes('approve') || item.decision.toLowerCase().includes('grant');
                         const isRefused = item.decision.toLowerCase().includes('refus') || item.decision.toLowerCase().includes('reject');
                         return (
-                          <div key={index} className="p-3.5 rounded-xl border border-border/80 bg-card/70 space-y-2 hover:border-primary/40 transition-colors shadow-2xs">
+                          <div key={index} className="p-3.5 rounded-xl border border-border/80 bg-card/70 space-y-2 hover:border-primary/40 transition-colours shadow-2xs">
                               <div className="flex flex-wrap justify-between items-start gap-2">
                                 <p className="font-semibold text-sm text-foreground flex-1 leading-snug">{item.application}</p>
                                 <Badge 
@@ -861,8 +890,12 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
                                   {formatDecision(item.decision)}
                                 </Badge>
                               </div>
+                              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                                <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                                <span>{item.address || 'Site address not published in the source record'}</span>
+                              </p>
                               <div className="flex flex-wrap justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border/40 gap-2">
-                                  <span>Date: <span className="font-medium text-foreground">{item.date}</span>{item.distanceKm !== undefined ? ` • ${(item.distanceKm * 0.621371).toFixed(1)} miles away` : ''}</span>
+                                  <span>Date: <span className="font-medium text-foreground">{item.date}</span>{item.distanceKm !== undefined ? item.distanceKm === 0 ? ' • property-linked' : ` • ${(item.distanceKm * 0.621371).toFixed(2)} miles away` : ''}</span>
                                   <div className="flex items-center gap-3">
                                     {(item.applicationSize || item.applicationType) && <span>{[item.applicationSize, item.applicationType].filter(Boolean).join(' • ')}</span>}
                                     <span className="font-mono text-[11px]">Ref: {item.reference}</span>
@@ -925,11 +958,13 @@ export function ReportDisplay({
   onNewHomePack 
 }: ReportDisplayProps) {
   const { user, profile, isAdmin } = useAuth();
+  const isSample = window.location.pathname === '/sample' || window.location.pathname === '/sample-report';
   console.log("[DEBUG] isAdmin:", isAdmin, "profile role:", profile?.role);
   const [conditionReport, setConditionReport] = useState<string | null>(null);
   const [isConditionReportLoading, setIsConditionReportLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isInIframe, setIsInIframe] = useState(false);
+  const [serverPropertyAccess, setServerPropertyAccess] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const pdfTemplateRef = useRef<HTMLDivElement>(null);
 
@@ -937,7 +972,23 @@ export function ReportDisplay({
     setIsInIframe(window.self !== window.top);
   }, []);
 
+  React.useEffect(() => {
+    if (isSample || !user) {
+      setServerPropertyAccess(false);
+      return;
+    }
+    let active = true;
+    authenticatedFetch('/api/billing/access', { method: 'POST', body: JSON.stringify(address) })
+      .then(response => { if (active) setServerPropertyAccess(response.ok); })
+      .catch(() => { if (active) setServerPropertyAccess(false); });
+    return () => { active = false; };
+  }, [isSample, user?.uid, address.houseNumber, address.street, address.town, address.postcode]);
+
   const downloadPdf = async () => {
+    if (!isSample) {
+      const access = await authenticatedFetch('/api/billing/access', { method: 'POST', body: JSON.stringify(address) });
+      if (!access.ok) { toast.error('Purchase access to this property before downloading.'); return; }
+    }
     setIsDownloading(true);
     const toastId = toast.loading('Preparing PDF report...');
 
@@ -952,7 +1003,7 @@ export function ReportDisplay({
       }
 
       const safeStreet = `${address.houseNumber}-${address.street}`.replace(/[^a-z0-9]/gi, '-');
-      const filename = `HomePack-${safeStreet}.pdf`;
+      const filename = `UKHomePack-${safeStreet}.pdf`;
 
       // Ensure the template is visible during capture
       const originalStyle = template.parentElement?.style.cssText || "";
@@ -1030,7 +1081,7 @@ export function ReportDisplay({
         }
 
         pdf.save(filename);
-        toast.success('HomePack PDF downloaded successfully (9 pages)!', { id: toastId });
+        toast.success('UK Property HomePack Report downloaded successfully!', { id: toastId });
       } finally {
         if (template.parentElement) {
           template.parentElement.style.cssText = originalStyle;
@@ -1053,7 +1104,7 @@ export function ReportDisplay({
       <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <div className="space-y-1">
-          <p className="text-lg font-semibold">Compiling HomePack...</p>
+          <p className="text-lg font-semibold">Compiling UK Property Report…</p>
           <p className="text-sm text-muted-foreground">Gathering official HM Land Registry, EPC, and environmental registers</p>
         </div>
       </div>
@@ -1063,7 +1114,7 @@ export function ReportDisplay({
   if (!reportData) return null;
 
   const { propertyData, summary, logs } = reportData;
-  const { landRegistry, epc, floodRisk, planningHistory, planningConstraints, planningCoverage, councilTax, radonRisk, coalMining, broadband } = propertyData;
+  const { landRegistry, recentStreetSales, epc, floodRisk, planningHistory, planningConstraints, planningCoverage, councilTax, radonRisk, coalMining, broadband } = propertyData;
 
   // Real-time resilience: if report was cached without healthcare data, asynchronously load it
   const [liveHealthcare, setLiveHealthcare] = useState<HealthcareAccessData | undefined>(propertyData.healthcare);
@@ -1117,44 +1168,25 @@ export function ReportDisplay({
   }
 
   const primaryTransaction = getPrimaryTransaction(landRegistry);
-  const isFree = profile?.role === 'free';
-  const isBusinessSubscriber = profile?.role === 'subscription' || profile?.role === 'agency' || profile?.role === 'admin';
+  const isBusinessSubscriber = hasBusinessAccess(profile);
   const fullAddress = `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`.trim();
-  const hasPurchasedReport = Boolean(
-    profile?.purchasedReports?.includes(fullAddress) ||
-    profile?.purchasedReports?.includes(propertyData.address) ||
-    (address.postcode && profile?.purchasedReports?.some(p => p.toLowerCase().includes(address.postcode.toLowerCase().trim())))
-  );
-  const canDownloadPdf = isBusinessSubscriber || hasPurchasedReport;
+  const hasPurchasedReport = ownsProperty(profile, address);
+  const canDownloadPdf = isSample || isBusinessSubscriber || hasPurchasedReport || serverPropertyAccess;
+  const isFree = !canDownloadPdf;
   const [showB2CPurchaseModal, setShowB2CPurchaseModal] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
 
   // White-label branding attributes
-  const isWhiteLabel = (profile?.role === 'agency' || (profile?.accountType === 'business' && profile?.role !== 'free')) && Boolean(profile?.branding);
+  const isWhiteLabel = !isSample && profile?.role === 'agency' && isBusinessSubscriber && Boolean(profile?.branding);
   const branding = profile?.branding;
   const brandPrimary = (isWhiteLabel && branding?.primaryColor) || '#2d4a77';
   const brandAccent = (isWhiteLabel && branding?.accentColor) || '#d1e3f8';
   const brandLogo = (isWhiteLabel && branding?.logoUrl) || null;
-  const companyName = (isWhiteLabel && (profile?.company || branding?.companyTagline || branding?.agentName)) || 'HomePackAI';
+  const companyName = (isWhiteLabel && (profile?.company || branding?.companyTagline || branding?.agentName)) || 'UKHomePack.com';
 
   const handleB2CPurchase = async () => {
-    if (!user) {
-      toast.error('Please sign in or create an account to unlock your £9.99 report download');
-      return;
-    }
-    setIsPurchasing(true);
-    try {
-      await purchaseReportForUser(user.uid, fullAddress);
-      toast.success('Report purchased! Generating your official 9-page HomePack PDF (£9.99)...');
-      setShowB2CPurchaseModal(false);
-      setTimeout(() => {
-        downloadPdf();
-      }, 400);
-    } catch (e: any) {
-      toast.error(e.message || 'Could not complete report purchase');
-    } finally {
-      setIsPurchasing(false);
-    }
+    sessionStorage.setItem('homepack_checkout_address', JSON.stringify(address));
+    window.location.assign('/payment?plan=report');
   };
 
   return (
@@ -1175,7 +1207,7 @@ export function ReportDisplay({
           <p className="text-muted-foreground font-sans mt-1">
             {isWhiteLabel && profile?.company 
               ? `Client due diligence pack prepared by ${profile.company}` 
-              : 'Comprehensive property information pack generated by HomePackAI.'}
+              : 'UK Property HomePack Report compiled by UKHomePack.com.'}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -1186,14 +1218,14 @@ export function ReportDisplay({
             onClick={onNewHomePack || onReset}
           >
             <Plus className="mr-2 h-4 w-4" />
-            New HomePack
+            New Property Report
           </Button>
 
           {canDownloadPdf ? (
             <div className="flex items-center gap-2">
               {hasPurchasedReport && !isBusinessSubscriber && (
                 <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 font-medium px-2.5 py-1 text-xs">
-                  B2C Single Pack Unlocked
+                  Single Property Unlocked
                 </Badge>
               )}
               <Button 
@@ -1232,7 +1264,7 @@ export function ReportDisplay({
                 className="w-full sm:w-auto text-xs font-medium"
               >
                 <Link to="/pricing">
-                  B2B Subscription (£29–£49/mo)
+                  B2B Subscription (£49–£79/mo)
                 </Link>
               </Button>
             </div>
@@ -1240,8 +1272,9 @@ export function ReportDisplay({
         </div>
       </div>
 
-      {/* Modular 9-Page PDF Template */}
+      {/* Modular Property PDF Template */}
       <HomePackPdfTemplate
+        isSample={isSample}
         pdfTemplateRef={pdfTemplateRef}
         propertyData={mergedPropertyData}
         healthcare={activeHealthcare}
@@ -1285,7 +1318,7 @@ export function ReportDisplay({
                   {/* Hero Highlight Card */}
                   <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Official Last Sold Price</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Latest sale recorded in HM Land Registry Price Paid Data</span>
                       <div className="flex items-baseline gap-3">
                         <span className="text-2xl font-serif font-bold text-[#1e3a8a] dark:text-blue-400">
                           £{parseInt(primaryTransaction.pricePaid, 10).toLocaleString()}
@@ -1296,7 +1329,7 @@ export function ReportDisplay({
                       </div>
                     </div>
                     <div className="text-left sm:text-right space-y-0.5">
-                      <span className="text-xs text-muted-foreground block">Completion Date:</span>
+                      <span className="text-xs text-muted-foreground block">Recorded sale date:</span>
                       <span className="text-sm font-semibold text-foreground block">
                         {new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')}
                       </span>
@@ -1304,18 +1337,22 @@ export function ReportDisplay({
                     </div>
                   </div>
 
+                  <p className="text-xs text-muted-foreground">
+                    Exact matched record: <span className="font-medium text-foreground">{primaryTransaction.addressString}</span>. This is the latest sale present in the Price Paid Data, which may not include every transaction, and is not a current valuation.
+                  </p>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="p-3 rounded-xl border border-border/70 bg-card/60">
                       <span className="text-[10px] uppercase font-bold text-muted-foreground block">Tenure Type</span>
                       <span className="text-sm font-semibold text-foreground">{primaryTransaction.estateType || 'Freehold'}</span>
                     </div>
                     <div className="p-3 rounded-xl border border-border/70 bg-card/60">
-                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">Record Date</span>
-                      <span className="text-sm font-semibold text-foreground">{new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB')}</span>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">Property Type</span>
+                      <span className="text-sm font-semibold text-foreground">{primaryTransaction.propertyType || 'Not recorded'}</span>
                     </div>
                     <div className="p-3 rounded-xl border border-border/70 bg-card/60">
                       <span className="text-[10px] uppercase font-bold text-muted-foreground block">Registry Category</span>
-                      <span className="text-sm font-semibold text-foreground">Standard Price Paid</span>
+                      <span className="text-sm font-semibold text-foreground">{primaryTransaction.transactionCategory || 'Not recorded'}</span>
                     </div>
                   </div>
                   
@@ -1328,7 +1365,7 @@ export function ReportDisplay({
                       </h3>
                       <div className="space-y-2">
                         {landRegistry.map((transaction, index) => (
-                          <div key={index} className="p-3 rounded-xl border border-border/70 bg-card/50 flex justify-between items-center text-sm hover:bg-muted/40 transition-colors">
+                          <div key={index} className="p-3 rounded-xl border border-border/70 bg-card/50 flex justify-between items-center text-sm hover:bg-muted/40 transition-colours">
                             <div className="space-y-0.5">
                               <p className="font-semibold text-foreground">£{parseInt(transaction.pricePaid, 10).toLocaleString()}</p>
                               <p className="text-xs text-muted-foreground">{transaction.estateType || 'Transfer'}</p>
@@ -1346,9 +1383,57 @@ export function ReportDisplay({
                 <div className="space-y-2">
                   <DataItem label="Title Number" value={"N/A"} />
                   <DataItem label="Tenure" value={"Data not found"} />
-                  <DataItem label="Last Sold" value={"No recent sales data recorded in Land Registry index"} />
+                  <DataItem label="Recorded Sales" value={"No sales data found in HM Land Registry Price Paid Data"} />
                </div>
             )}
+
+            <Separator className="my-5" />
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Recently recorded sales on this street</h3>
+                  <p className="text-xs text-muted-foreground">Latest neighbouring transactions found in HM Land Registry Price Paid Data.</p>
+                </div>
+                {recentStreetSales?.length > 0 && (
+                  <span className="text-xs text-muted-foreground">{recentStreetSales.length} records shown</span>
+                )}
+              </div>
+
+              {recentStreetSales?.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {recentStreetSales.map((sale, index) => (
+                    <div key={`${sale.addressString}-${sale.transactionDate}-${index}`} className="rounded-xl border border-border/70 bg-card/60 p-3 min-w-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground">£{parseInt(sale.pricePaid, 10).toLocaleString('en-GB')}</p>
+                          <p className="mt-1 text-xs text-muted-foreground break-words flex items-start gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span>{sale.addressString}</span>
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-md bg-muted/60 px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                          {new Date(sale.transactionDate).toLocaleDateString('en-GB')}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        {[sale.propertyType, sale.estateType, sale.newBuild ? 'New build' : null].filter(Boolean).join(' • ') || 'Property details not recorded'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  No neighbouring sales were returned for this exact street and town.
+                </div>
+              )}
+
+              <p className="text-[11px] text-muted-foreground">
+                These are recorded sale prices, not current valuations. Recent transactions can take time to appear and some transfers are excluded from Price Paid Data.
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Contains HM Land Registry data © Crown copyright and database right 2021. Licensed under the Open Government Licence v3.0.
+              </p>
+            </div>
           </DataSection>
 
           <DataSection id="section-epc" icon={Zap} title="Energy Performance (EPC)">
@@ -1403,7 +1488,7 @@ export function ReportDisplay({
           />
 
           <div id="section-condition">
-            {!isFree ? (
+            {!isSample && isBusinessSubscriber ? (
               <>
                 <div data-pdf-ignore>
                   <ImageUploader onReportGenerated={setConditionReport} setIsLoading={setIsConditionReportLoading} />
@@ -1438,7 +1523,7 @@ export function ReportDisplay({
           <Card className="w-full max-w-lg bg-card border shadow-xl p-6 relative">
             <button
               onClick={() => setShowB2CPurchaseModal(false)}
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors text-sm font-semibold"
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colours text-sm font-semibold"
               aria-label="Close modal"
             >
               ✕
@@ -1452,7 +1537,7 @@ export function ReportDisplay({
               </Badge>
             </div>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              Unlock Full 9-Page Due Diligence PDF
+              Unlock Full Property Due Diligence PDF
             </h3>
             <p className="text-sm text-muted-foreground mt-1 mb-4">
               Instant one-off purchase for <span className="font-semibold text-foreground">{propertyData.address}</span>. No subscription or recurring fees.
@@ -1463,13 +1548,13 @@ export function ReportDisplay({
                 <span className="font-medium text-sm">Official Property Pack PDF</span>
                 <div className="text-right">
                   <span className="text-2xl font-bold text-foreground">£9.99</span>
-                  <span className="text-xs text-muted-foreground ml-1">inc. VAT</span>
+                  <span className="text-xs text-muted-foreground ml-1">per property</span>
                 </div>
               </div>
               <ul className="text-xs space-y-2 text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <span className="text-emerald-600 font-bold">✓</span>
-                  <span>Full 9-page high-resolution PDF download</span>
+                  <span>Full multi-section high-resolution PDF download</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-emerald-600 font-bold">✓</span>
@@ -1489,11 +1574,11 @@ export function ReportDisplay({
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-emerald-600 font-bold">✓</span>
-                  <span>Nearest schools with verified Ofsted inspection ratings</span>
+                  <span>Nearby schools and available inspection information</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-emerald-600 font-bold">✓</span>
-                  <span>Ofcom broadband speed test data & 4G/5G mobile coverage</span>
+                  <span>Available broadband speed estimates and mobile coverage predictions</span>
                 </li>
               </ul>
             </div>
@@ -1525,7 +1610,7 @@ export function ReportDisplay({
                     ) : (
                       <>
                         <Download className="mr-2 h-4 w-4" />
-                        Confirm & Download (£9.99)
+                        Continue to Payment (£9.99)
                       </>
                     )}
                   </Button>
@@ -1554,7 +1639,7 @@ export function ReportDisplay({
             <div className="mt-4 pt-3 border-t text-center text-xs text-muted-foreground">
               Need regular reports?{' '}
               <Link to="/pricing" className="text-primary hover:underline font-medium">
-                Switch to B2B Pro (£29/mo) or White-Label (£49/mo)
+                Switch to B2B Pro (£49/mo) or White-Label (£79/mo)
               </Link>
             </div>
           </Card>

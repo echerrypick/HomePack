@@ -68,7 +68,7 @@ export function HomePackChecklistModal({ onViewReport }: HomePackChecklistModalP
               </div>
 
               <h2 className="text-xl font-bold tracking-tight text-foreground">
-                {isCompleted ? "Your HomePack is Ready" : "Compiling Property HomePack"}
+                {isCompleted ? "Your UK Property Report is Ready" : "Compiling UK Property Report"}
               </h2>
 
               <p className="text-sm text-muted-foreground line-clamp-1 font-medium flex items-center gap-1.5">
@@ -205,7 +205,7 @@ export function HomePackChecklistModal({ onViewReport }: HomePackChecklistModalP
                   }}
                   className="w-full sm:w-auto rounded-xl px-5 h-10 shadow-sm"
                 >
-                  <span>View HomePack Report</span>
+                  <span>View Property Report</span>
                   <ArrowRight className="ml-1.5 h-4 w-4" />
                 </Button>
               ) : isFailed ? (

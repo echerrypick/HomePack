@@ -1,6 +1,7 @@
+import { authenticatedFetch } from '../lib/billing-client';
 export async function generateAiSummary(propertyData: any) {
   try {
-    const response = await fetch('/api/generate-summary', {
+    const response = await authenticatedFetch('/api/generate-summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ propertyData }),
@@ -21,7 +22,7 @@ export async function generateAiSummary(propertyData: any) {
 
 export async function generateAiConditionReport(photoDataUris: string[]) {
   try {
-    const response = await fetch('/api/generate-condition-report', {
+    const response = await authenticatedFetch('/api/generate-condition-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ photoDataUris }),

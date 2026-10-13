@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -48,24 +49,23 @@ export default function CouncilTaxPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
-      <main className="flex-grow flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <main className="site-main flex-grow flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+        <PageHero eyebrow="Understand the running costs" icon={<Home />}><h1 className="site-page-heading">Council tax, with the context.</h1><p>Check the official VOA band for an exact property address. Available charges and source details help you plan ahead.</p></PageHero>
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl border border-slate-100"
+          className="max-w-2xl w-full space-y-8 bg-white p-8 rounded-2xl shadow-sm border border-border"
         >
           <div className="text-center">
-            <div className="mx-auto h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4">
+            <div className="mx-auto h-12 w-12 bg-primary rounded-xl flex items-center justify-center mb-4">
               <Search className="h-6 w-6 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
-              Council Tax Band Checker
-            </h2>
+            <h2 className="text-2xl font-bold tracking-tight">Check a property address</h2>
             <p className="mt-2 text-sm text-slate-500">
-              Enter property details to find the UK Council Tax band.
+              Enter the complete address to check the official VOA Council Tax band. No estimated band will be substituted.
             </p>
           </div>
 
@@ -84,7 +84,7 @@ export default function CouncilTaxPage() {
                     type="text"
                     value={houseNumber}
                     onChange={(e) => setHouseNumber(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-slate-900 sm:text-sm"
+                    className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-primary focus:border-primary text-slate-900 sm:text-sm"
                     placeholder="e.g. 10"
                   />
                 </div>
@@ -103,7 +103,7 @@ export default function CouncilTaxPage() {
                     type="text"
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-slate-900 sm:text-sm"
+                    className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-primary focus:border-primary text-slate-900 sm:text-sm"
                     placeholder="e.g. Downing Street"
                   />
                 </div>
@@ -123,7 +123,7 @@ export default function CouncilTaxPage() {
                     required
                     value={postcode}
                     onChange={(e) => setPostcode(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-slate-900 sm:text-sm uppercase"
+                    className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-primary focus:border-primary text-slate-900 sm:text-sm uppercase"
                     placeholder="e.g. SW1A 2AA"
                   />
                 </div>
@@ -134,7 +134,7 @@ export default function CouncilTaxPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {loading ? (
                   <Loader2 className="animate-spin h-5 w-5" />
@@ -169,12 +169,12 @@ export default function CouncilTaxPage() {
                 {result.results ? (
                   <div className="space-y-4">
                     <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wider">Multiple Results Found</h3>
-                    <p className="text-xs text-slate-600 mb-2">We found several properties in this postcode. Please select yours or refine your search.</p>
+                    <p className="text-xs text-slate-600 mb-2">The official lookup returned several properties. Refine the house number and street so an exact match can be confirmed.</p>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                       {result.results.map((r: any, i: number) => (
                         <div key={i} className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm border border-slate-100">
                           <span className="text-xs text-slate-700 font-medium truncate mr-2">{r.address}</span>
-                          <span className="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">Band {r.band}</span>
+                          <span className="text-sm font-bold text-primary bg-blue-50 px-2 py-1 rounded">Band {r.band}</span>
                         </div>
                       ))}
                     </div>
@@ -184,7 +184,12 @@ export default function CouncilTaxPage() {
                     <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wider">Property Found</h3>
                     <p className="text-sm text-slate-700 font-medium">{result.address}</p>
                     <div className="mt-4 inline-block">
-                      <span className="text-4xl font-black text-blue-600 block">Band {result.band}</span>
+                      <span className="text-4xl font-black text-primary block">Band {result.band}</span>
+                    </div>
+                    <div className="mt-4 border-t border-blue-100 pt-4 text-sm text-slate-700">
+                      <p><span className="font-semibold">Annual standard charge:</span> {result.annualAmount || 'Not available'}</p>
+                      <p><span className="font-semibold">Billing authority:</span> {result.authority || 'Not confirmed'}</p>
+                      <p><span className="font-semibold">Tax year:</span> {result.year || 'Not recorded'}</p>
                     </div>
                   </div>
                 )}

@@ -86,8 +86,11 @@ export function PropertyQuickNav({
     : 'Not recorded';
 
   // Council tax band
-  const ctBand = councilTax?.band ? `Band ${councilTax.band}` : 'Recorded';
-  const ctAmount = councilTax?.annualAmount || null;
+  const hasOfficialCouncilTaxBand = /^[A-I]$/i.test(String(councilTax?.band || ''));
+  const ctBand = hasOfficialCouncilTaxBand ? `Band ${councilTax!.band}` : 'Not available';
+  const ctAmount = hasOfficialCouncilTaxBand && String(councilTax?.annualAmount || '').startsWith('£')
+    ? councilTax?.annualAmount
+    : null;
 
   // Flood risk summary
   const floodLevel = floodRisk?.riskOfFloodingFromRiversAndSea || 'Low';
@@ -165,7 +168,11 @@ export function PropertyQuickNav({
             <div className="flex items-center justify-between py-1 border-b border-border/40">
               <span className="text-muted-foreground font-medium">Nearest GP:</span>
               <span className="font-bold text-foreground text-xs truncate max-w-[140px] text-right" title={propertyData.healthcare.gpSurgeries[0].name}>
-                {String(propertyData.healthcare.gpSurgeries[0].name || 'Local Surgery').replace(/Medical Centre|Surgery|Practice/gi, '').trim()} ({String(propertyData.healthcare.gpSurgeries[0].distance || '0.5 mi').split(' ')[0]} mi)
+                {String(propertyData.healthcare.gpSurgeries[0].name || 'Local Surgery').replace(/Medical Centre|Surgery|Practice/gi, '').trim()}
+                {(() => {
+                  const distance = String(propertyData.healthcare.gpSurgeries[0].distance || '').trim();
+                  return distance && !/unavailable|unknown|not recorded/i.test(distance) ? ` (${distance})` : '';
+                })()}
               </span>
             </div>
           )}

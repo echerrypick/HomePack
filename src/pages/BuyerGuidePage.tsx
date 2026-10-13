@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero';
 import React from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -11,11 +12,11 @@ export default function BuyerGuidePage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
 
-      <main className="container mx-auto px-4 py-12 max-w-4xl flex-grow">
-        <div className="mb-12 text-center">
-          <h1 className="text-4xl font-extrabold tracking-tight mb-4">The Ultimate Buyer's Guide</h1>
+      <main className="site-main container mx-auto px-4 py-12 max-w-4xl flex-grow">
+        <PageHero eyebrow="Your next home starts with good questions" illustration="property" icon={<FileText />}>
+          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">The Ultimate Buyer's Guide</h1>
           <p className="text-xl text-muted-foreground">Everything you need to know to navigate the UK property market with confidence.</p>
-        </div>
+        </PageHero>
 
         {/* TA6 Form Section */}
         <Card className="mb-12 border-primary/20 bg-primary/5">
@@ -35,18 +36,18 @@ export default function BuyerGuidePage() {
                 Key Update for 2026
               </h4>
               <p className="text-sm text-muted-foreground">
-                The latest 6th edition (2025) of the TA6 form is mandatory for all sales handled by solicitors after <strong>30 March 2026</strong>. This version includes more detailed disclosures to help prevent "transaction failure" and ensure buyers have all material information upfront.
+                The TA6 (6th edition, 2025) is required for Conveyancing Quality Scheme (CQS) firms on new transactions where the solicitor is instructed on or after <strong>30 March 2026</strong>. Earlier transactions that already used an older edition may continue with it. Ask your conveyancer which documents apply to your sale.
               </p>
             </div>
             <div className="flex flex-wrap gap-4 pt-2">
               <Button asChild variant="default">
-                <a 
-                  href="https://tls-sc104-prd-glo-fde-01-duatf0eka4hpcxe6.a03.azurefd.net/-/media/files/topics/property/ta6-6th-edition---law-society-explanatory-notes-2025.pdf?rev=a3f28e96e65c46dab1a04707df10e892&hash=88831BF28B3D5F02DCDA02208764B850" 
-                  target="_blank" 
+                <a
+                  href="https://www.lawsociety.org.uk/topics/property/transaction-forms"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2"
                 >
-                  Download TA6 Guidance Notes (PDF)
+                  Read current TA6 guidance
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </Button>
@@ -69,7 +70,7 @@ export default function BuyerGuidePage() {
                   "Get a Mortgage in Principle (MIP)",
                   "Research local areas and schools",
                   "Arrange property viewings",
-                  "Review the HomePack report (EPC, Flood, Planning)",
+                  "Review the UK Property HomePack Report (EPC, flood and planning)",
                   "Request the TA6 form from the seller's solicitor",
                   "Instruct a surveyor for a structural survey",
                   "Appoint a conveyancing solicitor",
@@ -123,23 +124,23 @@ export default function BuyerGuidePage() {
         <div className="space-y-6">
           <h2 className="text-2xl font-bold">Useful Resources</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <ResourceLink 
-              title="MoneyHelper: Buying a Home" 
+            <ResourceLink
+              title="MoneyHelper: Buying a Home"
               url="https://www.moneyhelper.org.uk/en/homes/buying-a-home"
               description="Free, impartial advice on the costs and process of buying."
             />
-            <ResourceLink 
-              title="GOV.UK: How to Buy a Home" 
+            <ResourceLink
+              title="GOV.UK: How to Buy a Home"
               url="https://www.gov.uk/government/publications/how-to-buy-a-home"
               description="The official government guide to the home buying process."
             />
-            <ResourceLink 
-              title="Land Registry Public Records" 
+            <ResourceLink
+              title="Land Registry Public Records"
               url="https://www.gov.uk/search-property-information-land-registry"
               description="Check property boundaries and ownership details."
             />
-            <ResourceLink 
-              title="Check Flood Risk" 
+            <ResourceLink
+              title="Check Flood Risk"
               url="https://www.gov.uk/check-long-term-flood-risk"
               description="Detailed long-term flood risk assessments by postcode."
             />
@@ -154,9 +155,9 @@ export default function BuyerGuidePage() {
 
 function ResourceLink({ title, url, description }: { title: string, url: string, description: string }) {
   return (
-    <a 
-      href={url} 
-      target="_blank" 
+    <a
+      href={url}
+      target="_blank"
       rel="noopener noreferrer"
       className="block p-4 rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-md transition-all group"
     >

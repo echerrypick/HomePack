@@ -38,11 +38,11 @@ export function AddressForm({ onAddressSubmit, isLoading, error }: AddressFormPr
   }
 
   return (
-    <Card className="shadow-lg animate-fade-in-up">
+    <Card className="property-address-card shadow-md">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline">Create your Property Info Pack</CardTitle>
+        <CardTitle className="text-2xl font-bold tracking-tight">Create your Property Info Pack</CardTitle>
         <CardDescription>
-          Enter the property address to generate your report.
+          Enter the complete property address. Pay-as-you-go reports cost £9.99 per property; payment is required before generation for each new property.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -57,39 +57,39 @@ export function AddressForm({ onAddressSubmit, isLoading, error }: AddressFormPr
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2 md:col-span-1">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                <label htmlFor="property-houseNumber" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   House Number / Name
                 </label>
-                <Input placeholder="e.g., 10" {...register('houseNumber')} />
-                {errors.houseNumber && <p className="text-sm font-medium text-destructive">{errors.houseNumber.message}</p>}
+                <Input placeholder="e.g., 10" id="property-houseNumber" aria-invalid={Boolean(errors.houseNumber)} aria-describedby={errors.houseNumber ? 'property-houseNumber-error' : undefined} {...register('houseNumber')} />
+                {errors.houseNumber && <p id="property-houseNumber-error" className="text-sm font-medium text-destructive">{errors.houseNumber.message}</p>}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                <label htmlFor="property-street" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Street Name
                 </label>
-                <Input placeholder="e.g., Downing Street" {...register('street')} />
-                {errors.street && <p className="text-sm font-medium text-destructive">{errors.street.message}</p>}
+                <Input placeholder="e.g., Downing Street" id="property-street" aria-invalid={Boolean(errors.street)} aria-describedby={errors.street ? 'property-street-error' : undefined} {...register('street')} />
+                {errors.street && <p id="property-street-error" className="text-sm font-medium text-destructive">{errors.street.message}</p>}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                <label htmlFor="property-town" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Town/City
                 </label>
-                <Input placeholder="e.g., London" {...register('town')} />
-                {errors.town && <p className="text-sm font-medium text-destructive">{errors.town.message}</p>}
+                <Input placeholder="e.g., London" id="property-town" aria-invalid={Boolean(errors.town)} aria-describedby={errors.town ? 'property-town-error' : undefined} {...register('town')} />
+                {errors.town && <p id="property-town-error" className="text-sm font-medium text-destructive">{errors.town.message}</p>}
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                <label htmlFor="property-postcode" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Postcode
                 </label>
-                <Input placeholder="e.g., SW1A 2AA" {...register('postcode')} />
-                {errors.postcode && <p className="text-sm font-medium text-destructive">{errors.postcode.message}</p>}
+                <Input placeholder="e.g., SW1A 2AA" id="property-postcode" aria-invalid={Boolean(errors.postcode)} aria-describedby={errors.postcode ? 'property-postcode-error' : undefined} {...register('postcode')} />
+                {errors.postcode && <p id="property-postcode-error" className="text-sm font-medium text-destructive">{errors.postcode.message}</p>}
               </div>
             </div>
             <Button type="submit" disabled={isLoading} className="w-full">
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {isLoading ? 'Generating Report...' : 'Generate Report'}
+              {isLoading ? 'Checking property access…' : 'Continue with this property'}
             </Button>
           </form>
         </div>

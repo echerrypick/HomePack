@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero';
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useHomePackJob } from '@/contexts/HomePackJobContext';
@@ -9,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { History, Calendar, Lock, Unlock, MapPin, Loader2, Eye } from 'lucide-react';
 import { SearchedAddress } from '../types';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ownsProperty, propertyKey } from '@/lib/plans';
 
 export default function HistoryPage() {
   const { user, profile } = useAuth();
@@ -17,12 +19,7 @@ export default function HistoryPage() {
   const navigate = useNavigate();
 
   const isLocked = (timestamp: string) => {
-    if (profile?.role === 'admin' || profile?.role === 'agency') return false;
-    
-    const searchDate = new Date(timestamp);
-    const oneYearLater = new Date(searchDate);
-    oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
-    return new Date() < oneYearLater;
+    return false;
   };
 
   const getUnlockDate = (timestamp: string) => {
@@ -36,26 +33,15 @@ export default function HistoryPage() {
     });
   };
 
-  if (!user) return null;
+  if (!user) return <div className="min-h-screen flex flex-col"><Header /><main className="site-main container mx-auto px-4 py-20 flex-grow"><PageHero eyebrow="Your property workspace" icon={<History />}><h1 className="site-page-heading">Your reports, all in one place.</h1><p>Sign in to revisit your property searches and reports saved in this browser.</p><Button className="mt-6" onClick={() => navigate('/tool')}>Sign in to view your history</Button></PageHero></main><Footer /></div>;
 
   const history = profile?.searchHistory || [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-4 py-12 flex-grow space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <History className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">HomePack History</h1>
-              <p className="text-sm text-muted-foreground">Track generated property packs, active background jobs, and access permissions.</p>
-            </div>
-          </div>
-          <Button onClick={() => navigate('/tool')} className="rounded-full px-5">
-            Create New HomePack
-          </Button>
-        </div>
+      <main className="site-main container mx-auto px-4 py-12 flex-grow space-y-8">
+        <PageHero eyebrow="Your property workspace" icon={<History />}><h1 className="site-page-heading">Your property report history</h1><p>Revisit your searches, follow active reports and reopen reports saved in this browser.</p><Button asChild className="mt-5"><Link to="/tool" state={{ startNewHomePack: true }}>Create a new property report</Link></Button></PageHero>
 
         {/* Active In-Progress Job Card */}
         {activeJob && activeJob.status === 'processing' && (
@@ -87,7 +73,7 @@ export default function HistoryPage() {
               Record of all searches conducted under your account.
               {profile?.role !== 'admin' && profile?.role !== 'agency' && (
                 <span className="block mt-1 text-sm text-muted-foreground">
-                  Note: Properties are locked for 1 year from the search date for {profile?.role} users.
+                  Each £9.99 purchase covers one property. Reports saved in this browser can be reopened below.
                 </span>
               )}
             </CardDescription>
@@ -113,7 +99,6 @@ export default function HistoryPage() {
                   {[...history].reverse().map((item, index) => {
                     const locked = isLocked(item.timestamp);
                     const matchingSaved = recentReports.find(r => 
-                      item.address.toLowerCase().includes(r.address.postcode.toLowerCase()) ||
                       r.addressString.toLowerCase() === item.address.toLowerCase()
                     );
 

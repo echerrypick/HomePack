@@ -25,6 +25,10 @@ export type UserNotifications = {
   marketingEmails?: boolean;
 };
 
+export type ReportSettings = {
+  includeNearbyPlanning?: boolean;
+};
+
 export type UserProfile = {
   uid: string;
   email: string;
@@ -36,9 +40,21 @@ export type UserProfile = {
   bio?: string;
   accountType?: AccountType;
   notifications?: UserNotifications;
+  reportSettings?: ReportSettings;
   role: UserRole;
   branding?: WhiteLabelBranding;
   purchasedReports?: string[];
+  purchasedPropertyKeys?: string[];
+  developmentPurchasedPropertyKeys?: string[];
+  developmentPurchasedReports?: string[];
+  developmentSubscriptionPlan?: 'subscription' | 'agency';
+  developmentSubscriptionExpiresAt?: number;
+  subscriptionStatus?: string;
+  subscriptionPlan?: 'subscription' | 'agency';
+  subscriptionCancelAtPeriodEnd?: boolean;
+  stripeSubscriptionId?: string;
+  subscriptionExpiresAt?: number;
+  stripeCustomerId?: string;
   reportCredits?: number;
   searchCount: number;
   lastSearchReset: string;
@@ -60,6 +76,9 @@ export type LandRegistryResult = {
   pricePaid: string;
   transactionDate: string;
   estateType: string;
+  propertyType?: string;
+  transactionCategory?: string;
+  newBuild?: boolean;
   addressString: string;
 };
 
@@ -178,6 +197,9 @@ export type CouncilTaxData = {
   authority: string;
   year: string;
   source?: string;
+  sourceUrl?: string;
+  chargeNote?: string;
+  unavailable?: boolean;
 } | null;
 
 export type RadonRiskData = {
@@ -412,6 +434,7 @@ export interface CrimeData {
 export type PropertyData = {
   address: string;
   landRegistry: LandRegistryResult[];
+  recentStreetSales?: LandRegistryResult[];
   epc: EpcData;
   floodRisk: FloodRiskData;
   planningHistory: PlanningHistoryItem[];
@@ -419,6 +442,8 @@ export type PropertyData = {
   planningCoverage?: {
     applications: string;
     constraints: string;
+    scope?: 'street' | 'radius';
+    radiusMiles?: number;
   };
   councilTax: CouncilTaxData;
   radonRisk: RadonRiskData;
@@ -455,6 +480,7 @@ export interface HomePackJob {
   progress: number;
   currentStep: string;
   steps: HomePackJobStep[];
+  planningScope?: 'street' | 'radius';
   result?: ReportResult | null;
   error?: string | null;
   createdAt: number;

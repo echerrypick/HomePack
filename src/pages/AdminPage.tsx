@@ -1,3 +1,5 @@
+import { PageHero } from '@/components/layout/PageHero';
+import { Link } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { collection, query, getDocs, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db, UserRole, handleFirestoreError, OperationType } from '../firebase';
@@ -46,17 +48,14 @@ export default function AdminPage() {
     }
   };
 
-  if (authLoading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  if (!isAdmin) return <div className="flex items-center justify-center min-h-screen text-destructive font-bold">Access Denied</div>;
+  if (authLoading) return <div className="min-h-screen flex flex-col"><Header /><main className="site-main flex-grow" role="status">Loading account permissions…</main><Footer /></div>;
+  if (!isAdmin) return <div className="min-h-screen flex flex-col"><Header /><main className="site-main container flex-grow"><PageHero eyebrow="Account permissions" illustration="simple" icon={<Shield />}><h1 className="site-page-heading">Administrator access required</h1><p>This area is restricted to authorised administrators.</p><Button asChild className="mt-5"><Link to="/profile">Return to your account</Link></Button></PageHero></main><Footer /></div>;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-4 py-12 flex-grow">
-        <div className="flex items-center gap-3 mb-8">
-          <Shield className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-        </div>
+      <main className="site-main container mx-auto px-4 py-12 flex-grow">
+        <PageHero eyebrow="Administration" illustration="simple" icon={<Shield />}><h1 className="site-page-heading">Admin dashboard</h1><p>Review users, membership records and property-report activity.</p></PageHero>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>

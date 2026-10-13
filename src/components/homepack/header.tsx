@@ -18,7 +18,7 @@ export function HomePackHeader() {
             <div className="p-1.5 bg-primary rounded-md">
               <Building2 className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold tracking-tight">HomePack</span>
+            <span className="text-xl font-bold tracking-tight">UKHomePack.com</span>
           </Link>
 
           <div className="flex items-center gap-4">

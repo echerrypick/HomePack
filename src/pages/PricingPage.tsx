@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero';
 import React, { useState } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { updateUserSubscriptionPlan } from '../firebase';
 import { toast } from 'sonner';
+import { PLANS } from '@/lib/plans';
 
 export default function PricingPage() {
   const { user, profile } = useAuth();
@@ -19,20 +21,7 @@ export default function PricingPage() {
   const [filterType, setFilterType] = useState<'all' | 'consumer' | 'business'>('all');
 
   const handleActivatePlan = async (role: 'free' | 'subscription' | 'agency', accountType: 'consumer' | 'business') => {
-    if (!user) {
-      navigate('/tool');
-      return;
-    }
-    setIsUpdatingTier(role);
-    try {
-      await updateUserSubscriptionPlan(user.uid, role, accountType);
-      toast.success(`Plan updated to ${role === 'agency' ? 'B2B White-Label' : role === 'subscription' ? 'B2B Pro' : 'Free Preview'} successfully!`);
-      navigate('/profile');
-    } catch (e: any) {
-      toast.error(e.message || 'Could not update subscription plan');
-    } finally {
-      setIsUpdatingTier(null);
-    }
+    navigate(`/payment?plan=${role === 'free' ? 'report' : role}`);
   };
 
   const plans = [
@@ -42,19 +31,19 @@ export default function PricingPage() {
       badge: "Direct-to-Consumer (B2C)",
       badgeColor: "bg-emerald-600 hover:bg-emerald-600 text-white",
       title: "Pay-As-You-Go Report",
-      price: "£9.99",
-      period: "/ report",
-      description: "Direct single PDF download via our fast search tool. Ideal for buyers, sellers, and individual property investors.",
+      price: PLANS.report.price,
+      period: "/ property",
+      description: "One property report and PDF download. Each different property requires a new £9.99 payment before generation.",
       targetAudience: "Homebuyers, private sellers, and property investors wanting deep due diligence on a specific home.",
       features: [
-        "Instant one-off download — no monthly subscription",
-        "Full 9-page due diligence PDF dossier",
+        "One property per payment — no monthly subscription",
+        "Full multi-section due diligence PDF dossier",
         "HM Land Registry price paid history & tenure",
-        "Official EPC efficiency & verified heating/CO2 costs",
+        "Available EPC ratings, estimated costs & CO₂ emissions",
         "Environment Agency flood risk assessment & warnings",
-        "Local planning applications & historic decisions",
-        "Catchment schools & verified Ofsted inspection ratings",
-        "Ofcom broadband speed test data & mobile signals"
+        "Property and same-street planning applications",
+        "Nearby schools & available inspection information",
+        "Available broadband speed estimates & mobile coverage"
       ],
       buttonText: "Search & Buy Single Report (£9.99)",
       buttonAction: () => navigate('/tool'),
@@ -65,23 +54,23 @@ export default function PricingPage() {
       id: "b2b_pro",
       category: "business" as const,
       badge: "B2B Software Subscription",
-      badgeColor: "bg-blue-600 hover:bg-blue-600 text-white",
+      badgeColor: "bg-primary/10 text-primary",
       title: "B2B Pro",
-      price: "£29",
+      price: PLANS.subscription.price,
       period: "/ month",
-      description: "Unlimited searches and instant report generation packaged as an essential tool for estate agents and mortgage brokers.",
+      description: "Unlimited property reports for estate agents and mortgage brokers using the latest available source data.",
       targetAudience: "Estate agents, mortgage brokers, conveyancers, and surveyors managing active client pipelines.",
       features: [
         "Unlimited property searches & online reports",
-        "Token-free instant report generation",
-        "Full Land Registry historical transaction archive",
+        "PDF downloads included",
+        "Available Land Registry recorded transactions",
         "Detailed EPC energy breakdown & savings pathway",
-        "Complete local planning register & decisions",
-        "AI Condition & Surveyor structural assessment",
+        "Optional all-planning search within 0.3 miles",
+        "AI photo condition observations (not a structural survey)",
         "Search History Log with instant re-download",
-        "Priority live data feeds"
+        "Latest available data, subject to source coverage"
       ],
-      buttonText: profile?.role === 'subscription' ? 'Current Active Plan' : 'Subscribe to B2B Pro (£29/mo)',
+      buttonText: profile?.role === 'subscription' ? 'Current Active Plan' : profile?.stripeSubscriptionId ? 'Downgrade to B2B Pro (£49/mo)' : 'Subscribe to B2B Pro (£49/mo)',
       buttonAction: () => handleActivatePlan('subscription', 'business'),
       isCurrent: profile?.role === 'subscription',
       isPopular: true,
@@ -91,23 +80,23 @@ export default function PricingPage() {
       id: "b2b_agency",
       category: "business" as const,
       badge: "White-Labelling Enterprise",
-      badgeColor: "bg-purple-600 hover:bg-purple-600 text-white",
+      badgeColor: "bg-primary/10 text-primary",
       title: "Agency White-Label",
-      price: "£49",
+      price: PLANS.agency.price,
       period: "/ month",
-      description: "Full white-label SaaS suite. Upload your agency logo, custom color palette, and agent bio for client-ready presentation.",
+      description: "Reports with your agency branding. Upload your agency logo, custom colour palette, and agent bio for client-ready presentation.",
       targetAudience: "Established estate agencies, brokerages, and property firms delivering branded reports to clients.",
       features: [
         "Everything included in B2B Pro tier",
-        "Custom Agency Logo on cover & all 9 PDF pages",
-        "Custom Brand Colors (Primary & Accent palette match)",
+        "Custom agency logo on the PDF cover",
+        "Custom Brand Colours (Primary & Accent palette match)",
         "Agent Bio, direct phone, email & website sign-off",
         "Client-facing branded presentation mode",
-        "Removes HomePackAI watermarks on client deliverables",
-        "Team multi-seat access (up to 5 agents)",
-        "Dedicated phone & onboarding support"
+        "Uses your agency branding on client deliverables",
+        "Single account with saved agency branding",
+        "Email support"
       ],
-      buttonText: profile?.role === 'agency' ? 'Current Active Plan' : 'Activate White-Label (£49/mo)',
+      buttonText: profile?.role === 'agency' ? 'Current Active Plan' : profile?.stripeSubscriptionId ? 'Upgrade to White-Label (£79/mo)' : 'Activate White-Label (£79/mo)',
       buttonAction: () => handleActivatePlan('agency', 'business'),
       isCurrent: profile?.role === 'agency',
       isPopular: false,
@@ -122,13 +111,13 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-4 py-16 flex-grow">
+      <main className="site-main container mx-auto px-4 py-16 flex-grow">
         {/* Header section */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
-          <Badge variant="outline" className="mb-3 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary border-primary/30">
+        <PageHero eyebrow="Simple pricing. Clear choices." illustration="report">
+          <Badge variant="outline" className="mb-3 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary border-primary/20">
             Tailored For Consumers & Businesses
           </Badge>
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 font-serif text-[#2d4a77] dark:text-foreground">
+          <h1 className="site-page-heading text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 font-sans text-primary dark:text-foreground">
             Clear, Transparent Property Intelligence
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed">
@@ -165,10 +154,10 @@ export default function PricingPage() {
               Businesses & Agents (B2B)
             </button>
           </div>
-        </div>
+        </PageHero>
 
         {/* Pricing Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto pt-6 pb-12 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-10 max-w-7xl mx-auto pt-8 pb-12 items-stretch">
           {filteredPlans.map((plan, index) => {
             const Icon = plan.icon;
             const isHighlighted = hoveredIndex === null ? plan.isPopular : hoveredIndex === index;
@@ -180,14 +169,14 @@ export default function PricingPage() {
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
                 className={cn(
-                  "border bg-card flex flex-col relative transition-all duration-300 rounded-2xl",
+                  "border bg-card flex flex-col relative overflow-visible transition-all duration-300 rounded-2xl",
                   isHighlighted 
-                    ? "border-primary ring-2 ring-primary/20 shadow-xl scale-[1.02] z-20" 
+                    ? "border-primary ring-2 ring-primary/20 shadow-lg z-20"
                     : "border-border shadow-sm scale-100 z-10"
                 )}
               >
                 {plan.isPopular && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-bold px-3.5 py-1 rounded-full shadow-md z-30 uppercase tracking-wider">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap bg-primary text-primary-foreground text-[11px] font-bold px-3.5 py-1 rounded-full shadow-md z-30 uppercase tracking-wider">
                     Most Popular for Agents
                   </div>
                 )}
@@ -202,7 +191,7 @@ export default function PricingPage() {
                     </div>
                   </div>
 
-                  <CardTitle className="text-2xl font-bold font-serif text-[#2d4a77] dark:text-foreground mt-2">
+                  <CardTitle className="text-2xl font-bold font-sans text-primary dark:text-foreground mt-2">
                     {plan.title}
                   </CardTitle>
                   
@@ -243,9 +232,9 @@ export default function PricingPage() {
                     disabled={isUpdatingTier === plan.id || isCurrent}
                     variant={isHighlighted ? "default" : "outline"}
                     className={cn(
-                      "w-full h-11 text-sm font-semibold transition-all duration-200 rounded-xl",
+                      "w-full min-h-11 h-auto py-3 whitespace-normal text-sm font-semibold transition-all duration-200 rounded-xl",
                       isHighlighted && "shadow-md",
-                      plan.id === 'b2c' && "bg-emerald-600 hover:bg-emerald-700 text-white border-transparent"
+                      plan.id === 'b2c' && "bg-primary hover:bg-primary/90 text-primary-foreground border-transparent"
                     )}
                   >
                     {isUpdatingTier === plan.id ? (
@@ -272,26 +261,26 @@ export default function PricingPage() {
         </div>
 
         {/* B2B White Label Feature Highlight Card */}
-        <div className="max-w-5xl mx-auto mt-6 p-8 bg-[#f8fafc] dark:bg-slate-900/50 border border-purple-200 dark:border-purple-900/40 rounded-2xl shadow-xs">
+        <div className="max-w-5xl mx-auto mt-6 p-8 bg-[#f8fafc] dark:bg-slate-900/50 border border-border rounded-2xl shadow-xs">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Badge className="bg-purple-600 text-white font-semibold">White-Label Feature</Badge>
-                <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">£49/month SaaS</span>
+                <Badge className="bg-primary/10 text-primary font-semibold">White-Label Feature</Badge>
+                <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">£79/month SaaS</span>
               </div>
-              <h3 className="text-xl font-bold font-serif text-[#2d4a77] dark:text-foreground">
-                Turn HomePackAI into your firm's own bespoke property tool
+              <h3 className="text-xl font-bold font-sans text-primary dark:text-foreground">
+                Present UK Property HomePack Reports in your agency's branding
               </h3>
               <p className="text-sm text-muted-foreground max-w-2xl">
-                Upload your agency logo, match your firm's exact brand colors, and present your bio and direct contact links across all 9 pages of official PDF reports.
+                Upload your agency logo, match your firm's exact brand colours, and present your bio and direct contact links across your PDF reports.
               </p>
             </div>
-            <div className="flex gap-3 shrink-0">
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
               <Button asChild variant="outline" className="border-purple-300 dark:border-purple-800">
                 <Link to="/profile">Manage Branding</Link>
               </Button>
               <Button 
-                className="bg-purple-600 hover:bg-purple-700 text-white shadow-xs"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                 onClick={() => handleActivatePlan('agency', 'business')}
                 disabled={profile?.role === 'agency'}
               >

@@ -198,7 +198,7 @@ export function AiSummary({ summary }: AiSummaryProps) {
           iconColor: 'text-emerald-600',
           accent: 'border-l-emerald-500'
         };
-        const match = sec.body.match(/(Band\s+[A-H]|£[\d,]+(?:\.\d{2})?)/i);
+        const match = sec.body.match(/(Band\s+[A-I]|£[\d,]+(?:\.\d{2})?)/i);
         if (match) highlightBadge = match[1];
       } else if (lower.includes('broadband') || lower.includes('internet') || lower.includes('speed')) {
         icon = Wifi;
@@ -517,4 +517,3 @@ export function AiSummary({ summary }: AiSummaryProps) {
     </Card>
   );
 }
-

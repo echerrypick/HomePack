@@ -48,7 +48,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "echerrypick@btinternet.com"));
+          ((request.auth.token.email_verified == true && request.auth.token.email == "echerrypick@btinternet.com")));
     }
 
     function hasRequiredFields(fields) {
@@ -84,6 +84,7 @@ service cloud.firestore {
              (!('preferredRegion' in data) || (data.preferredRegion is string && data.preferredRegion.size() <= 50)) &&
              (!('bio' in data) || (data.bio is string && data.bio.size() <= 1000)) &&
              (!('notifications' in data) || data.notifications is map) &&
+             (!('reportSettings' in data) || data.reportSettings is map) &&
              (!('branding' in data) || data.branding is map) &&
              (!('purchasedReports' in data) || data.purchasedReports is list) &&
              (!('reportCredits' in data) || data.reportCredits is number) &&
@@ -103,14 +104,17 @@ service cloud.firestore {
 
       // Users can create their own profile with 'free' role. Admins can create any profile.
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
-        (isOwner(userId) && request.resource.data.role == 'free') ||
+        (isOwner(userId) && request.resource.data.role == 'free' &&
+          (!('accountType' in request.resource.data) || request.resource.data.accountType == 'consumer') &&
+          request.resource.data.uid == userId && request.resource.data.email == request.auth.token.email && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'accountType', 'phoneNumber', 'company', 'jobTitle', 'preferredRegion', 'bio', 'notifications', 'reportSettings', 'branding', 'updatedAt', 'createdAt', 'searchCount', 'lastSearchReset', 'searchedAddresses', 'searchHistory', 'propertyReportCounts'])) ||
         isAdmin()
       );
 
-      // Users can update their own profile permitted fields, but NOT protected fields (role, uid, email).
+      // Users can update their own profile permitted fields, but NOT protected fields (role, accountType, uid, email).
       // Admins can update anything.
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
         (isOwner(userId) && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'phoneNumber', 'company', 'jobTitle', 'preferredRegion', 'bio', 'notifications', 'reportSettings', 'branding', 'updatedAt', 'searchCount', 'searchedAddresses', 'searchHistory', 'propertyReportCounts']) &&
          request.resource.data.role == resource.data.role &&
          request.resource.data.uid == resource.data.uid &&
          request.resource.data.email == resource.data.email) ||

@@ -1,15 +1,15 @@
+import { PageHero } from '@/components/layout/PageHero';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { resetPassword, updateUserProfile, updateUserSubscriptionPlan, PermittedProfileUpdates } from '../firebase';
+import { resetPassword, updateUserProfile, PermittedProfileUpdates } from '../firebase';
 import { toast } from 'sonner';
 import { 
   User, 
@@ -33,14 +33,16 @@ import {
   Layers,
   ArrowRight,
   Palette,
-  Download,
   CheckCircle2,
   Globe,
   FileText,
-  CreditCard,
-  Home
+  Home,
+  Search
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { billingRequest } from '@/lib/billing-client';
+import { PLANS, membershipAccountType } from '@/lib/plans';
+import './profile.css';
 
 const ROLE_DISPLAY_NAMES: Record<string, { label: string; color: string; desc: string }> = {
   admin: {
@@ -49,19 +51,19 @@ const ROLE_DISPLAY_NAMES: Record<string, { label: string; color: string; desc: s
     desc: 'Unrestricted administrative access across all system tools and user accounts.'
   },
   agency: {
-    label: 'Agency White-Label (£49/mo)',
+    label: 'Agency White-Label (£79/mo)',
     color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-900/50',
-    desc: 'Full enterprise tier with unlimited searches, custom agency logo & brand colors, and agent bio on all reports.'
+    desc: 'Full enterprise tier with unlimited searches, custom agency logo & brand colours, and agent bio on all reports.'
   },
   subscription: {
-    label: 'B2B Pro Subscriber (£29/mo)',
+    label: 'B2B Pro Subscriber (£49/mo)',
     color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50',
-    desc: 'Professional tier with unlimited property searches, token-free PDF exports, and complete Land Registry/planning.'
+    desc: 'Professional tier with unlimited property searches, PDF exports, and an optional all-planning search within 0.3 miles.'
   },
   free: {
-    label: 'Standard Free Account',
+    label: 'Pay-As-You-Go Account',
     color: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800',
-    desc: 'Basic tier with complimentary single-property preview lookups and pay-as-you-go PDF download option.'
+    desc: '£9.99 for one property report. Each new property requires payment before generation.'
   }
 };
 
@@ -77,12 +79,14 @@ const SUGGESTED_ROLES = [
 ];
 
 export default function ProfilePage() {
-  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+  const { user, profile, loading } = useAuth();
   const [isResetting, setIsResetting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSwitchingTier, setIsSwitchingTier] = useState(false);
   const [copiedUid, setCopiedUid] = useState(false);
+  const [developmentSimulation, setDevelopmentSimulation] = useState(false);
+  useEffect(() => { fetch('/api/billing/status').then(r => r.json()).then(status => setDevelopmentSimulation(status.developmentSimulation === true)).catch(() => {}); }, []);
 
   // Form state for permitted editable items
   const [formData, setFormData] = useState<PermittedProfileUpdates>({
@@ -92,7 +96,6 @@ export default function ProfilePage() {
     jobTitle: '',
     preferredRegion: '',
     bio: '',
-    accountType: 'consumer',
     branding: {
       logoUrl: '',
       primaryColor: '#2d4a77',
@@ -108,6 +111,9 @@ export default function ProfilePage() {
       emailAlerts: true,
       propertyUpdates: true,
       marketingEmails: false,
+    },
+    reportSettings: {
+      includeNearbyPlanning: false,
     }
   });
 
@@ -121,7 +127,6 @@ export default function ProfilePage() {
         jobTitle: profile?.jobTitle || '',
         preferredRegion: profile?.preferredRegion || '',
         bio: profile?.bio || '',
-        accountType: profile?.accountType || (profile?.role === 'agency' || profile?.role === 'subscription' ? 'business' : 'consumer'),
         branding: {
           logoUrl: profile?.branding?.logoUrl || '',
           primaryColor: profile?.branding?.primaryColor || '#2d4a77',
@@ -137,17 +142,22 @@ export default function ProfilePage() {
           emailAlerts: profile?.notifications?.emailAlerts ?? true,
           propertyUpdates: profile?.notifications?.propertyUpdates ?? true,
           marketingEmails: profile?.notifications?.marketingEmails ?? false,
+        },
+        reportSettings: {
+          includeNearbyPlanning: profile?.reportSettings?.includeNearbyPlanning ?? false,
         }
       });
     }
   }, [profile, user]);
 
-  const handleCopyUid = () => {
+  const handleCopyUid = async () => {
     if (!user?.uid) return;
-    navigator.clipboard.writeText(user.uid);
-    setCopiedUid(true);
-    toast.success('Account UID copied to clipboard');
-    setTimeout(() => setCopiedUid(false), 2000);
+    try {
+      await navigator.clipboard.writeText(user.uid);
+      setCopiedUid(true);
+      toast.success('Account ID copied');
+      setTimeout(() => setCopiedUid(false), 2000);
+    } catch { toast.error('Unable to copy. Select and copy the account ID instead.'); }
   };
 
   const handlePasswordReset = async () => {
@@ -175,6 +185,11 @@ export default function ProfilePage() {
     setIsSaving(true);
     try {
       await updateUserProfile(user.uid, formData);
+      if (hasActiveBusinessPlan && formData.reportSettings) {
+        await billingRequest('/api/profile/report-settings', {
+          includeNearbyPlanning: formData.reportSettings.includeNearbyPlanning === true
+        });
+      }
       toast.success('Profile and account attributes updated successfully');
       setIsEditing(false);
     } catch (error: any) {
@@ -184,28 +199,8 @@ export default function ProfilePage() {
     }
   };
 
-  const handleAccountTypeToggle = async (type: 'consumer' | 'business') => {
-    if (!user) return;
-    try {
-      await updateUserProfile(user.uid, { accountType: type });
-      setFormData(prev => ({ ...prev, accountType: type }));
-      toast.success(`Account switched to ${type === 'business' ? 'Business / Professional (B2B)' : 'Regular Customer (B2C)'}`);
-    } catch (e: any) {
-      toast.error('Failed to change account type');
-    }
-  };
-
   const handleSwitchSubscriptionPlan = async (role: 'free' | 'subscription' | 'agency') => {
-    if (!user) return;
-    setIsSwitchingTier(true);
-    try {
-      await updateUserSubscriptionPlan(user.uid, role, 'business');
-      toast.success(`Subscription plan successfully updated to ${role === 'agency' ? 'B2B White-Label (£49/mo)' : role === 'subscription' ? 'B2B Pro (£29/mo)' : 'Free Trial'}`);
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to update subscription tier');
-    } finally {
-      setIsSwitchingTier(false);
-    }
+    navigate(`/payment?plan=${role === 'free' ? 'report' : role}`);
   };
 
   const handleCancelEdit = () => {
@@ -217,7 +212,6 @@ export default function ProfilePage() {
       jobTitle: profile?.jobTitle || '',
       preferredRegion: profile?.preferredRegion || '',
       bio: profile?.bio || '',
-      accountType: profile?.accountType || 'consumer',
       branding: {
         logoUrl: profile?.branding?.logoUrl || '',
         primaryColor: profile?.branding?.primaryColor || '#2d4a77',
@@ -233,34 +227,31 @@ export default function ProfilePage() {
         emailAlerts: profile?.notifications?.emailAlerts ?? true,
         propertyUpdates: profile?.notifications?.propertyUpdates ?? true,
         marketingEmails: profile?.notifications?.marketingEmails ?? false,
+      },
+      reportSettings: {
+        includeNearbyPlanning: profile?.reportSettings?.includeNearbyPlanning ?? false,
       }
     });
     setIsEditing(false);
   };
 
+  if (loading) return <div className="min-h-screen bg-background flex flex-col"><Header /><main className="site-main flex-grow" role="status">Loading your account…</main><Footer /></div>;
+
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <main className="container mx-auto px-4 py-16 max-w-md flex-grow text-center">
-          <Card id="profile-unauth-card" className="p-8">
-            <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h1 className="text-2xl font-bold mb-2">Sign in Required</h1>
-            <p className="text-muted-foreground text-sm mb-6">
-              Please sign in to view and manage your profile settings, search history, and account tier.
-            </p>
-            <Button asChild className="w-full">
-              <Link to="/tool">Go to Sign In</Link>
-            </Button>
-          </Card>
+        <main className="site-main container mx-auto px-4 py-16 flex-grow">
+          <PageHero eyebrow="Your account" illustration="simple" icon={<User />}><h1 className="site-page-heading">Your property journey, organised.</h1><p>Sign in to manage your details, membership and purchased property access.</p><Button asChild className="mt-5"><Link to="/tool">Go to Sign In</Link></Button></PageHero>
         </main>
         <Footer />
       </div>
     );
   }
 
-  const currentAccountType = profile?.accountType || formData.accountType || 'consumer';
-  const roleInfo = ROLE_DISPLAY_NAMES[profile?.role || 'free'] || ROLE_DISPLAY_NAMES.free;
+  const currentAccountType = membershipAccountType(profile, Date.now(), developmentSimulation);
+  const hasActiveBusinessPlan = currentAccountType === 'business';
+  const roleInfo = ROLE_DISPLAY_NAMES[hasActiveBusinessPlan ? profile?.role || 'free' : 'free'] || ROLE_DISPLAY_NAMES.free;
   const memberSince = profile?.createdAt 
     ? new Date(profile.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : 'Recently';
@@ -268,25 +259,23 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-4 py-10 max-w-4xl flex-grow">
+      <main className="site-main profile-dashboard container mx-auto px-4 py-10 flex-grow">
         {/* Page Title & Profile Header Banner */}
-        <div id="profile-header" className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div id="profile-header" className="profile-banner flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
-            <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xl shadow-sm">
+            <div className="profile-avatar h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xl shadow-sm">
               {(profile?.displayName || user.displayName || user.email || 'U')[0].toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Your Profile & Account</h1>
+                <h1 className="site-page-heading text-2xl sm:text-3xl font-bold tracking-tight">Your Profile & Account</h1>
                 <Badge variant="outline" className={currentAccountType === 'business' ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-emerald-50 text-emerald-700 border-emerald-300'}>
                   {currentAccountType === 'business' ? 'Business / B2B' : 'Regular Customer / B2C'}
                 </Badge>
-                <Badge variant="outline" className={roleInfo.color}>
-                  {roleInfo.label}
-                </Badge>
+
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Manage your account type, professional branding, and property due diligence history
+                Manage your account, personal details and property report activity, all in one place.
               </p>
             </div>
           </div>
@@ -298,7 +287,7 @@ export default function ProfilePage() {
               className="gap-2 shadow-sm shrink-0 self-start sm:self-auto"
             >
               <Edit3 className="h-4 w-4" />
-              Edit Permitted Details
+              Edit account details
             </Button>
           ) : (
             <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -326,7 +315,16 @@ export default function ProfilePage() {
           )}
         </div>
 
-        <div className="grid gap-8">
+        <dl className="profile-stats" aria-label="Account activity summary">
+          {[
+            {icon: User, label: 'Account type', value: currentAccountType === 'business' ? 'Business / Professional (B2B)' : 'Regular Customer (B2C)'},
+            {icon: FileText, label: 'Properties purchased', value: `${profile?.purchasedPropertyKeys?.length || 0} properties`},
+            {icon: Search, label: 'Searches performed', value: `${profile?.searchCount ?? 0} searches`},
+            {icon: Calendar, label: 'Member since', value: memberSince},
+          ].map(({icon: Icon, label, value}) => <div key={label}><span className="profile-round-icon"><Icon aria-hidden="true" /></span><div><dt>{label}</dt><dd>{value}</dd></div></div>)}
+        </dl>
+
+        <div className="profile-sections grid gap-8">
           {/* SECTION 1: ACCOUNT CLASSIFICATION & TIER ATTRIBUTES */}
           <Card id="account-classification-card" className="border-border shadow-xs overflow-hidden">
             <CardHeader className="bg-muted/30 pb-4">
@@ -337,57 +335,43 @@ export default function ProfilePage() {
                     Account Classification & Features
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    Configure whether you use HomePackAI as an individual buyer/seller or as a property business
+                    Your account type follows your membership. Business access begins after verified payment.
                   </CardDescription>
                 </div>
 
-                {/* Account Type Switcher */}
-                <div className="flex items-center bg-background p-1 rounded-xl border shadow-2xs self-start sm:self-auto">
-                  <button
-                    type="button"
-                    onClick={() => handleAccountTypeToggle('consumer')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      currentAccountType === 'consumer' 
-                        ? 'bg-emerald-600 text-white shadow-xs' 
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Regular Customer (B2C)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAccountTypeToggle('business')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      currentAccountType === 'business' 
-                        ? 'bg-blue-600 text-white shadow-xs' 
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Business / Professional (B2B)
-                  </button>
+                <div className="profile-membership-actions">
+                  <span className={`profile-membership-status ${hasActiveBusinessPlan ? 'profile-membership-business' : ''}`}><span className="profile-round-icon">{hasActiveBusinessPlan ? <Building2 /> : <User />}</span><span><strong>{hasActiveBusinessPlan ? 'Business / Professional (B2B)' : 'Regular Customer (B2C)'}</strong><small>{hasActiveBusinessPlan ? 'Active membership' : 'One-off property reports'}</small></span></span>
+                  {profile?.role !== 'admin' && <Button asChild variant={hasActiveBusinessPlan ? 'outline' : 'default'}><Link to="/pricing">{hasActiveBusinessPlan ? 'Change membership' : 'Upgrade to a business membership'}<ArrowRight className="h-4 w-4" /></Link></Button>}
                 </div>
               </div>
             </CardHeader>
 
             <CardContent className="pt-5 space-y-6">
+              {profile?.subscriptionCancelAtPeriodEnd && <p role="status" className="profile-cancellation-note">Your subscription ends on {new Date(profile.subscriptionExpiresAt || 0).toLocaleDateString('en-GB')}. No further renewals are scheduled. Business access continues through the paid period, then your account returns to pay-as-you-go.</p>}
+              {profile?.stripeCustomerId && <Button variant="outline" onClick={async () => {
+                try { window.location.assign((await billingRequest('/api/billing/portal', {})).url); }
+                catch (e: any) { toast.error(e.message); }
+              }}>Manage billing and cancellation</Button>}
+              {hasActiveBusinessPlan && profile?.stripeCustomerId && !profile.subscriptionCancelAtPeriodEnd && <p className="text-xs text-muted-foreground">To return to pay-as-you-go, cancel your subscription through billing management. Business access continues until the paid period ends; purchased properties remain available.</p>}
               {currentAccountType === 'consumer' ? (
                 /* CONSUMER / B2C ATTRIBUTES */
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40">
+                  <div className="profile-consumer-panel p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                      <span className="profile-home-icon"><Home aria-hidden="true" /></span>
+                      <div className="profile-consumer-copy space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Badge className="bg-emerald-600 text-white font-semibold text-xs">Direct-to-Consumer (B2C)</Badge>
                           <span className="text-xs text-muted-foreground font-medium">Pay-as-you-go (£9.99/report)</span>
                         </div>
                         <h4 className="font-semibold text-foreground text-base">Individual Homebuyer & Seller Account</h4>
                         <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                          Download official 9-page due diligence dossiers on any UK property for £9.99 per report with zero subscription obligations. All your purchased packs remain permanently saved in your profile.
+                          Pay £9.99 for a report on one property with no subscription. Each different property requires payment before generation. Purchased property access is saved to your account.
                         </p>
                       </div>
-                      <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
+                      <Button asChild size="sm" className="profile-new-search shrink-0">
                         <Link to="/tool">
-                          <Download className="mr-1.5 h-3.5 w-3.5" />
+                          <Search className="mr-1.5 h-3.5 w-3.5" />
                           New Search
                         </Link>
                       </Button>
@@ -395,33 +379,36 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Purchased Reports List */}
-                  <div className="p-4 rounded-xl border border-border bg-background">
+                  <div className="profile-purchases p-4 rounded-xl border border-border bg-background">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-emerald-600" />
-                        <h4 className="font-semibold text-sm">Unlocked B2C Report Downloads ({profile?.purchasedReports?.length || 0})</h4>
+                        <h4 className="font-semibold text-sm">Purchased properties ({profile?.purchasedPropertyKeys?.length || 0})</h4>
                       </div>
-                      <span className="text-xs text-muted-foreground">Permanent Cloud Access</span>
+                      <span className="text-xs text-muted-foreground">Purchased property access</span>
                     </div>
 
-                    {(profile?.purchasedReports || []).length > 0 ? (
+                    {(profile?.purchasedPropertyKeys || []).length > 0 ? (
                       <div className="space-y-2">
-                        {profile?.purchasedReports?.map((addr, idx) => (
+                        {profile?.purchasedPropertyKeys?.map((key, idx) => {
+                          const [houseNumber, street, town, postcode] = key.split('|').map(decodeURIComponent);
+                          const addr = `${houseNumber} ${street}, ${town}, ${postcode}`;
+                          return (
                           <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border text-sm">
                             <div className="flex items-center gap-2 min-w-0 pr-2">
                               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
                               <span className="font-medium text-foreground truncate">{addr}</span>
                             </div>
                             <Button asChild variant="outline" size="sm" className="h-8 text-xs shrink-0">
-                              <Link to="/tool">View Pack</Link>
+                              <Link to="/tool" state={{ paidAddress: { houseNumber, street, town, postcode } }}>Open property</Link>
                             </Button>
                           </div>
-                        ))}
+                        ); })}
                       </div>
                     ) : (
-                      <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground text-xs">
-                        <p>No individual reports purchased yet.</p>
-                        <p className="mt-1">When you generate a property report, you can unlock the full 9-page official PDF for £9.99.</p>
+                      <div className="profile-empty-purchases">
+                        <div className="profile-empty-art" aria-hidden="true"><FileText /><Home /></div>
+                        <div><h4>No individual reports purchased yet.</h4><p>Choose a property and pay {PLANS.report.price} before generating its report and PDF.</p><p>Your purchased property access will appear here for easy access.</p><Button asChild><Link to="/tool" state={{ startNewHomePack: true }}><Search className="h-4 w-4" />Search for a property<ArrowRight className="h-4 w-4" /></Link></Button></div>
                       </div>
                     )}
                   </div>
@@ -438,7 +425,7 @@ export default function ProfilePage() {
                         </div>
                         <h4 className="font-semibold text-foreground text-base">Estate Agent, Broker & Surveyor SaaS</h4>
                         <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                          Package unlimited due diligence searches into your firm's daily operations. Upgrade to Enterprise White-Label (£49/mo) to stamp your custom agency logo, branding, and agent bio on all client reports.
+                          Package unlimited due diligence searches into your firm's daily operations. Upgrade to Enterprise White-Label (£79/mo) to stamp your custom agency logo, branding, and agent bio on all client reports.
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0">
@@ -446,18 +433,18 @@ export default function ProfilePage() {
                           size="sm" 
                           variant={profile?.role === 'subscription' ? 'default' : 'outline'}
                           onClick={() => handleSwitchSubscriptionPlan('subscription')}
-                          disabled={isSwitchingTier || profile?.role === 'subscription'}
+                          disabled={profile?.role === 'subscription'}
                           className="text-xs h-8"
                         >
-                          {profile?.role === 'subscription' ? '✓ Pro Active' : 'B2B Pro (£29/mo)'}
+                          {profile?.role === 'subscription' ? '✓ Pro Active' : 'B2B Pro (£49/mo)'}
                         </Button>
                         <Button 
                           size="sm" 
-                          className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-8"
+                          className="text-xs h-8"
                           onClick={() => handleSwitchSubscriptionPlan('agency')}
-                          disabled={isSwitchingTier || profile?.role === 'agency'}
+                          disabled={profile?.role === 'agency'}
                         >
-                          {profile?.role === 'agency' ? '✓ White-Label Active' : 'White-Label (£49/mo)'}
+                          {profile?.role === 'agency' ? '✓ White-Label Active' : 'White-Label (£79/mo)'}
                         </Button>
                       </div>
                     </div>
@@ -470,14 +457,14 @@ export default function ProfilePage() {
                         <Palette className="h-5 w-5 text-purple-600" />
                         <div>
                           <h4 className="font-semibold text-foreground text-sm">Agency White-Label Branding Suite</h4>
-                          <p className="text-xs text-muted-foreground">Customise client-facing reports with your logo, colors, and direct contact details</p>
+                          <p className="text-xs text-muted-foreground">Customise client-facing reports with your logo, colours, and direct contact details</p>
                         </div>
                       </div>
                       {profile?.role === 'agency' ? (
                         <Badge className="bg-purple-600 text-white text-xs">Active on Reports</Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">
-                          Included in White-Label (£49/mo)
+                          Included in White-Label (£79/mo)
                         </Badge>
                       )}
                     </div>
@@ -520,7 +507,7 @@ export default function ProfilePage() {
                             </div>
                           )}
                           <h5 className="font-serif font-bold text-base" style={{ color: profile?.branding?.primaryColor || '#2d4a77' }}>
-                            {profile?.company || profile?.branding?.companyTagline || 'HomePackAI Enterprise'}
+                            {profile?.company || profile?.branding?.companyTagline || 'Agency Property Reports'}
                           </h5>
                           <p className="text-[11px] text-muted-foreground">Property Information Report</p>
                           <div className="mt-3 pt-2 border-t text-[11px] text-muted-foreground flex justify-between items-center">
@@ -538,18 +525,18 @@ export default function ProfilePage() {
 
           {/* SECTION 2: PERMITTED EDITABLE ITEMS */}
           <Card id="permitted-details-card" className="border-primary/20 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-primary/40" />
+
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <CardTitle className="text-xl">Personal & Professional Details</CardTitle>
+                    <CardTitle className="text-xl flex items-center gap-2"><User className="h-6 w-6 text-primary" />Personal & Professional Details</CardTitle>
                     <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50 text-[11px] font-medium">
                       ✓ Permitted to Edit
                     </Badge>
                   </div>
                   <CardDescription className="mt-1">
-                    Information used on your HomePack reports, correspondence, and search defaults
+                    Information used on your UK Property HomePack Reports, correspondence, and search defaults
                   </CardDescription>
                 </div>
 
@@ -561,7 +548,7 @@ export default function ProfilePage() {
                     className="text-primary hover:text-primary/80 gap-1 text-xs font-semibold"
                   >
                     <Edit3 className="h-3.5 w-3.5" />
-                    Modify
+                    Edit Profile
                   </Button>
                 )}
               </div>
@@ -658,7 +645,7 @@ export default function ProfilePage() {
                           key={role}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, jobTitle: role }))}
-                          className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
+                          className={`text-xs px-2.5 py-1 rounded-md border transition-colours ${
                             formData.jobTitle === role 
                               ? 'bg-primary text-primary-foreground border-primary font-medium'
                               : 'bg-muted/50 hover:bg-muted text-muted-foreground border-border'
@@ -688,8 +675,34 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
+                  {hasActiveBusinessPlan && (
+                    <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 dark:border-blue-900/60 dark:bg-blue-950/20 space-y-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="includeNearbyPlanning" className="font-semibold flex items-center gap-1.5 text-sm cursor-pointer">
+                            <Layers className="h-4 w-4 text-blue-600" /> Extended planning search
+                            <Badge className="bg-blue-600 text-white text-[10px]">Business feature</Badge>
+                          </Label>
+                          <p className="text-xs text-muted-foreground max-w-xl">
+                            Include every verified planning application within 0.3 miles. When switched off, reports include property-linked and same-street applications only.
+                          </p>
+                        </div>
+                        <input
+                          id="includeNearbyPlanning"
+                          type="checkbox"
+                          checked={formData.reportSettings?.includeNearbyPlanning === true}
+                          onChange={(event) => setFormData(previous => ({
+                            ...previous,
+                            reportSettings: { includeNearbyPlanning: event.target.checked }
+                          }))}
+                          className="mt-1 h-5 w-5 rounded border-border accent-blue-600 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Business White-Label Branding Fields */}
-                  {formData.accountType === 'business' && (
+                  {hasActiveBusinessPlan && (
                     <div className="pt-3 border-t border-purple-200 dark:border-purple-900/40 space-y-4 bg-purple-50/20 dark:bg-purple-950/10 p-4 rounded-xl">
                       <div className="flex items-center gap-2">
                         <Palette className="h-4 w-4 text-purple-600" />
@@ -832,7 +845,7 @@ export default function ProfilePage() {
                       <Bell className="h-4 w-4 text-primary" /> Communication & Alert Preferences
                     </Label>
                     <div className="grid gap-2.5">
-                      <label className="flex items-center gap-3 p-2.5 rounded-lg border border-border/70 hover:bg-muted/30 cursor-pointer transition-colors">
+                      <label className="flex items-center gap-3 p-2.5 rounded-lg border border-border/70 hover:bg-muted/30 cursor-pointer transition-colours">
                         <input 
                           type="checkbox"
                           className="h-4 w-4 rounded text-primary focus:ring-primary border-input"
@@ -848,7 +861,7 @@ export default function ProfilePage() {
                         </div>
                       </label>
 
-                      <label className="flex items-center gap-3 p-2.5 rounded-lg border border-border/70 hover:bg-muted/30 cursor-pointer transition-colors">
+                      <label className="flex items-center gap-3 p-2.5 rounded-lg border border-border/70 hover:bg-muted/30 cursor-pointer transition-colours">
                         <input 
                           type="checkbox"
                           className="h-4 w-4 rounded text-primary focus:ring-primary border-input"
@@ -864,7 +877,7 @@ export default function ProfilePage() {
                         </div>
                       </label>
 
-                      <label className="flex items-center gap-3 p-2.5 rounded-lg border border-border/70 hover:bg-muted/30 cursor-pointer transition-colors">
+                      <label className="flex items-center gap-3 p-2.5 rounded-lg border border-border/70 hover:bg-muted/30 cursor-pointer transition-colours">
                         <input 
                           type="checkbox"
                           className="h-4 w-4 rounded text-primary focus:ring-primary border-input"
@@ -876,7 +889,7 @@ export default function ProfilePage() {
                         />
                         <div className="text-xs">
                           <div className="font-medium text-foreground">Product & Regulatory Insights</div>
-                          <div className="text-muted-foreground">Periodic monthly digest on UK property legislation, planning changes, and HomePack features</div>
+                          <div className="text-muted-foreground">Periodic monthly digest on UK property legislation, planning changes, and UKHomePack.com features</div>
                         </div>
                       </label>
                     </div>
@@ -904,75 +917,16 @@ export default function ProfilePage() {
                 </form>
               ) : (
                 <div className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-6">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Full Name
-                      </Label>
-                      <div className="flex items-center gap-2 font-medium text-foreground text-base">
-                        <User className="h-4 w-4 text-primary shrink-0" />
-                        {profile?.displayName || user.displayName || <span className="text-muted-foreground font-normal italic">Not specified</span>}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Telephone / Mobile
-                      </Label>
-                      <div className="flex items-center gap-2 font-medium text-foreground text-base">
-                        <Phone className="h-4 w-4 text-primary shrink-0" />
-                        {profile?.phoneNumber || <span className="text-muted-foreground font-normal italic">Not provided</span>}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Company / Firm
-                      </Label>
-                      <div className="flex items-center gap-2 font-medium text-foreground text-base">
-                        <Building2 className="h-4 w-4 text-primary shrink-0" />
-                        {profile?.company || <span className="text-muted-foreground font-normal italic">Individual / Private</span>}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Property Role
-                      </Label>
-                      <div className="flex items-center gap-2 font-medium text-foreground text-base">
-                        <Briefcase className="h-4 w-4 text-primary shrink-0" />
-                        {profile?.jobTitle || <span className="text-muted-foreground font-normal italic">Not specified</span>}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Default Search Region / Postcode
-                      </Label>
-                      <div className="flex items-center gap-2 font-medium text-foreground text-base">
-                        <MapPin className="h-4 w-4 text-primary shrink-0" />
-                        {profile?.preferredRegion ? (
-                          <Badge variant="secondary" className="font-mono text-xs">
-                            {profile.preferredRegion}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground font-normal italic">Any UK Region</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Last Profile Update
-                      </Label>
-                      <div className="flex items-center gap-2 text-sm text-foreground">
-                        <Calendar className="h-4 w-4 text-primary shrink-0" />
-                        {profile?.updatedAt 
-                          ? new Date(profile.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                          : 'Original registration'}
-                      </div>
-                    </div>
-                  </div>
+                  <dl className="profile-detail-grid">
+                    {[
+                      {icon:User,label:'Full name',value:profile?.displayName || user.displayName,fallback:'Not specified'},
+                      {icon:Phone,label:'Telephone / Mobile',value:profile?.phoneNumber,fallback:'Not provided'},
+                      {icon:Building2,label:'Company / Firm',value:profile?.company,fallback:'Individual / Private'},
+                      {icon:Briefcase,label:'Property role',value:profile?.jobTitle,fallback:'Not specified'},
+                      {icon:MapPin,label:'Default search region / postcode',value:profile?.preferredRegion || 'Any UK Region',fallback:''},
+                      {icon:Calendar,label:'Last profile update',value:profile?.updatedAt ? new Date(profile.updatedAt).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Original registration',fallback:''},
+                    ].map(({icon:Icon,label,value,fallback}) => <div key={label}><Icon aria-hidden="true" /><dt>{label}</dt><dd className={!value?'profile-not-provided':''}>{value || fallback}</dd></div>)}
+                  </dl>
 
                   {profile?.bio && (
                     <div className="pt-3 border-t border-border/60">
@@ -988,7 +942,7 @@ export default function ProfilePage() {
                   {/* Notification Status Pill Summary */}
                   <div className="pt-3 border-t border-border/60 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-muted-foreground font-medium flex items-center gap-1 mr-1">
-                      <Bell className="h-3.5 w-3.5 text-primary" /> Active Alerts:
+                      <Bell className="h-3.5 w-3.5 text-primary" /> Notification preferences:
                     </span>
                     <Badge variant="outline" className="text-[11px] font-normal">
                       Search Alerts: {profile?.notifications?.emailAlerts !== false ? 'Enabled' : 'Disabled'}
@@ -1004,20 +958,7 @@ export default function ProfilePage() {
               )}
             </CardContent>
 
-            {!isEditing && (
-              <CardFooter className="bg-muted/20 border-t border-border/50 py-3 px-6 flex justify-between items-center text-xs text-muted-foreground">
-                <span>Need to update your contact or company details?</span>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                  className="gap-1.5 text-xs font-medium"
-                >
-                  <Edit3 className="h-3.5 w-3.5" />
-                  Edit Profile
-                </Button>
-              </CardFooter>
-            )}
+
           </Card>
 
           {/* SECTION 2: PROTECTED / LOCKED ACCOUNT DETAILS */}
@@ -1040,123 +981,11 @@ export default function ProfilePage() {
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-              {/* Account Email (Protected) */}
-              <div className="p-3.5 rounded-lg border border-border bg-background/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    <Mail className="h-3.5 w-3.5 text-primary" /> Primary Login Email
-                  </div>
-                  <div className="font-semibold text-foreground text-sm sm:text-base">
-                    {user.email}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Tied directly to your Firebase Authentication credential. Password can be reset below.
-                  </p>
-                </div>
-                <Badge variant="outline" className="shrink-0 self-start sm:self-center gap-1 text-xs text-muted-foreground border-dashed">
-                  <Lock className="h-3 w-3 text-amber-500" /> Protected Identifier
-                </Badge>
-              </div>
-
-              {/* Account Role / Tier (Protected) */}
-              <div className="p-3.5 rounded-lg border border-border bg-background/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    <Layers className="h-3.5 w-3.5 text-primary" /> Subscription & Account Tier
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground text-base">
-                      {roleInfo.label}
-                    </span>
-                    <Badge variant="outline" className={roleInfo.color}>
-                      {profile?.role || 'free'}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {roleInfo.desc}
-                  </p>
-                </div>
-
-                <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                  <Badge variant="outline" className="gap-1 text-xs text-muted-foreground border-dashed self-start sm:self-auto">
-                    <Lock className="h-3 w-3 text-amber-500" /> Protected Tier
-                  </Badge>
-                  {profile?.role !== 'admin' && profile?.role !== 'agency' && (
-                    <Button asChild size="sm" variant="default" className="text-xs h-8">
-                      <Link to="/pricing">
-                        Upgrade Plan
-                        <ArrowRight className="h-3 w-3 ml-1" />
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* User ID / UID (Protected) */}
-              <div className="p-3.5 rounded-lg border border-border bg-background/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5 min-w-0">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    <Key className="h-3.5 w-3.5 text-primary" /> Immutable User UID
-                  </div>
-                  <div className="font-mono text-xs sm:text-sm text-foreground truncate">
-                    {user.uid}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Unique database identity key assigned by Firebase security infrastructure.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="outline" className="gap-1 text-xs text-muted-foreground border-dashed">
-                    <Lock className="h-3 w-3 text-amber-500" /> Immutable Key
-                  </Badge>
-                  <Button 
-                    id="copy-uid-btn"
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleCopyUid}
-                    className="h-8 text-xs gap-1"
-                  >
-                    {copiedUid ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copiedUid ? 'Copied' : 'Copy'}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Registration & Search Counter (Protected) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-3.5 rounded-lg border border-border bg-background/80 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-primary" /> Member Since
-                    </span>
-                    <Badge variant="outline" className="text-[10px] border-dashed text-muted-foreground">
-                      <Lock className="h-2.5 w-2.5 mr-0.5 text-amber-500" /> Record
-                    </Badge>
-                  </div>
-                  <div className="font-semibold text-foreground text-sm">
-                    {memberSince}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">Original account registration date</p>
-                </div>
-
-                <div className="p-3.5 rounded-lg border border-border bg-background/80 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <History className="h-3.5 w-3.5 text-primary" /> Searches Performed
-                    </span>
-                    <Badge variant="outline" className="text-[10px] border-dashed text-muted-foreground">
-                      <Lock className="h-2.5 w-2.5 mr-0.5 text-amber-500" /> Counter
-                    </Badge>
-                  </div>
-                  <div className="font-semibold text-foreground text-sm">
-                    {profile?.searchCount ?? 0} searches logged
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Managed automatically based on your plan limits
-                  </p>
-                </div>
-              </div>
+            <CardContent className="profile-protected-list">
+              <div className="profile-protected-row"><span className="profile-round-icon"><Mail /></span><span className="profile-protected-label">Primary login email</span><div className="profile-protected-value"><strong>{user.email}</strong><p>Your sign-in email. You can request a password reset below.</p></div><Badge variant="outline"><Lock />Protected identifier</Badge></div>
+              <div className="profile-protected-row"><span className="profile-round-icon"><Layers /></span><span className="profile-protected-label">Subscription & account tier</span><div className="profile-protected-value"><strong>{roleInfo.label}</strong><p>{roleInfo.desc}</p></div><div className="profile-protected-actions"><Badge variant="outline"><Lock />Protected tier</Badge>{profile?.role !== 'admin' && <Button asChild size="sm"><Link to="/pricing">{profile?.stripeSubscriptionId ? 'Manage plan' : 'Explore plans'}<ArrowRight className="h-3.5 w-3.5" /></Link></Button>}</div></div>
+              <div className="profile-protected-row"><span className="profile-round-icon"><Key /></span><span className="profile-protected-label">Permanent account ID</span><div className="profile-protected-value"><strong className="profile-account-id">{user.uid}</strong><p>Your unique account reference. Include it when contacting support.</p></div><div className="profile-protected-actions"><Badge variant="outline"><Lock />Protected ID</Badge><Button id="copy-uid-btn" variant="outline" size="sm" onClick={handleCopyUid}>{copiedUid ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copiedUid ? 'Copied' : 'Copy'}</Button></div></div>
+              <div className="profile-protected-counters">{[{icon:Calendar,label:'Member since',value:memberSince},{icon:Search,label:'Searches performed',value:`${profile?.searchCount ?? 0} searches logged`}].map(({icon:Icon,label,value}) => <div key={label}><span className="profile-round-icon"><Icon /></span><div><span>{label}</span><strong>{value}</strong></div><Badge variant="outline"><Lock />Record</Badge></div>)}</div>
             </CardContent>
           </Card>
 
@@ -1199,7 +1028,7 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <History className="h-5 w-5 text-primary" />
-                  HomePack Property History
+                  UK Property Report History
                 </CardTitle>
                 <Button asChild variant="ghost" size="sm" className="text-xs">
                   <Link to="/history">

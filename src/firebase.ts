@@ -107,7 +107,7 @@ export const syncUserProfile = async (user: FirebaseUser, displayNameOverride?: 
       uid: user.uid,
       email: user.email || '',
       displayName: displayNameOverride || user.displayName || '',
-      role: user.email === 'echerrypick@btinternet.com' ? 'admin' : 'free',
+      role: (user.emailVerified && user.email === 'echerrypick@btinternet.com') ? 'admin' : 'free',
       searchCount: 0,
       lastSearchReset: new Date().toISOString(),
       searchedAddresses: [],
@@ -124,7 +124,7 @@ export const syncUserProfile = async (user: FirebaseUser, displayNameOverride?: 
 
   const existingUser = userDoc.data() as UserProfile;
   // Ensure admin role for the specified email even if document already exists
-  if (user.email === 'echerrypick@btinternet.com' && existingUser.role !== 'admin') {
+  if ((user.emailVerified && user.email === 'echerrypick@btinternet.com') && existingUser.role !== 'admin') {
     try {
       await updateDoc(userDocRef, { role: 'admin' });
       return { ...existingUser, role: 'admin' };
@@ -201,11 +201,13 @@ export type PermittedProfileUpdates = {
   jobTitle?: string;
   preferredRegion?: string;
   bio?: string;
-  accountType?: AccountType;
   notifications?: {
     emailAlerts?: boolean;
     propertyUpdates?: boolean;
     marketingEmails?: boolean;
+  };
+  reportSettings?: {
+    includeNearbyPlanning?: boolean;
   };
   branding?: WhiteLabelBranding;
 };
@@ -225,7 +227,6 @@ export const updateUserProfile = async (uid: string, updates: PermittedProfileUp
     if (updates.jobTitle !== undefined) payload.jobTitle = updates.jobTitle.trim();
     if (updates.preferredRegion !== undefined) payload.preferredRegion = updates.preferredRegion.trim().toUpperCase();
     if (updates.bio !== undefined) payload.bio = updates.bio.trim();
-    if (updates.accountType !== undefined) payload.accountType = updates.accountType;
     if (updates.notifications !== undefined) payload.notifications = updates.notifications;
     if (updates.branding !== undefined) {
       payload.branding = {
@@ -257,34 +258,14 @@ export const updateUserProfile = async (uid: string, updates: PermittedProfileUp
  * Unlocks an individual £9.99 B2C HomePack PDF report download for a user
  */
 export const purchaseReportForUser = async (uid: string, address: string): Promise<void> => {
-  try {
-    const userDocRef = doc(db, 'users', uid);
-    await updateDoc(userDocRef, {
-      purchasedReports: arrayUnion(address),
-      updatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
-    throw error;
-  }
+  throw new Error('Use secure checkout to purchase a property report.');
 };
 
 /**
  * Updates a user's subscription tier (e.g. B2B Pro or White-Label Agency)
  */
 export const upgradeUserPlan = async (uid: string, role: UserRole, accountType: AccountType = 'business'): Promise<void> => {
-  try {
-    const userDocRef = doc(db, 'users', uid);
-    await updateDoc(userDocRef, {
-      role,
-      accountType,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
-    throw error;
-  }
+  throw new Error('Use secure checkout to change your subscription.');
 };
 
 export const updateUserSubscriptionPlan = upgradeUserPlan;
-

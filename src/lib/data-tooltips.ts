@@ -1,7 +1,7 @@
 export const DATA_TOOLTIPS: Record<string, string> = {
   // Land Registry
-  'pricePaid': 'The most recent sale price recorded by HM Land Registry.',
-  'transactionDate': 'The date the most recent sale was completed.',
+  'pricePaid': 'The latest sale price present in HM Land Registry Price Paid Data. The dataset may not include every transaction.',
+  'transactionDate': 'The date of the latest sale present in HM Land Registry Price Paid Data.',
   'estateType': 'The type of ownership (e.g., Freehold or Leasehold).',
   'addressString': 'The official address as recorded by the Land Registry.',
 
@@ -34,7 +34,7 @@ export const DATA_TOOLTIPS: Record<string, string> = {
   
   // Council Tax
   'band': 'The Council Tax band assigned to the property based on its value in 1991.',
-  'annualAmount': 'The estimated annual Council Tax charge for the current financial year.',
+  'annualAmount': 'The published standard annual Council Tax charge for this band and tax year, before any discounts, exemptions, reductions or premiums.',
   'authority': 'The local council responsible for collecting Council Tax.',
 
   // Radon

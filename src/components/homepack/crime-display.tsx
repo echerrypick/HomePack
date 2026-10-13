@@ -250,12 +250,12 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
           {/* Burglary */}
           <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between hover:border-primary/40 transition-colors shadow-2xs">
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-col items-start gap-2 mb-3 min-w-0">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Home className="h-3.5 w-3.5 text-amber-600" />
                   Burglary
                 </span>
-                <Badge variant={keyCategories.burglary.riskLevel === 'Low' ? 'secondary' : keyCategories.burglary.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0">
+                <Badge variant={keyCategories.burglary.riskLevel === 'Low' ? 'secondary' : keyCategories.burglary.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0 self-start max-w-full">
                   {keyCategories.burglary.status} vs national
                 </Badge>
               </div>
@@ -281,12 +281,12 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
           {/* Vehicle Crime */}
           <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between hover:border-primary/40 transition-colors shadow-2xs">
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-col items-start gap-2 mb-3 min-w-0">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Car className="h-3.5 w-3.5 text-blue-600" />
                   Vehicle Crime
                 </span>
-                <Badge variant={keyCategories.vehicleCrime.riskLevel === 'Low' ? 'secondary' : keyCategories.vehicleCrime.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0">
+                <Badge variant={keyCategories.vehicleCrime.riskLevel === 'Low' ? 'secondary' : keyCategories.vehicleCrime.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0 self-start max-w-full">
                   {keyCategories.vehicleCrime.status} vs national
                 </Badge>
               </div>
@@ -308,12 +308,12 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
           {/* Anti-Social Behaviour */}
           <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between hover:border-primary/40 transition-colors shadow-2xs">
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-col items-start gap-2 mb-3 min-w-0">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Users className="h-3.5 w-3.5 text-purple-600" />
                   Anti-Social Behaviour
                 </span>
-                <Badge variant={keyCategories.asb.riskLevel === 'Low' ? 'secondary' : keyCategories.asb.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0">
+                <Badge variant={keyCategories.asb.riskLevel === 'Low' ? 'secondary' : keyCategories.asb.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0 self-start max-w-full">
                   {keyCategories.asb.status} vs national
                 </Badge>
               </div>
@@ -335,12 +335,12 @@ export function CrimeDisplay({ data, postcode }: CrimeDisplayProps) {
           {/* Violent Crime */}
           <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between hover:border-primary/40 transition-colors shadow-2xs">
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-col items-start gap-2 mb-3 min-w-0">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Activity className="h-3.5 w-3.5 text-rose-600" />
                   Violence & Safety
                 </span>
-                <Badge variant={keyCategories.violentCrime.riskLevel === 'Low' ? 'secondary' : keyCategories.violentCrime.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0">
+                <Badge variant={keyCategories.violentCrime.riskLevel === 'Low' ? 'secondary' : keyCategories.violentCrime.riskLevel === 'Moderate' ? 'outline' : 'destructive'} className="text-[10px] font-semibold px-2 py-0 self-start max-w-full">
                   {keyCategories.violentCrime.status} vs national
                 </Badge>
               </div>

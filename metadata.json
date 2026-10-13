@@ -1,6 +1,6 @@
 {
-  "name": "HomePack",
-  "description": "Generate a compliant upfront Property Info Pack for any UK address.",
+  "name": "UKHomePack.com",
+  "description": "Create a UK Property HomePack Report using the latest available property and local-area data.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

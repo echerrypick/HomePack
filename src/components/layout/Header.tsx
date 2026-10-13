@@ -66,7 +66,7 @@ export function Header() {
   return (
     <header 
       className={cn(
-        "sticky top-0 z-50 w-full transition-all duration-200 border-b",
+        "site-header sticky top-0 z-50 w-full transition-all duration-200 border-b",
         isScrolled 
           ? "bg-background/85 backdrop-blur-md border-border shadow-sm py-2" 
           : "bg-background border-border/40 py-3.5"
@@ -81,56 +81,19 @@ export function Header() {
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/75 leading-none">
-                HomePack
+                UKHomePack.com
               </span>
               <span className="text-[10px] text-muted-foreground font-medium tracking-wide">
-                UK Property Intelligence
+                UK Property Reports
               </span>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1 lg:gap-1.5">
-            {/* If Logged In: New HomePack button styled like homepage */}
-            {user ? (
-              <Button 
-                asChild 
-                size="sm" 
-                className="rounded-full px-4 h-9 text-xs font-semibold shadow-md shadow-primary/20 hover:shadow-primary/30 transition-all gap-1.5 mr-2"
-              >
-                <Link to="/tool" state={{ startNewHomePack: true }}>
-                  <span>New HomePack</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            ) : (
-              <>
-                <Link 
-                  to="/features"
-                  className={cn(
-                    "px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                    location.pathname === '/features' 
-                      ? "text-primary bg-primary/10 font-semibold" 
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
-                >
-                  Features
-                </Link>
-
-                <Link 
-                  to="/pricing"
-                  className={cn(
-                    "px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                    location.pathname === '/pricing' 
-                      ? "text-primary bg-primary/10 font-semibold" 
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
-                >
-                  Pricing
-                </Link>
-              </>
-            )}
-
+          <nav className="hidden xl:flex items-center gap-1 lg:gap-1.5">
+            <Link to="/pricing" className={cn("px-3 py-2 text-sm font-medium rounded-lg transition-colors", location.pathname === '/pricing' ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-muted")}>
+              Pricing & membership
+            </Link>
             {/* Services Dropdown (Contains Standalone Checks & Guides) */}
             <DropdownMenu>
               <DropdownMenuTrigger render={
@@ -239,7 +202,8 @@ export function Header() {
           </nav>
 
           {/* User Profile / Auth Actions */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden xl:flex items-center gap-3">
+            {user && <Button asChild size="sm" className="rounded-xl px-5 shadow-sm font-semibold"><Link to="/tool" state={{ startNewHomePack: true }}>Get a Property Report<ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
             <HomePackJobHeaderPill />
             {user ? (
               <div className="flex items-center gap-3">
@@ -281,7 +245,7 @@ export function Header() {
                     <DropdownMenuItem render={
                       <Link to="/tool" state={{ startNewHomePack: true }} className="flex items-center gap-2.5 p-2 rounded-md hover:bg-muted cursor-pointer font-medium text-sm">
                         <ArrowRight className="h-4 w-4 text-primary" />
-                        <span>New HomePack</span>
+                        <span>New Property Report</span>
                       </Link>
                     } />
                     
@@ -324,19 +288,21 @@ export function Header() {
               <div className="flex items-center gap-2.5">
                 <LoginDialog trigger={<Button variant="ghost" size="sm" className="font-semibold text-sm">Sign In</Button>} />
                 <Button asChild size="sm" className="rounded-full px-5 shadow-sm font-semibold">
-                  <Link to="/tool">Get Started</Link>
+                  <Link to="/tool" state={{ startNewHomePack: true }}><>Get a Property Report<ArrowRight className="h-3.5 w-3.5" /></></Link>
                 </Button>
               </div>
             )}
           </div>
 
           {/* Mobile Right Controls */}
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-2 xl:hidden">
             <HomePackJobHeaderPill />
             <button 
               className="p-2 rounded-lg hover:bg-muted transition-colors"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Toggle Navigation Menu"
+              aria-expanded={isMenuOpen}
+              aria-controls="site-mobile-navigation"
             >
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
@@ -346,7 +312,7 @@ export function Header() {
 
       {/* Mobile Navigation Drawer */}
       {isMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 w-full bg-background border-b border-border p-4 space-y-3 animate-in slide-in-from-top duration-200 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div id="site-mobile-navigation" className="xl:hidden absolute top-full left-0 w-full bg-background border-b border-border p-4 space-y-3 animate-in slide-in-from-top duration-200 shadow-2xl max-h-[85vh] overflow-y-auto">
           {/* User Status Card on Mobile */}
           {user && (
             <div className="p-3 rounded-xl bg-muted/60 border border-border flex items-center justify-between mb-2">
@@ -381,7 +347,7 @@ export function Header() {
             {user && (
               <Button asChild className="w-full justify-center rounded-full font-semibold shadow-md shadow-primary/20 gap-2 mb-2">
                 <Link to="/tool" state={{ startNewHomePack: true }} onClick={() => setIsMenuOpen(false)}>
-                  <span>New HomePack</span>
+                  <span>New Property Report</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
@@ -456,6 +422,7 @@ export function Header() {
               <span>Sample Report</span>
             </Link>
 
+            {user && <Link to="/pricing" className="block px-3.5 py-2.5 text-base font-semibold rounded-lg hover:bg-muted" onClick={() => setIsMenuOpen(false)}>Pricing & membership</Link>}
             {user ? (
               <>
                 <Link 

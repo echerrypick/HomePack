@@ -12,7 +12,7 @@ export function Footer() {
         { name: 'Features', href: '/features' },
         { name: 'Pricing', href: '/pricing' },
         { name: 'Sample Report', href: '/sample' },
-        { name: 'New HomePack', href: '/tool' },
+        { name: 'New Property Report', href: '/tool' },
       ],
     },
     {
@@ -34,7 +34,7 @@ export function Footer() {
   ];
 
   return (
-    <footer className="bg-card border-t border-border pt-16 pb-8">
+    <footer className="site-footer bg-card border-t border-border pt-16 pb-8">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 mb-16">
           {/* Brand Column */}
@@ -43,25 +43,11 @@ export function Footer() {
               <div className="p-1.5 bg-primary rounded-lg group-hover:scale-105 transition-transform">
                 <Building2 className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold tracking-tight">HomePack</span>
+              <span className="text-xl font-bold tracking-tight">UKHomePack.com</span>
             </Link>
             <p className="text-muted-foreground max-w-sm leading-relaxed">
-              Empowering UK property buyers and sellers with instant, deep property insights. Get the full picture before you commit.
+              Property information from the latest available sources to help buyers and sellers make informed decisions.
             </p>
-            <div className="flex items-center gap-4">
-              <a href="#" className="p-2 rounded-full bg-muted hover:bg-primary/10 hover:text-primary transition-colors">
-                <Twitter className="h-4 w-4" />
-              </a>
-              <a href="#" className="p-2 rounded-full bg-muted hover:bg-primary/10 hover:text-primary transition-colors">
-                <Facebook className="h-4 w-4" />
-              </a>
-              <a href="#" className="p-2 rounded-full bg-muted hover:bg-primary/10 hover:text-primary transition-colors">
-                <Linkedin className="h-4 w-4" />
-              </a>
-              <a href="#" className="p-2 rounded-full bg-muted hover:bg-primary/10 hover:text-primary transition-colors">
-                <Github className="h-4 w-4" />
-              </a>
-            </div>
           </div>
 
           {/* Links Columns */}
@@ -89,16 +75,12 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-xs text-muted-foreground">
-            © {currentYear} HomePack UK. All rights reserved. Registered in England & Wales.
+            © {currentYear} UKHomePack.com. All rights reserved.
           </p>
           <div className="flex items-center gap-8">
              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Mail className="h-3 w-3" />
-                <span>support@homepack.uk</span>
-             </div>
-             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Phone className="h-3 w-3" />
-                <span>+44 20 7946 0000</span>
+                <a href="mailto:support@ukhomepack.com" className="hover:underline">support@ukhomepack.com</a>
              </div>
           </div>
         </div>

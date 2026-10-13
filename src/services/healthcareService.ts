@@ -53,7 +53,7 @@ export async function fetchCqcRatingForOds(odsCode: string, cqcApiKey?: string):
   try {
     const headers: Record<string, string> = {
       'Accept': 'application/json',
-      'User-Agent': 'HomePack-PropertyDossier/1.0'
+      'User-Agent': 'UKHomePack.com-PropertyReport/1.0'
     };
     if (cqcApiKey && cqcApiKey !== 'YOUR_CQC_API_KEY') {
       headers['Ocp-Apim-Subscription-Key'] = cqcApiKey;

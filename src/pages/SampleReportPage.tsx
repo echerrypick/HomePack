@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero';
 import React from 'react';
 import { ReportDisplay } from '@/components/homepack/report-display';
 import { Address, ReportResult } from '@/types';
@@ -5,113 +6,131 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 
 const SAMPLE_ADDRESS: Address = {
-  houseNumber: '10',
-  street: 'Downing Street',
-  town: 'London',
-  postcode: 'SW1A 2AA'
+  houseNumber: '41',
+  street: 'Bingley Avenue',
+  town: 'Tamworth',
+  postcode: 'B78 3BU'
 };
 
 const SAMPLE_REPORT_DATA: ReportResult = {
   propertyData: {
-    address: '10 Downing Street, London, SW1A 2AA',
+    address: '41 Bingley Avenue, Tamworth, Tamworth, Staffordshire, B78 3BU',
+    coordinates: { lat: 52.630908, lng: -1.718256 },
     landRegistry: [
       {
-        pricePaid: '1500000',
-        transactionDate: '2020-05-15',
+        pricePaid: '225000',
+        transactionDate: '2025-11-13',
         estateType: 'Freehold',
-        addressString: '10 Downing Street, London, SW1A 2AA'
+        propertyType: 'Terraced',
+        transactionCategory: 'Standard Price Paid',
+        addressString: '41 Bingley Avenue, Tamworth, Tamworth, Staffordshire, B78 3BU'
       },
       {
-        pricePaid: '1200000',
-        transactionDate: '2015-10-20',
+        pricePaid: '197995',
+        transactionDate: '2020-02-24',
         estateType: 'Freehold',
-        addressString: '10 Downing Street, London, SW1A 2AA'
+        propertyType: 'Terraced',
+        transactionCategory: 'Standard Price Paid',
+        newBuild: true,
+        addressString: '41 Bingley Avenue, Tamworth, Tamworth, Staffordshire, B78 3BU'
       }
     ],
+    recentStreetSales: [
+      { pricePaid: '248000', transactionDate: '2026-07-01', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '43 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '287500', transactionDate: '2025-06-27', estateType: 'Freehold', propertyType: 'Semi Detached', newBuild: false, addressString: '22 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '243000', transactionDate: '2025-05-19', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '35 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '230000', transactionDate: '2025-04-15', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '38 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '235000', transactionDate: '2025-02-10', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '40 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '225000', transactionDate: '2024-12-13', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '31 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '240000', transactionDate: '2024-11-22', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '39 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '245000', transactionDate: '2024-07-25', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '31 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '258000', transactionDate: '2024-07-24', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '42 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' },
+      { pricePaid: '219950', transactionDate: '2024-07-18', estateType: 'Freehold', propertyType: 'Terraced', newBuild: false, addressString: '33 Bingley Avenue, Tamworth, Staffordshire, B78 3BU' }
+    ],
     epc: {
-      lmkKey: '1234567890',
-      address1: '10 Downing Street',
+      lmkKey: '0462-3882-7995-2620-3881',
+      address1: '41 Bingley Avenue',
       address2: '',
       address3: '',
-      posttown: 'London',
-      postcode: 'SW1A 2AA',
-      county: 'Greater London',
-      lodgementDate: '2022-01-01',
-      inspectionDate: '2021-12-15',
-      lodgementDatetime: '2022-01-01 10:00:00',
-      rating: 'C',
-      potentialRating: 'B',
-      currentEnergyEfficiency: '72',
-      potentialEnergyEfficiency: '85',
+      posttown: 'Tamworth',
+      postcode: 'B78 3BU',
+      county: 'Staffordshire',
+      lodgementDate: '2020-01-22',
+      inspectionDate: '2020-01-22',
+      lodgementDatetime: '2020-01-22 09:10:18',
+      rating: 'B',
+      potentialRating: 'A',
+      currentEnergyEfficiency: '83',
+      potentialEnergyEfficiency: '97',
       propertyType: 'House',
-      builtForm: 'Detached',
-      constructionAgeBand: '1900-1929',
-      tenure: 'Owner-occupied',
-      uprn: '100023332222',
-      uprnSource: 'Land Registry',
-      buildingReferenceNumber: '99887766',
-      localAuthority: 'E09000001',
-      localAuthorityLabel: 'City of Westminster',
+      builtForm: 'End-Terrace',
+      constructionAgeBand: '2019',
+      tenure: 'Not recorded',
+      uprn: '394042808',
+      uprnSource: 'Energy Assessor',
+      buildingReferenceNumber: '0462-3882-7995-2620-3881',
+      localAuthority: 'E07000199',
+      localAuthorityLabel: 'Tamworth Borough Council',
       constituency: 'E14000647',
-      constituencyLabel: 'Cities of London and Westminster',
-      totalFloorArea: '150',
-      numberHabitableRooms: '8',
-      numberHeatedRooms: '8',
-      transactionType: 'Marketed sale',
-      mainHeatDescription: 'Gas central heating',
-      mainheatcontDescription: 'Programmer, room thermostat and TRVs',
+      constituencyLabel: 'Tamworth',
+      totalFloorArea: '63',
+      numberHabitableRooms: 'Not recorded',
+      numberHeatedRooms: 'Not recorded',
+      transactionType: 'New dwelling',
+      mainHeatDescription: 'Boiler and radiators, mains gas',
+      mainheatcontDescription: 'Time and temperature zone control',
       mainFuel: 'Gas',
       secondheatDescription: 'None',
       hotwaterDescription: 'From main system',
-      wallsDescription: 'Solid brick, as built, no insulation (assumed)',
-      wallsEnergyEff: 'Very Poor',
-      wallsEnvEff: 'Very Poor',
-      roofDescription: 'Pitched, 200 mm loft insulation',
-      roofEnergyEff: 'Good',
-      roofEnvEff: 'Good',
-      floorDescription: 'Suspended, no insulation (assumed)',
-      floorEnergyEff: 'N/A',
-      floorEnvEff: 'N/A',
-      windowsDescription: 'Fully double glazed',
-      windowsEnergyEff: 'Average',
-      windowsEnvEff: 'Average',
+      wallsDescription: 'Average thermal transmittance 0.27 W/m²K',
+      wallsEnergyEff: 'Very Good',
+      wallsEnvEff: 'Very Good',
+      roofDescription: 'Average thermal transmittance 0.11 W/m²K',
+      roofEnergyEff: 'Very Good',
+      roofEnvEff: 'Very Good',
+      floorDescription: 'Average thermal transmittance 0.14 W/m²K',
+      floorEnergyEff: 'Very Good',
+      floorEnvEff: 'Very Good',
+      windowsDescription: 'High performance glazing',
+      windowsEnergyEff: 'Very Good',
+      windowsEnvEff: 'Very Good',
       lightingDescription: 'Low energy lighting in all fixed outlets',
       lightingEnergyEff: 'Very Good',
       lightingEnvEff: 'Very Good',
-      co2EmissionsCurrent: '5.2',
-      co2EmissionsPotential: '2.1',
-      environmentImpactCurrent: '65',
-      environmentImpactPotential: '82',
-      energyConsumptionCurrent: '245',
-      energyConsumptionPotential: '110',
-      heatingCostCurrent: '1200',
-      heatingCostPotential: '600',
-      hotWaterCostCurrent: '150',
-      hotWaterCostPotential: '100',
-      lightingCostCurrent: '80',
-      lightingCostPotential: '80',
-      glazedType: 'Double glazing',
+      co2EmissionsCurrent: '1',
+      co2EmissionsPotential: '0',
+      environmentImpactCurrent: '87',
+      environmentImpactPotential: '100',
+      energyConsumptionCurrent: '94',
+      energyConsumptionPotential: '-6',
+      heatingCostCurrent: '195',
+      heatingCostPotential: '195',
+      hotWaterCostCurrent: '66',
+      hotWaterCostPotential: '40',
+      lightingCostCurrent: '52',
+      lightingCostPotential: '52',
+      glazedType: 'High performance glazing',
       glazedArea: 'Normal',
       multiGlazeProportion: '100',
       lowEnergyLighting: '100',
-      lowEnergyFixedLightCount: '12',
-      fixedLightingOutletsCount: '12',
+      lowEnergyFixedLightCount: '10',
+      fixedLightingOutletsCount: '10',
       mainheatEnergyEff: 'Good',
       mainheatEnvEff: 'Good',
       mainheatcEnergyEff: 'Good',
       mainheatcEnvEff: 'Good',
       hotWaterEnvEff: 'Good',
-      numberOpenFireplaces: '2',
+      numberOpenFireplaces: '0',
       solarWaterHeatingFlag: 'N',
       windTurbineCount: '0',
       photoSupply: '0',
-      expiryDate: '2032-01-01',
-      reportType: 'Existing',
+      expiryDate: '2030-01-21',
+      reportType: 'New dwelling',
       energyTariff: 'Standard',
-      mechanicalVentilation: 'None',
-      co2EmissCurrPerFloorArea: '34',
+      mechanicalVentilation: 'Natural ventilation',
+      co2EmissCurrPerFloorArea: '17',
       mainsGasFlag: 'Y',
-      mainHeatingControls: 'Programmer, room thermostat and TRVs',
+      mainHeatingControls: 'Time and temperature zone control',
       hotWaterEnergyEff: 'Good',
       sheatingEnergyEff: 'N/A',
       heatLossCorridor: 'None',
@@ -119,151 +138,241 @@ const SAMPLE_REPORT_DATA: ReportResult = {
       flatTopStorey: 'N',
       extensionCount: '0',
       floorLevel: '0',
-      floorHeight: '2.4'
+      floorHeight: '2.33'
     },
     floodRisk: {
-      postcode: 'SW1A 2AA',
+      postcode: 'B78 3BU',
       riskOfFloodingFromRiversAndSea: 'Very Low',
       riskOfFloodingFromSurfaceWater: 'Very Low',
       riskOfFloodingFromGroundwater: 'Not assessed by this source',
       riskOfFloodingFromReservoirs: 'Check Environment Agency map',
       suitability: 'County to Town',
       publishDate: '2023-06-01',
-      easting: '530000',
-      northing: '179000',
-      latitude: '51.5033',
-      longitude: '-0.1275',
+      easting: '419166',
+      northing: '303719',
+      latitude: '52.6309',
+      longitude: '-1.7183',
       activeWarnings: 'None'
     },
     councilTax: {
-      band: 'H',
-      annualAmount: '1824.38',
-      authority: 'City of Westminster',
-      year: `${new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1}/${String((new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1) + 1).slice(-2)}`
+      band: 'B',
+      annualAmount: '£1,789.48',
+      authority: 'Tamworth',
+      year: '2026/27',
+      source: 'VOA band; CouncilTaxBands.com 2026/27 area charge compiled from published government schedules',
+      sourceUrl: 'https://counciltaxbands.com/councils/tamworth/'
     },
     radonRisk: {
-      riskLevel: 'Low',
-      percentage: '< 1%',
-      description: 'The property is in a Lower probability radon area as less than 1% of homes are estimated to be at or above the Action Level.'
+      riskLevel: 'Not assessed in this sample',
+      percentage: 'Not available',
+      description: 'Obtain an address-level UKradon report before relying on a radon assessment.'
     },
     coalMining: {
       isReportingArea: false,
       isHighRiskArea: false,
-      description: 'The property is not within a coal mining reporting area.'
+      description: 'Not assessed by an official property-level source in this sample.'
     },
     broadband: {
       standardAvailable: true,
       superfastAvailable: true,
-      ultrafastAvailable: true,
-      maxDownloadSpeed: '1000 Mbps',
-      maxUploadSpeed: '220 Mbps'
+      ultrafastAvailable: false,
+      maxDownloadSpeed: '76 Mbps',
+      maxUploadSpeed: '5 Mbps',
+      results: [
+        { type: 'Standard', available: true, downloadSpeed: '24 Mbps', uploadSpeed: '1 Mbps' },
+        { type: 'Superfast', available: true, downloadSpeed: '76 Mbps', uploadSpeed: '5 Mbps' },
+        { type: 'Ultrafast', available: false, downloadSpeed: 'N/A', uploadSpeed: 'N/A' },
+        { type: 'Gigabit', available: false, downloadSpeed: 'N/A', uploadSpeed: 'N/A' }
+      ],
+      networks: ['Openreach • FTTC', 'Virgin Media • Cable']
     },
     planningHistory: [
       {
-        application: 'Installation of security measures',
+        application: 'Discharge of condition 3 (visibility splays) of application 0196/2021',
         decision: 'Approved',
-        date: '2021-03-10',
-        reference: '21/01234/FULL',
-        url: '#'
+        date: '2025-11-11',
+        reference: '0213/2025',
+        url: 'https://planning.tamworth.gov.uk/Northgate/PlanningExplorerAA/Generic/StdDetails.aspx?PT=PlanningApplicationsOn-Line&TYPE=PL/PlanningPK.xml&PARAM0=382909',
+        address: 'Land at Dunstall Farm, Dunstall Lane / Ventura Park Road / Meadow Road, Tamworth, Staffordshire, B78 3AX',
+        distanceKm: 0.477,
+        applicationType: 'Conditions',
+        applicationSize: 'Small',
+        source: 'PlanIt'
       },
       {
-        application: 'Internal alterations to office space',
+        application: 'Discharge of conditions 3 (wastewater scheme) and 9 (sound insulation) of application 0257/2024',
+        decision: 'Withdrawn',
+        date: '2025-05-01',
+        reference: '0096/2025',
+        url: 'https://planning.tamworth.gov.uk/Northgate/PlanningExplorerAA/Generic/StdDetails.aspx?PT=PlanningApplicationsOn-Line&TYPE=PL/PlanningPK.xml&PARAM0=381607',
+        address: '43 Longbourn Crescent, Tamworth, Staffordshire, B78 3ES',
+        distanceKm: 0.246,
+        applicationType: 'Conditions',
+        source: 'PlanIt'
+      },
+      {
+        application: 'Erection of an outbuilding for use as a dog grooming business',
         decision: 'Approved',
-        date: '2019-11-05',
-        reference: '19/05678/LBC',
-        url: '#'
+        date: '2024-11-20',
+        reference: '0257/2024',
+        url: 'https://planning.tamworth.gov.uk/Northgate/PlanningExplorerAA/Generic/StdDetails.aspx?PT=PlanningApplicationsOn-Line&TYPE=PL/PlanningPK.xml&PARAM0=380187',
+        address: '43 Longbourn Crescent, Tamworth, Staffordshire, B78 3ES',
+        distanceKm: 0.246,
+        applicationType: 'Full',
+        applicationSize: 'Small',
+        source: 'PlanIt'
       }
     ],
+    planningConstraints: [],
+    planningCoverage: {
+      scope: 'radius',
+      radiusMiles: 0.3,
+      applications: 'verified PlanIt applications within 0.3 miles; this sample demonstrates the optional business-plan planning scope',
+      constraints: 'Planning Data point intersection; absence of a result does not guarantee no constraint exists'
+    },
     healthcare: {
-      postcode: 'SW1A 2AA',
+      postcode: 'B78 3BU',
       gpSurgeries: [
         {
-          name: 'The Westminster Medical Practice',
-          odsCode: 'E87012',
-          address: '42 Whitehall, Westminster, London',
-          postcode: 'SW1A 2BX',
-          distance: '0.3 miles',
-          isAcceptingNewPatients: true,
-          cqcRating: 'Good',
-          cqcPublicationDate: '2023-11-14',
-          cqcReportUrl: 'https://www.cqc.org.uk',
-          phone: '020 7930 1234',
-          website: 'https://www.westminstermedical.nhs.uk'
+          name: 'Pear Tree Surgery',
+          odsCode: 'M84006',
+          address: '28 Meadow Close, Kingsbury, Tamworth',
+          postcode: 'B78 2NR',
+          distance: 'Distance unavailable',
+          isAcceptingNewPatients: null,
+          cqcRating: 'CQC match unavailable',
+          phone: '01827 872755',
+          website: 'http://www.peartreesurgery.nhs.uk'
         },
         {
-          name: 'Victoria Health Centre',
-          odsCode: 'Y02456',
-          address: '77 Victoria Street, London',
-          postcode: 'SW1H 0HW',
-          distance: '0.6 miles',
-          isAcceptingNewPatients: true,
-          cqcRating: 'Outstanding',
-          cqcPublicationDate: '2024-02-18',
-          cqcReportUrl: 'https://www.cqc.org.uk',
-          phone: '020 7828 5678',
-          website: 'https://www.victoriahealthcentre.nhs.uk'
+          name: 'Polesworth Surgery',
+          odsCode: 'M84007001',
+          address: 'High Street, Polesworth, Tamworth',
+          postcode: 'B78 1DU',
+          distance: 'Distance unavailable',
+          isAcceptingNewPatients: null,
+          cqcRating: 'CQC match unavailable',
+          phone: '01827 330321',
+          website: 'http://www.dordonsurgery.co.uk/'
         },
         {
-          name: 'St James & Soho Surgery',
-          odsCode: 'Y04112',
-          address: '15 Great Chapel Street, London',
-          postcode: 'W1F 8FR',
-          distance: '0.9 miles',
-          isAcceptingNewPatients: false,
-          cqcRating: 'Good',
-          cqcPublicationDate: '2023-08-20',
-          phone: '020 7437 2345'
+          name: 'Laurel House Surgery (Fazeley Branch)',
+          odsCode: 'M83062001',
+          address: 'Albert Road, Fazeley, Tamworth',
+          postcode: 'B78 3JQ',
+          distance: 'Distance unavailable',
+          isAcceptingNewPatients: null,
+          cqcRating: 'CQC match unavailable',
+          phone: '01827 283994',
+          website: 'http://www.laurelhousesurgery.co.uk/index.aspx'
         }
       ],
       dentists: [
         {
-          name: 'Westminster Dental Care & Implant Clinic',
-          odsCode: 'V12098',
-          address: '28 Parliament Street, London',
-          postcode: 'SW1A 2JA',
-          distance: '0.2 miles',
-          isAcceptingNhsPatients: true,
-          cqcRating: 'CQC Inspected & Compliant',
-          phone: '020 7222 4321',
-          website: 'https://www.westminsterdental.co.uk'
+          name: 'Polesworth Dental Surgery',
+          odsCode: 'V006094',
+          address: '11 Bridge Street, Polesworth, Staffordshire',
+          postcode: 'B78 1DR',
+          distance: 'Distance unavailable',
+          isAcceptingNhsPatients: null,
+          cqcRating: 'Inspected / Compliant',
+          phone: '01827 892958'
         },
         {
-          name: 'St James Dental Practice',
-          odsCode: 'V18944',
-          address: '12 Pall Mall, London',
-          postcode: 'SW1Y 5ED',
-          distance: '0.5 miles',
-          isAcceptingNhsPatients: false,
-          cqcRating: 'Good',
-          phone: '020 7930 9876'
+          name: 'Kingsbury Dental Practice',
+          odsCode: 'V006082',
+          address: '5 Jubilee Court, Kingsbury, Staffordshire',
+          postcode: 'B78 2LL',
+          distance: 'Distance unavailable',
+          isAcceptingNhsPatients: null,
+          cqcRating: 'Inspected / Compliant',
+          phone: '01827 874210',
+          website: 'http://www.bhandaldentalpractices.co.uk/'
         }
       ],
       pharmacies: [
         {
-          name: 'Boots Pharmacy - Whitehall',
-          odsCode: 'FPM89',
-          address: '36 Whitehall, Westminster, London',
-          postcode: 'SW1A 2BX',
-          distance: '0.2 miles',
-          openingHours: 'Mon-Fri: 08:30 - 18:30, Sat: 09:00 - 17:00',
-          phone: '020 7930 5678',
-          services: ['NHS Pharmacy First', 'Prescription Dispensing', 'Flu Vaccination', 'Blood Pressure Check']
+          name: 'Polesworth Pharmacy',
+          odsCode: 'FRJ85',
+          address: '14-16 Bridge Street, Polesworth, Staffordshire',
+          postcode: 'B78 1DT',
+          distance: 'Distance unavailable',
+          openingHours: 'Mon-Fri 09:00-17:30; Sat 09:00-13:00 and 14:00-17:30',
+          phone: '01827 892313',
+          services: ['Electronic Prescription Service (EPS)', 'NHS Pharmacy First']
         },
         {
-          name: 'Parliament Street Chemist',
-          odsCode: 'FX412',
-          address: '14 Parliament Street, London',
-          postcode: 'SW1A 2NE',
-          distance: '0.3 miles',
-          openingHours: 'Mon-Fri: 09:00 - 18:00',
-          phone: '020 7222 1122',
-          services: ['Prescription Dispensing', 'Emergency Contraception', 'Stop Smoking Service']
+          name: 'ASDA Pharmacy',
+          odsCode: 'FGV24',
+          address: 'ASDA Superstore, Ventura Road, Tamworth',
+          postcode: 'B78 3HB',
+          distance: 'Distance unavailable',
+          openingHours: 'Mon-Sat 09:00-20:00 with scheduled breaks; Sun 10:00-16:00',
+          phone: '01827 302210',
+          services: ['Electronic Prescription Service (EPS)', 'NHS Pharmacy First']
         }
       ],
-      summary: 'Illustrative healthcare directory near SW1A 2AA. Registration and NHS availability must be confirmed directly with each provider.'
+      summary: 'Primary healthcare services near B78 3BU from NHS service directories. Registration, NHS availability and opening hours must be confirmed directly.',
+      source: 'NHS Directory of Healthcare Services & Care Quality Commission',
+      lastUpdated: '27/09/2026'
+    },
+    crime: {
+      radiusMiles: 1,
+      totalLast12Months: 1310,
+      monthlyAverage: 131,
+      latestMonth: '2026-07',
+      earliestMonth: '2025-08',
+      monthlyTrends: [
+        { date: '2025-08', displayMonth: "Aug '25", totalCrimes: 136, isPublished: true, burglary: 3, vehicleCrime: 9, antiSocialBehaviour: 9, violentCrime: 50, other: 65 },
+        { date: '2025-09', displayMonth: "Sep '25", totalCrimes: 138, isPublished: true, burglary: 6, vehicleCrime: 10, antiSocialBehaviour: 13, violentCrime: 51, other: 58 },
+        { date: '2025-11', displayMonth: "Nov '25", totalCrimes: 112, isPublished: true, burglary: 2, vehicleCrime: 6, antiSocialBehaviour: 13, violentCrime: 40, other: 51 },
+        { date: '2025-12', displayMonth: "Dec '25", totalCrimes: 138, isPublished: true, burglary: 1, vehicleCrime: 5, antiSocialBehaviour: 12, violentCrime: 45, other: 75 },
+        { date: '2026-01', displayMonth: "Jan '26", totalCrimes: 117, isPublished: true, burglary: 0, vehicleCrime: 4, antiSocialBehaviour: 17, violentCrime: 44, other: 52 },
+        { date: '2026-02', displayMonth: "Feb '26", totalCrimes: 124, isPublished: true, burglary: 9, vehicleCrime: 17, antiSocialBehaviour: 17, violentCrime: 36, other: 45 },
+        { date: '2026-04', displayMonth: "Apr '26", totalCrimes: 139, isPublished: true, burglary: 3, vehicleCrime: 5, antiSocialBehaviour: 13, violentCrime: 51, other: 67 },
+        { date: '2026-05', displayMonth: "May '26", totalCrimes: 147, isPublished: true, burglary: 2, vehicleCrime: 11, antiSocialBehaviour: 15, violentCrime: 47, other: 72 },
+        { date: '2026-06', displayMonth: "Jun '26", totalCrimes: 131, isPublished: true, burglary: 5, vehicleCrime: 8, antiSocialBehaviour: 8, violentCrime: 32, other: 78 },
+        { date: '2026-07', displayMonth: "Jul '26", totalCrimes: 128, isPublished: true, burglary: 2, vehicleCrime: 4, antiSocialBehaviour: 13, violentCrime: 47, other: 62 }
+      ],
+      categoryBreakdown: [
+        { categoryKey: 'violent-crime', label: 'Violence & Personal Safety', count: 443, percentage: 33.8, riskLevel: 'Elevated', description: 'Offences against the person, common assault, harassment or personal threats.' },
+        { categoryKey: 'shoplifting', label: 'Shoplifting & Commercial Theft', count: 275, percentage: 21, riskLevel: 'Moderate', description: 'Theft from local retail premises or high-street stores.' },
+        { categoryKey: 'anti-social-behaviour', label: 'Anti-Social Behaviour (ASB)', count: 130, percentage: 9.9, riskLevel: 'Elevated', description: 'Nuisance conduct, noise, rowdy gatherings or intimidation.' },
+        { categoryKey: 'public-order', label: 'Public Order Offences', count: 124, percentage: 9.5, riskLevel: 'Low' },
+        { categoryKey: 'vehicle-crime', label: 'Vehicle Crime', count: 79, percentage: 6, riskLevel: 'Elevated' },
+        { categoryKey: 'burglary', label: 'Burglary & Break-ins', count: 33, percentage: 2.5, riskLevel: 'Moderate' }
+      ],
+      benchmarks: {
+        localAnnualTotal: 1310,
+        localAnnualRatePer1000: 59.5,
+        forceName: 'Staffordshire Police',
+        forceRatePer1000: 81.2,
+        nationalRatePer1000: 85.5,
+        vsForceComparison: 'Lower',
+        vsForceDifferencePercent: -27,
+        vsNationalComparison: 'Lower',
+        vsNationalDifferencePercent: -30,
+        safetyRating: 'Low Crime Area',
+        safetyScore: 96
+      },
+      keyCategories: {
+        burglary: { count: 33, percentage: 2.5, ratePer1000: 1.5, forceRate: 3.8, nationalRate: 4.2, status: 'Lower', riskLevel: 'Low', monthlyAvg: 2.8 },
+        vehicleCrime: { count: 79, percentage: 6, ratePer1000: 3.6, forceRate: 5.1, nationalRate: 6.2, status: 'Lower', riskLevel: 'Low', monthlyAvg: 6.6 },
+        asb: { count: 130, percentage: 9.9, ratePer1000: 5.9, forceRate: 16.8, nationalRate: 17.5, status: 'Lower', riskLevel: 'Low', monthlyAvg: 10.8 },
+        violentCrime: { count: 443, percentage: 33.8, ratePer1000: 20.1, forceRate: 31, nationalRate: 32.4, status: 'Lower', riskLevel: 'Low', monthlyAvg: 36.9 }
+      },
+      recentIncidents: [
+        { id: 136676284, category: 'anti-social-behaviour', categoryLabel: 'Anti-Social Behaviour (ASB)', month: "Jul '26", streetName: 'On or near Collins Grove', outcomeStatus: 'Status awaiting police update', distanceMiles: 0.1 },
+        { id: 136674400, category: 'anti-social-behaviour', categoryLabel: 'Anti-Social Behaviour (ASB)', month: "Jul '26", streetName: 'On or near Dunstall Lane', outcomeStatus: 'Status awaiting police update', distanceMiles: 0.2 },
+        { id: 136675120, category: 'anti-social-behaviour', categoryLabel: 'Anti-Social Behaviour (ASB)', month: "Jul '26", streetName: 'On or near Dunstall Lane', outcomeStatus: 'Status awaiting police update', distanceMiles: 0.2 },
+        { id: 136670502, category: 'burglary', categoryLabel: 'Burglary & Break-ins', month: "Jul '26", streetName: 'On or near Armstrong', outcomeStatus: 'Under investigation', distanceMiles: 0.6 }
+      ],
+      policeForce: { id: 'staffordshire', name: 'Staffordshire Police', telephone: '101', url: 'https://www.staffordshire.police.uk' },
+      source: 'data.police.uk (Home Office UK Police Open Data)',
+      lastUpdated: '2026-09-27T17:39:59.489Z'
     }
   },
-  summary: "This property is a historic detached house in the City of Westminster. It has a solid sales history with significant value appreciation. The energy performance is currently rated C, which is typical for a building of this age, but there is potential to reach a B rating with floor insulation and solar panels. Flood risk is very low. Planning history shows recent approvals for security and internal improvements, indicating the property is well-maintained and adapted for modern use.",
+  summary: "**Property Address:** 41 Bingley Avenue, Tamworth, B78 3BU\n\n- **Recorded sale history:** £225,000 on 13 November 2025; earlier new-build transaction £197,995 on 24 February 2020.\n- **Energy efficiency:** Official EPC Band B (83), potentially Band A (97), with 63 m² recorded floor area.\n- **Council Tax:** Official VOA Band B; published Tamworth 2026/27 area charge £1,789.48 before discounts or account adjustments.\n- **Broadband:** Address-level Ofcom lookup returned up to 76 Mbps download and 5 Mbps upload; ultrafast and gigabit were not shown as available.\n- **Planning:** This sample demonstrates the optional business search and shows verified PlanIt applications within 0.3 miles.\n- **Healthcare:** Nearby services are taken from NHS directories; registration and NHS availability must be confirmed directly.\n\nThis is a dated sample snapshot, not a substitute for a newly generated report or professional property searches.",
   logs: []
 };
 
@@ -271,16 +380,8 @@ export default function SampleReportPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-4 py-12 flex-grow">
-        <div className="mb-8 p-5 bg-amber-50 border border-amber-300 rounded-lg text-center" role="note" aria-label="Illustrative sample report notice">
-          <h1 className="text-xl font-bold text-amber-900">Illustrative Sample Report</h1>
-          <p className="mt-1 text-sm font-medium text-amber-900">
-            Demonstration only — 10 Downing Street is used as an example address. All property details, prices, ratings, nearby services and conclusions shown below are illustrative and have not been verified for this property.
-          </p>
-          <p className="mt-1 text-xs text-amber-800">
-            This sample must not be relied upon for a purchase, valuation, legal decision or other property due diligence.
-          </p>
-        </div>
+      <main className="site-main container mx-auto px-4 py-12 flex-grow">
+        <PageHero eyebrow="Explore before you buy" illustration="report"><h1 className="site-page-heading">See a HomePack for yourself.</h1><p>Explore the dated sample for 41 Bingley Avenue, Tamworth, B78 3BU. Snapshot checked 27 September 2026.</p><p className="page-hero-footnote">Source records change. Generate a new report for current research and independently verify material findings.</p></PageHero>
         <ReportDisplay 
           address={SAMPLE_ADDRESS} 
           reportData={SAMPLE_REPORT_DATA} 
