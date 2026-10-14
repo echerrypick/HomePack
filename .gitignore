@@ -9,3 +9,6 @@ coverage/
 
 # Local previews, screenshots and review fixtures
 /tmp/
+
+# Generated customer report artifacts
+/output/pdf/

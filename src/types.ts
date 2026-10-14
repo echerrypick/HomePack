@@ -83,6 +83,10 @@ export type LandRegistryResult = {
 };
 
 export type EpcData = {
+    registerType?: 'domestic' | 'non-domestic';
+    assessmentMethod?: string;
+    buildingComplexity?: string;
+    buildingEnvironment?: string;
     address1: string;
     address2: string;
     address3: string;
@@ -92,7 +96,7 @@ export type EpcData = {
     lodgementDate: string;
     inspectionDate: string;
     rating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-    potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+    potentialRating: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | '';
     propertyType: string;
     tenure: string;
     uprn: string;
@@ -253,6 +257,7 @@ export type BroadbandData = {
 } | null;
 
 export type PlanningHistoryItem = {
+  propertyLinked?: boolean;
     application: string;
     decision: string;
     date: string;
@@ -440,6 +445,10 @@ export type PropertyData = {
   planningHistory: PlanningHistoryItem[];
   planningConstraints?: PlanningConstraint[];
   planningCoverage?: {
+    checkedAt?: string;
+    nearbyApplicationsCount?: number;
+    excludedByScope?: number;
+    sources?: { name: string; kind: 'applications' | 'constraints'; status: 'available' | 'unavailable' | 'not_checked' | 'partial'; count: number }[];
     applications: string;
     constraints: string;
     scope?: 'street' | 'radius';

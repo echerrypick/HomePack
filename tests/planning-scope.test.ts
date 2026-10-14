@@ -9,9 +9,10 @@ test('street matching tolerates common road suffix abbreviations', () => {
 
 test('standard scope keeps property-linked and same-street applications only', () => {
   const applications = [
-    { reference: 'property', distanceKm: 0 },
+    { reference: 'property', distanceKm: 0, propertyLinked: true },
     { reference: 'street', address: '14 Bingley Avenue', distanceKm: 0.2 },
     { reference: 'nearby', address: '1 Nearby Close', distanceKm: 0.2 },
+    { reference: 'same-point-neighbour', address: '2 Other Street', distanceKm: 0 },
     { reference: 'outside', address: '20 Bingley Avenue', distanceKm: 0.6 }
   ];
   assert.deepEqual(

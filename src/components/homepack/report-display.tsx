@@ -1,3 +1,4 @@
+import { ENVIRONMENTAL_COVERAGE, planningCoverageMessage } from '@/lib/report-coverage';
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -21,8 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ownsProperty, hasBusinessAccess } from '@/lib/plans';
 import { authenticatedFetch } from '@/lib/billing-client';
 import { toast } from 'sonner';
-import html2canvas from 'html2canvas-pro';
-import { jsPDF } from 'jspdf';
+import { createReportPdf } from '@/lib/report-pdf';
 import { HomePackPdfTemplate } from './HomePackPdfTemplate';
 import { PropertyQuickNav } from './PropertyQuickNav';
 
@@ -209,6 +209,7 @@ function EpcDisplay({ epcData, logs, isFree, isAdmin }: { epcData: EpcData, logs
 
     return (
         <div className="space-y-4">
+            {epcData.registerType === 'non-domestic' && <p className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-900">Non-domestic EPC: commercial asset ratings use a different scale from domestic efficiency scores. Household costs and potential ratings are not inferred.</p>}
             <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-border/70 space-y-2.5">
                 <div className="flex justify-between items-center font-serif font-bold text-[#1e3a8a] dark:text-blue-400">
                     <div className="flex items-center gap-2">
@@ -218,7 +219,7 @@ function EpcDisplay({ epcData, logs, isFree, isAdmin }: { epcData: EpcData, logs
                         )}
                     </div>
                     <span className="text-sm font-sans font-semibold text-emerald-600 dark:text-emerald-400">
-                      Potential: Band {epcData.potentialRating}
+                      {epcData.potentialRating ? `Potential: Band ${epcData.potentialRating}` : 'Potential rating not supplied'}
                     </span>
                 </div>
                 <Progress value={epcValue} className="h-3.5 rounded-full" />
@@ -596,55 +597,57 @@ function CouncilTaxDisplay({ data, logs, isAdmin, postcode }: { data: CouncilTax
 }
 
 function EnvironmentalHazardsDisplay({ radon, coal }: { radon: RadonRiskData, coal: CoalMiningData }) {
-  const coalWasAssessed = Boolean(coal?.description) && !/not assessed|unavailable/i.test(coal.description);
+  const coalWasAssessed = Boolean(coal?.description) && !/not assessed|unavailable|not included/i.test(coal.description);
+  const radonWasAssessed = Boolean(radon?.riskLevel) && !/unknown|not assessed|unavailable|not included/i.test(radon.riskLevel);
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Badge variant="secondary" className="text-[10px] py-0 px-2 h-5 bg-emerald-100 text-emerald-800 border-emerald-200 font-medium">
-          <Search className="h-2.5 w-2.5 mr-1" /> Geological Records Grounded
+          <Search className="h-2.5 w-2.5 mr-1" /> Environmental information & further checks
         </Badge>
       </div>
 
+      <p className="text-sm text-muted-foreground">Available public-source findings are shown in this report. Some environmental risks require a separate specialist search; the checks below explain what still needs verification.</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Radon Card */}
         <div className="p-4 rounded-xl border border-border/80 bg-card space-y-3 flex flex-col justify-between shadow-2xs">
           <div>
-            <div className="flex justify-between items-start mb-2">
+            <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
               <h4 className="text-sm font-serif font-bold flex items-center gap-2 text-[#1e3a8a] dark:text-blue-400">
                 <Mountain className="h-4 w-4 text-blue-600 shrink-0" />
                 <span>Radon Gas Assessment</span>
               </h4>
-              <Badge variant={radon?.riskLevel === 'Low' ? 'outline' : 'destructive'} className="text-[10px] font-semibold shrink-0">
-                {radon?.percentage || radon?.riskLevel || 'Low'}
+              <Badge variant={!radonWasAssessed || radon?.riskLevel === 'Low' ? 'outline' : 'destructive'} className="text-[10px] font-semibold shrink-0">
+                {radonWasAssessed ? radon.riskLevel : 'Further check recommended'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {radon?.description || 'Radon data not available.'}
+              {radonWasAssessed ? radon.description : ENVIRONMENTAL_COVERAGE.radon.detail}
             </p>
           </div>
           <p className="text-[10px] text-muted-foreground/70 italic pt-2 border-t border-border/40">
-            Source: UKHSA / UKradon. <a href="https://www.ukradon.org/information/ukmaps" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Check the official radon map</a>
+            Further information: UKHSA / UKradon. <a href="https://www.ukradon.org/information/ukmaps" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Check the official radon map</a>
           </p>
         </div>
 
         {/* Coal Mining Card */}
         <div className="p-4 rounded-xl border border-border/80 bg-card space-y-3 flex flex-col justify-between shadow-2xs">
           <div>
-            <div className="flex justify-between items-start mb-2">
+            <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
               <h4 className="text-sm font-serif font-bold flex items-center gap-2 text-[#1e3a8a] dark:text-blue-400">
                 <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
                 <span>Coal Mining & Ground Stability</span>
               </h4>
               <Badge variant={coal?.isHighRiskArea ? 'destructive' : 'outline'} className="text-[10px] font-semibold shrink-0">
-                {coal?.isHighRiskArea ? 'High Risk' : coalWasAssessed ? 'Outside reporting area' : 'Not assessed'}
+                {coal?.isHighRiskArea ? 'High Risk' : coalWasAssessed ? 'Outside reporting area' : 'Further check recommended'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {coal?.description || 'Coal mining data not available; no risk conclusion has been inferred.'}
+              {coalWasAssessed ? coal.description : ENVIRONMENTAL_COVERAGE.mining.detail}
             </p>
           </div>
           <p className="text-[10px] text-muted-foreground/70 italic pt-2 border-t border-border/40">
-            Source: The Coal Authority Mining Records
+            <a href="https://www.gov.uk/check-if-property-is-affected-by-coal-mining" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Check the official mining search service</a>
           </p>
         </div>
       </div>
@@ -818,6 +821,8 @@ function MobileDisplay({ data, summary }: { data: MobileData[] | undefined, summ
 
 function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, uprn, logs, isAdmin }: { planningHistory: PlanningHistoryItem[], constraints?: PlanningConstraint[], coverage?: PropertyData['planningCoverage'], uprn: string, logs: string[], isAdmin: boolean }) {
     const planningLogs = logs.filter(log => log.startsWith('[PLANNING'));
+    const applicationCoverage = planningCoverageMessage(coverage, 'applications');
+    const constraintCoverage = planningCoverageMessage(coverage, 'constraints');
     const formatDecision = (value: string) => {
       if (/grant|approv/i.test(value) && /condition/i.test(value)) return 'Approved with conditions';
       if (/grant|approv/i.test(value)) return 'Approved';
@@ -856,11 +861,12 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
                 </div>
               ) : (
                 <div className="p-3 rounded-lg border border-dashed text-xs text-muted-foreground">
-                  No intersecting constraints were returned by the selected Planning Data datasets. This is not confirmation that the property is constraint-free.
+                  <strong className="block mb-1">{constraintCoverage.title}</strong>{constraintCoverage.detail}
                 </div>
               )}
             </div>
 
+            {constraints.length > 0 && constraintCoverage.incomplete && <p className="text-xs text-amber-800 p-3 bg-amber-50 rounded-lg">{constraintCoverage.detail}</p>}
             <div className="flex items-center justify-between gap-2 pt-1">
               <h3 className="text-sm font-semibold text-foreground">
                 {coverage?.scope === 'radius' ? 'Planning applications within 0.3 miles' : 'Planning applications at the property and on this street'}
@@ -868,6 +874,7 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
               <span className="text-[10px] text-muted-foreground">Planning Data + PlanIt</span>
             </div>
 
+            {planningHistory.length > 0 && applicationCoverage.incomplete && <p className="text-xs text-amber-800 p-3 bg-amber-50 rounded-lg">{applicationCoverage.detail}</p>}
             {planningHistory.length > 0 ? (
                 <div className="space-y-3">
                      {planningHistory.map((item, index) => {
@@ -912,11 +919,14 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
                 </div>
             ) : (
                 <div className="p-4 rounded-xl bg-muted/30 border border-dashed border-border text-center space-y-1">
-                    <p className="text-sm font-medium text-foreground">No applications returned by the available sources</p>
-                    <p className="text-xs text-muted-foreground">This does not confirm that no planning activity exists; local register coverage can vary.</p>
+                    <p className="text-sm font-medium text-foreground">{applicationCoverage.title}</p>
+                    <p className="text-xs text-muted-foreground">{applicationCoverage.detail}</p>
                 </div>
             )}
 
+            {coverage?.scope === 'street' && Boolean(coverage.excludedByScope) && <p className="text-xs text-muted-foreground">{coverage.excludedByScope} nearby application{coverage.excludedByScope === 1 ? ' was' : 's were'} outside this report’s property-and-same-street scope. Those records are not included in the application list above.</p>}
+            <a href="https://www.gov.uk/search-register-planning-decisions" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">Find the local authority planning register <ExternalLink className="h-3 w-3" /></a>
+            {coverage?.checkedAt && <p className="text-xs text-muted-foreground">Search run: {new Date(coverage.checkedAt).toLocaleString('en-GB')}.</p>}
             {coverage && <p className="text-[10px] text-muted-foreground leading-relaxed">Coverage: {coverage.applications}. Constraints use {coverage.constraints.toLowerCase()}.</p>}
 
             <div className="flex flex-col gap-2 pt-1" data-pdf-ignore>
@@ -1005,88 +1015,11 @@ export function ReportDisplay({
       const safeStreet = `${address.houseNumber}-${address.street}`.replace(/[^a-z0-9]/gi, '-');
       const filename = `UKHomePack-${safeStreet}.pdf`;
 
-      // Ensure the template is visible during capture
-      const originalStyle = template.parentElement?.style.cssText || "";
-      if (template.parentElement) {
-        template.parentElement.style.position = 'static';
-        template.parentElement.style.left = '0';
-        template.parentElement.style.visibility = 'visible';
-        template.parentElement.style.height = 'auto';
-        template.parentElement.style.overflow = 'visible';
-      }
-
-      // Small delay to allow any pending layout or images to settle
-      await new Promise(resolve => setTimeout(resolve, 350));
-
-      try {
-        const pageElements = Array.from(template.querySelectorAll<HTMLElement>('[data-pdf-page]'));
-        if (pageElements.length === 0) {
-          throw new Error('No pages found in report template');
-        }
-
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4',
-          compress: true,
-        });
-
-        for (let i = 0; i < pageElements.length; i++) {
-          const pageEl = pageElements[i];
-          toast.loading(`Rendering page ${i + 1} of ${pageElements.length}...`, { id: toastId });
-
-          const canvas = await html2canvas(pageEl, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff',
-            onclone: (clonedDoc) => {
-              try {
-                const styleTags = clonedDoc.getElementsByTagName('style');
-                for (let s = 0; s < styleTags.length; s++) {
-                  try {
-                    let css = styleTags[s].innerHTML;
-                    if (css && (css.includes('oklch') || css.includes('oklab'))) {
-                      css = css.replace(/oklch\([^)]+\)/g, '#64748b');
-                      css = css.replace(/oklab\([^)]+\)/g, '#64748b');
-                      styleTags[s].innerHTML = css;
-                    }
-                  } catch (e) {}
-                }
-
-                const allElements = clonedDoc.getElementsByTagName('*');
-                for (let j = 0; j < allElements.length; j++) {
-                  const el = allElements[j] as HTMLElement;
-                  const props = ['color', 'backgroundColor', 'borderColor', 'outlineColor', 'fill', 'stroke'];
-                  props.forEach(prop => {
-                    try {
-                      const style = el.style as any;
-                      const val = style?.[prop];
-                      if (val && (val.includes('oklch') || val.includes('oklab'))) {
-                        style[prop] = '#64748b';
-                      }
-                    } catch (e) {}
-                  });
-                }
-              } catch (e) {}
-            },
-          });
-
-          const imgData = canvas.toDataURL('image/jpeg', 0.95);
-          if (i > 0) {
-            pdf.addPage('a4', 'portrait');
-          }
-          // A4 is 210mm x 297mm
-          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-        }
-
-        pdf.save(filename);
-        toast.success('UK Property HomePack Report downloaded successfully!', { id: toastId });
-      } finally {
-        if (template.parentElement) {
-          template.parentElement.style.cssText = originalStyle;
-        }
-      }
+      const pdf = await createReportPdf(template, (page, total) => {
+        toast.loading(`Rendering page ${page} of ${total}...`, { id: toastId });
+      });
+      pdf.save(filename);
+      toast.success('UK Property HomePack Report downloaded successfully!', { id: toastId });
     } catch (error: any) {
       console.error('CRITICAL PDF ERROR:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1264,7 +1197,7 @@ export function ReportDisplay({
                 className="w-full sm:w-auto text-xs font-medium"
               >
                 <Link to="/pricing">
-                  B2B Subscription (£49–£79/mo)
+                  Business plans (£49–£79/month)
                 </Link>
               </Button>
             </div>
@@ -1530,7 +1463,7 @@ export function ReportDisplay({
             </button>
             <div className="flex items-center gap-2 mb-3">
               <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-semibold">
-                Direct-to-Consumer (B2C)
+                Retail
               </Badge>
               <Badge variant="outline" className="text-xs">
                 Single-Pack Download
@@ -1639,7 +1572,7 @@ export function ReportDisplay({
             <div className="mt-4 pt-3 border-t text-center text-xs text-muted-foreground">
               Need regular reports?{' '}
               <Link to="/pricing" className="text-primary hover:underline font-medium">
-                Switch to B2B Pro (£49/mo) or White-Label (£79/mo)
+                Switch to Business (£49/mo) or Business Plus (£79/mo)
               </Link>
             </div>
           </Card>

@@ -24,7 +24,7 @@ export function isPlanningApplicationOnStreet(applicationAddress: unknown, stree
   return ` ${normalizedAddress} `.includes(` ${normalizedTarget} `);
 }
 
-export function filterPlanningApplicationsForScope<T extends { address?: string; distanceKm?: number }>(
+export function filterPlanningApplicationsForScope<T extends { address?: string; distanceKm?: number; propertyLinked?: boolean }>(
   applications: T[],
   scope: PlanningScope,
   street: string
@@ -32,6 +32,6 @@ export function filterPlanningApplicationsForScope<T extends { address?: string;
   return applications.filter(application => {
     if (!isWithinPlanningRadius(application.distanceKm)) return false;
     if (scope === 'radius') return true;
-    return application.distanceKm === 0 || isPlanningApplicationOnStreet(application.address, street);
+    return application.propertyLinked === true || isPlanningApplicationOnStreet(application.address, street);
   });
 }

@@ -20,7 +20,7 @@ const features = [
 const faqs = [
   ['Where does the data come from?', 'We bring together available public and official records, including HM Land Registry, the EPC Register, planning sources and Police.uk. Coverage and publication dates vary.'],
   ['How quickly do I get the report?', 'Generation starts after verified payment. Follow progress on screen, then read and download your PDF when it is ready. Delivery time depends on the data sources.'],
-  ['Is it a subscription?', `No. A retail report is a one-off ${PLANS.report.price} payment for one property, with no recurring fees. Professional memberships are available separately.`],
+  ['Is it a subscription?', `No. A retail report is a one-off ${PLANS.report.price} payment for one property, with no recurring fees. Business and Business Plus memberships are available separately.`],
   ['Do I need an account?', 'Yes. Sign in or create an account to choose a property and buy a report. Your purchase is saved to your account.'],
   ['Can I return to a purchased property?', 'Yes. You can generate another report for the same purchased address without paying again. Recent report files are saved in this browser; download a copy to keep.'],
   ['Does this replace a survey or legal searches?', 'No. Reports support initial research. Missing data does not mean there is no risk. Verify significant findings with the relevant source, surveyor or conveyancer.'],

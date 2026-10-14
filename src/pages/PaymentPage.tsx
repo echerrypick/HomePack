@@ -25,6 +25,7 @@ export default function PaymentPage() {
     enabled: boolean;
     available: boolean;
     developmentSimulation: boolean;
+    testMode?: boolean;
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -38,6 +39,7 @@ export default function PaymentPage() {
         enabled: d.enabled !== false,
         available: Boolean(d.available),
         developmentSimulation: Boolean(d.developmentSimulation),
+        testMode: Boolean(d.testMode),
       }))
       .catch(() => setBillingStatus({ enabled: true, available: false, developmentSimulation: false }));
   }, []);
@@ -48,6 +50,7 @@ export default function PaymentPage() {
     try {
       const result = await billingRequest('/api/billing/verify', { sessionId });
       if (!result.paid) { setError('Payment is still pending. Check again once payment is complete.'); return; }
+      window.dispatchEvent(new Event('homepack-billing-updated'));
       if (result.address) setCompletedAddress(result.address);
       else setCompletedPlan((result.plan || plan) as PaidPlan);
     } catch (e: any) { setError(e.message); } finally { setBusy(false); }
@@ -78,7 +81,7 @@ export default function PaymentPage() {
           <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
             <CheckCircle2 className="h-8 w-8" />
           </div>
-          <DialogTitle className="text-center">{billingStatus?.developmentSimulation ? 'Test payment journey complete' : 'Payment complete'}</DialogTitle>
+          <DialogTitle className="text-center">{(billingStatus?.developmentSimulation || billingStatus?.testMode) ? 'Test payment journey complete' : 'Payment complete'}</DialogTitle>
           <DialogDescription className="text-center">
             {completedAddress
               ? 'This property is now unlocked for your account. You can generate the report without another payment for the same address.'
@@ -99,7 +102,9 @@ export default function PaymentPage() {
         <p className="text-4xl font-bold">{PLANS[plan].price}<span className="text-base font-normal">{plan === 'report' ? ' for one property' : ' / month'}</span></p>
         {plan === 'report' ? <><p>Payment unlocks a report for this property only. Each different property requires a separate £9.99 payment before generation. You can return to your purchased property without paying again.</p><p className="font-semibold">{address ? `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}` : 'Choose a property to continue.'}</p></> : <p>Monthly subscription with unlimited property reports. Renews monthly until cancelled. Manage billing and cancellation from your profile. Existing members can review a plan change in Stripe: upgrades are prorated, downgrades take effect at the next renewal, and cancellation ends renewal while retaining access through the paid period.</p>}
       </>}
+      {!sessionId && <p className="text-sm text-muted-foreground leading-relaxed">Your report brings together available public-source records. Coverage varies by property and provider, and incomplete checks are identified. Licensed radon, mining and ground-stability searches are not included.</p>}
       {params.has('cancelled') && <p>Checkout was cancelled. No new report has been generated.</p>}
+      {billingStatus?.testMode && !billingStatus.developmentSimulation && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><p className="font-semibold">Stripe test mode</p><p>No real money is charged. Test purchases and memberships are separate from live access.</p></div>}
       {billingStatus?.developmentSimulation ? (
         <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-semibold">Local payment simulation</p>

@@ -1,3 +1,6 @@
+import { fetchPlanningHistory } from './server/planning';
+import { fetchEpcData } from './server/epc';
+import { selectBestEpcCertificate } from './server/epc-match';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -13,8 +16,8 @@ import { scrapeCoverage as scrapeSiginfoCoverage } from './src/lib/siginfoScrape
 import { getHealthcareAccessData } from './src/services/healthcareService';
 import { getCrimeDataForCoordinates } from './src/services/crimeService';
 import { authenticate, requireProperty, requireBusiness, registerBillingRoutes, registerPaymentWebhook } from './server/billing';
-import { PLANNING_RADIUS_KM, PLANNING_RADIUS_MILES, isWithinPlanningRadius } from './server/planning-radius';
-import { filterPlanningApplicationsForScope, type PlanningScope } from './server/planning-scope';
+import { type PlanningScope } from './server/planning-scope';
+import { saveReport, listReports, readReport, saveJob, readJob, cleanupExpiredJobs } from './server/report-store';
 import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-registry-match';
 
 const execPromise = promisify(exec);
@@ -451,6 +454,7 @@ async function generateSummary(propertyData: any, retries = 3, signal?: AbortSig
       const prunedData = {
         address: propertyData.address,
         epc: propertyData.epc ? {
+          registerType: propertyData.epc.registerType || 'domestic',
           rating: propertyData.epc.rating,
           potentialRating: propertyData.epc.potentialRating,
           propertyType: propertyData.epc.propertyType,
@@ -471,6 +475,7 @@ async function generateSummary(propertyData: any, retries = 3, signal?: AbortSig
           activeWarnings: propertyData.floodRisk.activeWarnings
         } : null,
         planningHistoryCount: propertyData.planningHistory?.length || 0,
+        planningCoverage: propertyData.planningCoverage || { status: 'not recorded' },
         councilTax: propertyData.councilTax,
         radonRisk: propertyData.radonRisk?.riskLevel,
         coalMining: propertyData.coalMining?.description,
@@ -479,7 +484,7 @@ async function generateSummary(propertyData: any, retries = 3, signal?: AbortSig
           ultrafast: propertyData.broadband.ultrafastAvailable,
           maxSpeed: propertyData.broadband.maxDownloadSpeed
         } : null,
-        mobile: propertyData.mobile?.map((m: any) => `${m.operator}: 5G ${m.fiveG || 'Available'}, Voice: ${m.voice || 'Likely'}, Data: ${m.data || 'Likely'}${m.transmitterNotice ? ` (${m.transmitterNotice})` : ''}`).join('; ') || null,
+        mobile: propertyData.mobile?.map((m: any) => `${m.operator}: 5G ${m.fiveG || 'not verified'}, Voice: ${m.voice || 'not verified'}, Data: ${m.data || 'not verified'}${m.transmitterNotice ? ` (${m.transmitterNotice})` : ''}`).join('; ') || null,
         mobileSummary: propertyData.mobileSummary || null,
         schools: propertyData.schools?.map((s: any) => `${s.name} (${s.type}, Ofsted: ${s.ofstedRating}, ${s.distance})`).join('; ') || null,
         healthcare: propertyData.healthcare ? {
@@ -507,6 +512,12 @@ async function generateSummary(propertyData: any, retries = 3, signal?: AbortSig
 
       const prompt = `You are an AI assistant specialized in summarizing UK property data for home buyers. Provide a concise, highly readable, structured summary.
 
+ACCURACY AND COVERAGE RULES:
+- Missing, unassessed or unavailable information is not a low-risk finding. Do not invent a result or say that no records exist.
+- When a planning source is unavailable, partial or not_checked, describe the search as incomplete. State the search area and date limits; zero matching applications is not a complete planning clearance.
+- Radon, mining and licensed ground-stability searches are not included in this report unless an explicit verified result is present. Recommend the relevant specialist check without implying it has been performed.
+- Non-domestic EPC asset scores use a different scale from domestic efficiency scores. Identify expired certificates as historical.
+
 CRITICAL FORMATTING RULES:
 - DO NOT use tables, markdown tables, HTML tags, or <br> tags under ANY circumstances.
 - DO NOT use pipes (|).
@@ -516,6 +527,7 @@ CRITICAL FORMATTING RULES:
 
 - **Energy efficiency:** [EPC rating, potential, heating costs]
 - **Flood risk:** [rivers, sea, and surface water risk levels]
+- **Planning:** [matching applications, coverage limits and any incomplete sources]
 - **Running costs:** [Council Tax band and annual charge]
 - **Broadband connectivity:** [available speeds e.g. Ultrafast/Superfast, FTTP]
 - **Catchment schools:** [nearest primary and secondary schools strictly within 1.5 miles and their Ofsted ratings]
@@ -576,673 +588,6 @@ ${JSON.stringify(prunedData, null, 2)}`;
 registerPaymentWebhook(app);
 app.use(express.json({ limit: '50mb' }));
 registerBillingRoutes(app);
-
-// EPC Data Helper: Extracts a field from certificate or candidate matching various casing conventions
-function getEpcField(obj: any, ...keys: string[]): string | null {
-  if (!obj || typeof obj !== 'object') return null;
-
-  const extractScalar = (val: any): string | null => {
-    if (val === undefined || val === null) return null;
-    if (typeof val === 'object') {
-      // Check common nested property names in UK Open Data APIs
-      const inner = val.value ?? val.amount ?? val.cost ?? val.total ?? val.text ?? val.rating ?? val.score ?? val.current;
-      if (inner !== undefined && inner !== null && typeof inner !== 'object') {
-        const str = String(inner).trim();
-        return (str && str !== '[object Object]') ? str : null;
-      }
-      return null;
-    }
-    const str = String(val).trim();
-    if (!str || str === '[object Object]' || str === 'undefined' || str === 'null') {
-      return null;
-    }
-    return str;
-  };
-
-  for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
-      const scalar = extractScalar(obj[k]);
-      if (scalar !== null) return scalar;
-    }
-  }
-
-  const nestedCandidates = [obj.data, obj.certificate, obj.attributes, obj.properties];
-  for (const nested of nestedCandidates) {
-    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-      for (const k of keys) {
-        if (nested[k] !== undefined && nested[k] !== null && nested[k] !== '') {
-          const scalar = extractScalar(nested[k]);
-          if (scalar !== null) return scalar;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-// Select the best matching certificate from the search results
-function selectBestEpcCertificate(items: any[], searchStreet: string): any {
-  if (!items || items.length === 0) return null;
-  if (items.length === 1) return items[0];
-
-  const streetClean = searchStreet.trim().toLowerCase();
-  const numMatch = streetClean.match(/^(\d+[a-z]?(-\d+[a-z]?)?)\b/i);
-  const houseNum = numMatch ? numMatch[1] : null;
-
-  const getFullAddr = (item: any): string => {
-    return [
-      item.address,
-      item.address1,
-      item.address_1,
-      item.addressLine1,
-      item.address_line_1,
-      item.line1,
-      item.address2,
-      item.address_2,
-      item.posttown,
-      item.town
-    ].filter(Boolean).join(' ').toLowerCase();
-  };
-
-  const getDate = (item: any): number => {
-    const raw = item.dateRegistered || item.registrationDate || item.lodgementDate || item['lodgement-date'] || item.lodgement_date || item.inspectionDate || item['inspection-date'] || 0;
-    const time = new Date(raw).getTime();
-    return isNaN(time) ? 0 : time;
-  };
-
-  if (houseNum) {
-    const numRegex = new RegExp(`(^|\\b|#)${houseNum}(\\b|,|\\s)`, 'i');
-    const matching = items.filter(item => {
-      const addr = getFullAddr(item);
-      return numRegex.test(addr) || addr.startsWith(houseNum);
-    });
-
-    if (matching.length > 0) {
-      matching.sort((a, b) => getDate(b) - getDate(a));
-      return matching[0];
-    }
-  }
-
-  const words = streetClean.split(/\s+/).filter(w => w.length > 2 && isNaN(Number(w)));
-  if (words.length > 0) {
-    const scored = items.map(item => {
-      const addr = getFullAddr(item);
-      let score = 0;
-      for (const w of words) {
-        if (addr.includes(w)) score++;
-      }
-      return { item, score, date: getDate(item) };
-    });
-
-    scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return b.date - a.date;
-    });
-
-    if (scored[0].score > 0) {
-      return scored[0].item;
-    }
-  }
-
-  const sorted = [...items].sort((a, b) => getDate(b) - getDate(a));
-  return sorted[0];
-}
-
-// EPC Data Fetching using UK Government Energy Certificate Data API
-async function fetchEpcData(street: string, postcode: string, logs: string[]) {
-  const searchEndpoint = "https://api.get-energy-performance-data.communities.gov.uk/api/domestic/search";
-  const certEndpoint = "https://api.get-energy-performance-data.communities.gov.uk/api/certificate";
-
-  const bearerToken = process.env.EPC_BEARER_TOKEN;
-
-  if (!bearerToken || bearerToken.trim() === "" || bearerToken === "YOUR_BEARER_TOKEN") {
-    logs.push("[EPC] Warning: EPC_BEARER_TOKEN is not configured. Please set EPC_BEARER_TOKEN in Settings.");
-    return null;
-  }
-
-  if (bearerToken.trim().startsWith("43c3")) {
-    logs.push("[EPC] Warning: EPC_BEARER_TOKEN appears to be legacy credentials (starts with 43c3...). Please provide the Bearer token from the GOV.UK Energy Certificate Data service.");
-    return null;
-  }
-
-  const headers: HeadersInit = {
-    "Accept": "application/json",
-    "Authorization": `Bearer ${bearerToken.trim()}`,
-  };
-
-  try {
-    const searchUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&address=${encodeURIComponent(street.trim())}&page_size=50`;
-    logs.push(`[EPC] Searching certificates via GOV.UK Energy Performance API...`);
-    
-    let res = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(7500) });
-    logs.push(`[EPC] Search API returned HTTP ${res.status}`);
-
-    if (!res.ok) {
-      if (res.status === 401 || res.status === 403) {
-        logs.push(`[EPC] Error: Authentication failed (HTTP ${res.status}). Check that EPC_BEARER_TOKEN is valid.`);
-      } else {
-        logs.push(`[EPC] Error: Search API returned HTTP ${res.status} ${res.statusText}`);
-      }
-      return null;
-    }
-
-    let searchJson = await res.json();
-    let items = Array.isArray(searchJson.data) ? searchJson.data : (Array.isArray(searchJson) ? searchJson : (searchJson.rows || []));
-
-    // If no exact match or candidate not found in first search, search by postcode
-    let candidate = selectBestEpcCertificate(items, street);
-    if (!candidate || items.length === 0) {
-      const fallbackUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&page_size=100`;
-      logs.push(`[EPC] Address match check required wider query. Trying postcode fallback (${postcode.trim()})...`);
-      try {
-        const fallbackRes = await fetch(fallbackUrl, { headers, signal: AbortSignal.timeout(7500) });
-        if (fallbackRes.ok) {
-          const fallbackJson = await fallbackRes.json();
-          const fallbackItems = Array.isArray(fallbackJson.data) ? fallbackJson.data : (Array.isArray(fallbackJson) ? fallbackJson : (fallbackJson.rows || []));
-          if (fallbackItems.length > 0) {
-            items = fallbackItems;
-            candidate = selectBestEpcCertificate(items, street);
-          }
-        }
-      } catch (fbErr: any) {
-        logs.push(`[EPC] Postcode fallback search note: ${fbErr?.message || fbErr}`);
-      }
-    }
-
-    if (!candidate) {
-      logs.push(`[EPC] Notice: No energy performance certificates found matching this address or postcode.`);
-      return null;
-    }
-
-    const certificateNumber = candidate.certificateNumber ||
-      candidate.certificate_number ||
-      candidate['certificate-number'] ||
-      candidate.certificateId ||
-      candidate['certificate-id'] ||
-      candidate.lmkKey ||
-      candidate['lmk-key'] ||
-      candidate.lmk_key ||
-      candidate.id;
-
-    let certObj: any = null;
-    if (certificateNumber) {
-      const certUrl = `${certEndpoint}?certificate_number=${encodeURIComponent(certificateNumber)}`;
-      logs.push(`[EPC] Fetching full certificate details for ${certificateNumber}...`);
-      try {
-        const certRes = await fetch(certUrl, { headers, signal: AbortSignal.timeout(7500) });
-        if (certRes.ok) {
-          const certJson = await certRes.json();
-          if (certJson && typeof certJson === 'object') {
-            if (certJson.data && typeof certJson.data === 'object' && !Array.isArray(certJson.data)) {
-              certObj = certJson.data;
-            } else if (Array.isArray(certJson.data) && certJson.data.length > 0) {
-              certObj = certJson.data[0];
-            } else if (certJson.rows && Array.isArray(certJson.rows) && certJson.rows.length > 0) {
-              certObj = certJson.rows[0];
-            } else if (certJson.certificate && typeof certJson.certificate === 'object') {
-              certObj = certJson.certificate;
-            }
-          }
-        } else {
-          logs.push(`[EPC] Certificate details returned HTTP ${certRes.status}, utilizing register search summary data.`);
-        }
-      } catch (cErr: any) {
-        logs.push(`[EPC] Certificate details request note (${cErr?.message || cErr}), utilizing register search summary data.`);
-      }
-    }
-
-    // Extract rating and potential rating, checking snake_case fields used by official GOV.UK API
-    const rawRating = (
-      getEpcField(certObj, 'current_energy_efficiency_band', 'currentEnergyEfficiencyBand', 'currentEnergyRating', 'current-energy-rating', 'current_energy_rating', 'rating', 'energyRating', 'energy_rating', 'currentEnergyBand', 'energyBand') ??
-      getEpcField(candidate, 'currentEnergyEfficiencyBand', 'current_energy_efficiency_band', 'currentEnergyRating', 'current-energy-rating', 'current_energy_rating', 'rating', 'energyRating', 'currentEnergyBand', 'energyBand') ?? 'D'
-    ).toString().trim().toUpperCase();
-
-    const rawPotentialRating = (
-      getEpcField(certObj, 'potential_energy_efficiency_band', 'potentialEnergyEfficiencyBand', 'potentialEnergyRating', 'potential-energy-rating', 'potential_energy_rating', 'potentialRating', 'potentialEnergyBand', 'potential_energy_band') ??
-      getEpcField(candidate, 'potentialEnergyEfficiencyBand', 'potential_energy_efficiency_band', 'potentialEnergyRating', 'potential-energy-rating', 'potential_energy_rating', 'potentialRating') ?? rawRating
-    ).toString().trim().toUpperCase();
-
-    const rating = (['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(rawRating) ? rawRating : 'D') as 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-    const potentialRating = (['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(rawPotentialRating) ? rawPotentialRating : 'C') as 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
-
-    let expiryDate: string | null = getEpcField(certObj, 'expiryDate', 'expiry-date', 'expiry_date') ?? getEpcField(candidate, 'expiryDate', 'expiry-date', 'expiry_date');
-    if (!expiryDate) {
-      const lodgeDate = getEpcField(certObj, 'lodgementDate', 'lodgement-date', 'lodgement_date', 'dateRegistered', 'registrationDate', 'registration_date') ??
-        getEpcField(candidate, 'lodgementDate', 'lodgement-date', 'lodgement_date', 'dateRegistered', 'registrationDate');
-      if (lodgeDate) {
-        try {
-          const d = new Date(lodgeDate);
-          if (!isNaN(d.getTime())) {
-            d.setFullYear(d.getFullYear() + 10);
-            expiryDate = d.toISOString().split('T')[0];
-          }
-        } catch (e) {}
-      }
-    }
-
-    // Helper to format descriptions from objects, arrays or strings
-    const extractDescription = (val: any): string => {
-      if (!val) return '';
-      if (typeof val === 'string') return val;
-      if (Array.isArray(val)) {
-        return val.map((item: any) => (typeof item === 'object' ? item.description || item.name || '' : String(item))).filter(Boolean).join('; ');
-      }
-      if (typeof val === 'object') {
-        return val.description || val.name || val.type || '';
-      }
-      return String(val);
-    };
-
-    // Helper to extract numeric cost or value from objects
-    const extractCostValue = (val: any): string => {
-      if (val === undefined || val === null) return '';
-      if (typeof val === 'object') {
-        return val.value !== undefined ? String(val.value) : (val.amount !== undefined ? String(val.amount) : '');
-      }
-      return String(val);
-    };
-
-    const mainheatDesc = extractDescription(certObj?.main_heating) ||
-      getEpcField(certObj, 'mainheatDescription', 'mainheat-description', 'mainheat_description', 'mainHeatDescription', 'mainHeatingDescription') ||
-      '';
-
-    const wallsDesc = extractDescription(certObj?.walls) ||
-      getEpcField(certObj, 'wallsDescription', 'walls-description', 'walls_description') ||
-      '';
-
-    const roofDesc = extractDescription(certObj?.roofs) ||
-      getEpcField(certObj, 'roofDescription', 'roof-description', 'roof_description') ||
-      '';
-
-    const windowsDesc = extractDescription(certObj?.windows) ||
-      getEpcField(certObj, 'windowsDescription', 'windows-description', 'windows_description') ||
-      '';
-
-    const floorDesc = extractDescription(certObj?.floors) ||
-      getEpcField(certObj, 'floorDescription', 'floor-description', 'floor_description') ||
-      '';
-
-    const hotwaterDesc = extractDescription(certObj?.hot_water) ||
-      getEpcField(certObj, 'hotwaterDescription', 'hotwater-description', 'hotwater_description', 'hotWaterDescription') ||
-      '';
-
-    const lightingDesc = extractDescription(certObj?.lighting) ||
-      getEpcField(certObj, 'lightingDescription', 'lighting-description', 'lighting_description') ||
-      '';
-
-    // Dwelling / Property type mapping
-    let propertyType = certObj?.dwelling_type ||
-      getEpcField(certObj, 'propertyType', 'property-type', 'property_type', 'dwelling_type') ||
-      getEpcField(candidate, 'propertyType', 'property-type') ||
-      'House';
-    if (String(propertyType) === '0') propertyType = 'House';
-
-    // Built form mapping
-    let builtForm = getEpcField(certObj, 'builtForm', 'built-form', 'built_form') || '';
-    const builtFormStr = String(builtForm).trim();
-    if (builtFormStr === '3') builtForm = 'End-terrace';
-    else if (builtFormStr === '1') builtForm = 'Detached';
-    else if (builtFormStr === '2') builtForm = 'Semi-detached';
-    else if (builtFormStr === '4') builtForm = 'Mid-terrace';
-
-    // Scores
-    const currentScore = certObj?.energy_rating_current !== undefined ? String(certObj.energy_rating_current) :
-      (getEpcField(certObj, 'currentEnergyEfficiency', 'current-energy-efficiency', 'current_energy_efficiency', 'currentEnergyScore') ?? '');
-
-    const potentialScore = certObj?.energy_rating_potential !== undefined ? String(certObj.energy_rating_potential) :
-      (getEpcField(certObj, 'potentialEnergyEfficiency', 'potential-energy-efficiency', 'potential_energy_efficiency', 'potentialEnergyScore') ?? '');
-
-    logs.push(`[EPC] Success: Found EPC for ${certificateNumber} (Current Band: ${rating} / Score: ${currentScore || 'N/A'}, Potential Band: ${potentialRating} / Score: ${potentialScore || 'N/A'})`);
-
-    return {
-      address1: getEpcField(certObj, 'address1', 'address-1', 'address_1', 'addressLine1', 'address_line_1', 'line1') ?? getEpcField(candidate, 'address1', 'addressLine1', 'address') ?? '',
-      address2: getEpcField(certObj, 'address2', 'address-2', 'address_2', 'addressLine2', 'address_line_2', 'line2') ?? getEpcField(candidate, 'address2', 'addressLine2') ?? '',
-      address3: getEpcField(certObj, 'address3', 'address-3', 'address_3', 'addressLine3', 'address_line_3', 'line3') ?? getEpcField(candidate, 'address3', 'addressLine3') ?? '',
-      posttown: getEpcField(certObj, 'posttown', 'post-town', 'post_town', 'postTown', 'town', 'city') ?? getEpcField(candidate, 'posttown', 'postTown', 'town') ?? '',
-      postcode: getEpcField(certObj, 'postcode', 'post-code', 'post_code') ?? getEpcField(candidate, 'postcode') ?? postcode,
-      county: getEpcField(certObj, 'county') ?? getEpcField(candidate, 'county') ?? '',
-      lodgementDate: getEpcField(certObj, 'lodgementDate', 'lodgement-date', 'lodgement_date', 'dateRegistered', 'registrationDate', 'registration_date') ?? getEpcField(candidate, 'lodgementDate', 'lodgement-date', 'dateRegistered', 'registrationDate') ?? '',
-      inspectionDate: getEpcField(certObj, 'inspectionDate', 'inspection-date', 'inspection_date', 'dateOfAssessment') ?? getEpcField(candidate, 'inspectionDate', 'inspection-date') ?? '',
-      rating,
-      potentialRating,
-      propertyType,
-      tenure: getEpcField(certObj, 'tenure') ?? getEpcField(candidate, 'tenure') ?? '',
-      uprn: String(getEpcField(certObj, 'uprn', 'buildingReferenceNumber', 'building-reference-number', 'building_reference_number') ?? getEpcField(candidate, 'uprn') ?? ''),
-      buildingReferenceNumber: String(getEpcField(certObj, 'buildingReferenceNumber', 'building-reference-number', 'building_reference_number') ?? getEpcField(candidate, 'buildingReferenceNumber', 'building-reference-number') ?? ''),
-      constructionAgeBand: getEpcField(certObj, 'constructionAgeBand', 'construction-age-band', 'construction_age_band') ?? getEpcField(candidate, 'constructionAgeBand') ?? '',
-      localAuthorityLabel: getEpcField(certObj, 'localAuthorityLabel', 'local-authority-label', 'local_authority_label', 'localAuthorityName') ?? getEpcField(candidate, 'localAuthorityLabel', 'council') ?? '',
-      totalFloorArea: String(getEpcField(certObj, 'totalFloorArea', 'total-floor-area', 'total_floor_area') ?? getEpcField(candidate, 'totalFloorArea') ?? ''),
-      mainheatcontDescription: getEpcField(certObj, 'mainheatcontDescription', 'mainheatcont-description', 'mainheatcont_description', 'mainHeatingControlsDescription', 'mainHeatingControls') ?? '',
-      reportType: getEpcField(certObj, 'reportType', 'report-type', 'report_type') ?? '',
-      energyTariff: getEpcField(certObj, 'energyTariff', 'energy-tariff', 'energy_tariff') ?? '',
-      mechanicalVentilation: getEpcField(certObj, 'mechanicalVentilation', 'mechanical-ventilation', 'mechanical_ventilation') ?? '',
-      co2EmissCurrPerFloorArea: getEpcField(certObj, 'co2EmissCurrPerFloorArea', 'co2-emiss-curr-per-floor-area', 'co2_emiss_curr_per_floor_area', 'co2_emissions_current_per_floor_area') ?? '',
-      mainsGasFlag: getEpcField(certObj, 'mainsGasFlag', 'mains-gas-flag', 'mains_gas_flag') ?? '',
-      constituencyLabel: getEpcField(certObj, 'constituencyLabel', 'constituency-label', 'constituency_label') ?? getEpcField(candidate, 'constituency') ?? '',
-      mainFuel: getEpcField(certObj, 'mainFuel', 'main-fuel', 'main_fuel') ?? '',
-      lightingDescription: lightingDesc,
-      multiGlazeProportion: getEpcField(certObj, 'multiGlazeProportion', 'multi-glaze-proportion', 'multi_glaze_proportion') ?? '',
-      mainHeatingControls: getEpcField(certObj, 'mainHeatingControls', 'main-heating-controls', 'main_heating_controls') ?? '',
-      secondheatDescription: getEpcField(certObj, 'secondheatDescription', 'secondheat-description', 'secondheat_description', 'secondaryHeatingDescription') ?? '',
-      transactionType: getEpcField(certObj, 'transactionType', 'transaction-type', 'transaction_type') ?? '',
-      lowEnergyLighting: getEpcField(certObj, 'lowEnergyLighting', 'low-energy-lighting', 'low_energy_lighting') ?? '',
-      hotwaterDescription: hotwaterDesc,
-      builtForm,
-      currentEnergyEfficiency: currentScore,
-      potentialEnergyEfficiency: potentialScore,
-      mainheatDescription: mainheatDesc,
-      mainHeatDescription: mainheatDesc,
-      wallsDescription: wallsDesc,
-      roofDescription: roofDesc,
-      windowsDescription: windowsDesc,
-      co2EmissionsCurrent: extractCostValue(getEpcField(certObj, 'co2EmissionsCurrent', 'co2-emissions-current', 'co2_emissions_current')),
-      co2EmissionsPotential: extractCostValue(getEpcField(certObj, 'co2EmissionsPotential', 'co2-emissions-potential', 'co2_emissions_potential')),
-      heatingCostCurrent: extractCostValue(getEpcField(certObj, 'heatingCostCurrent', 'heating-cost-current', 'heating_cost_current')),
-      heatingCostPotential: extractCostValue(getEpcField(certObj, 'heatingCostPotential', 'heating-cost-potential', 'heating_cost_potential')),
-      hotWaterCostCurrent: extractCostValue(getEpcField(certObj, 'hotWaterCostCurrent', 'hot-water-cost-current', 'hot_water_cost_current')),
-      hotWaterCostPotential: extractCostValue(getEpcField(certObj, 'hotWaterCostPotential', 'hot-water-cost-potential', 'hot_water_cost_potential')),
-      lightingCostCurrent: extractCostValue(getEpcField(certObj, 'lightingCostCurrent', 'lighting-cost-current', 'lighting_cost_current')),
-      lightingCostPotential: extractCostValue(getEpcField(certObj, 'lightingCostPotential', 'lighting-cost-potential', 'lighting_cost_potential')),
-      energyConsumptionCurrent: extractCostValue(getEpcField(certObj, 'energyConsumptionCurrent', 'energy-consumption-current', 'energy_consumption_current')),
-      energyConsumptionPotential: extractCostValue(getEpcField(certObj, 'energyConsumptionPotential', 'energy-consumption-potential', 'energy_consumption_potential')),
-      floorDescription: floorDesc,
-      roofEnergyEff: getEpcField(certObj, 'roofEnergyEff', 'roof-energy-eff', 'roof_energy_eff') ?? '',
-      windowsEnergyEff: getEpcField(certObj, 'windowsEnergyEff', 'windows-energy-eff', 'windows_energy_eff') ?? '',
-      wallsEnergyEff: getEpcField(certObj, 'wallsEnergyEff', 'walls-energy-eff', 'walls_energy_eff') ?? '',
-      hotWaterEnergyEff: getEpcField(certObj, 'hotWaterEnergyEff', 'hot-water-energy-eff', 'hot_water_energy_eff') ?? '',
-      lightingEnergyEff: getEpcField(certObj, 'lightingEnergyEff', 'lighting-energy-eff', 'lighting_energy_eff') ?? '',
-      numberHabitableRooms: getEpcField(certObj, 'numberHabitableRooms', 'number-habitable-rooms', 'number_habitable_rooms') ?? '',
-      numberHeatedRooms: getEpcField(certObj, 'numberHeatedRooms', 'number-heated-rooms', 'number_heated_rooms') ?? '',
-      lowEnergyFixedLightCount: getEpcField(certObj, 'lowEnergyFixedLightCount', 'low-energy-fixed-light-count', 'low_energy_fixed_light_count'),
-      uprnSource: getEpcField(certObj, 'uprnSource', 'uprn-source', 'uprn_source'),
-      floorHeight: getEpcField(certObj, 'floorHeight', 'floor-height', 'floor_height'),
-      mainheatEnergyEff: getEpcField(certObj, 'mainheatEnergyEff', 'mainheat-energy-eff', 'mainheat_energy_eff'),
-      windowsEnvEff: getEpcField(certObj, 'windowsEnvEff', 'windows-env-eff', 'windows_env_eff'),
-      lightingEnvEff: getEpcField(certObj, 'lightingEnvEff', 'lighting-env-eff', 'lighting_env_eff'),
-      environmentImpactPotential: getEpcField(certObj, 'environmentImpactPotential', 'environment-impact-potential', 'environment_impact_potential'),
-      glazedType: getEpcField(certObj, 'glazedType', 'glazed-type', 'glazed_type'),
-      sheathingEnergyEff: getEpcField(certObj, 'sheathingEnergyEff', 'sheathing-energy-eff', 'sheathing_energy_eff', 'sheatingEnergyEff', 'sheating-energy-eff'),
-      sheatingEnergyEff: getEpcField(certObj, 'sheathingEnergyEff', 'sheathing-energy-eff', 'sheathing_energy_eff', 'sheatingEnergyEff', 'sheating-energy-eff'),
-      fixedLightingOutletsCount: getEpcField(certObj, 'fixedLightingOutletsCount', 'fixed-lighting-outlets-count', 'fixed_lighting_outlets_count'),
-      solarWaterHeatingFlag: getEpcField(certObj, 'solarWaterHeatingFlag', 'solar-water-heating-flag', 'solar_water_heating_flag'),
-      constituency: getEpcField(certObj, 'constituency'),
-      localAuthority: getEpcField(certObj, 'localAuthority', 'local-authority', 'local_authority'),
-      numberOpenFireplaces: getEpcField(certObj, 'numberOpenFireplaces', 'number-open-fireplaces', 'number_open_fireplaces'),
-      glazedArea: getEpcField(certObj, 'glazedArea', 'glazed-area', 'glazed_area'),
-      heatLossCorridor: getEpcField(certObj, 'heatLossCorridor', 'heat-loss-corridor', 'heat_loss_corridor'),
-      flatStoreyCount: getEpcField(certObj, 'flatStoreyCount', 'flat-storey-count', 'flat_storey_count'),
-      roofEnvEff: getEpcField(certObj, 'roofEnvEff', 'roof-env-eff', 'roof_env_eff'),
-      environmentImpactCurrent: getEpcField(certObj, 'environmentImpactCurrent', 'environment-impact-current', 'environment_impact_current'),
-      floorEnergyEff: getEpcField(certObj, 'floorEnergyEff', 'floor-energy-eff', 'floor_energy_eff'),
-      hotWaterEnvEff: getEpcField(certObj, 'hotWaterEnvEff', 'hot-water-env-eff', 'hot_water_env_eff'),
-      mainheatcEnergyEff: getEpcField(certObj, 'mainheatcEnergyEff', 'mainheatc-energy-eff', 'mainheatc_energy_eff'),
-      wallsEnvEff: getEpcField(certObj, 'wallsEnvEff', 'walls-env-eff', 'walls_env_eff'),
-      photoSupply: getEpcField(certObj, 'photoSupply', 'photo-supply', 'photo_supply'),
-      mainheatEnvEff: getEpcField(certObj, 'mainheatEnvEff', 'mainheat-env-eff', 'mainheat_env_eff'),
-      floorEnvEff: getEpcField(certObj, 'floorEnvEff', 'floor-env-eff', 'floor_env_eff'),
-      lodgementDatetime: getEpcField(certObj, 'lodgementDatetime', 'lodgement-datetime', 'lodgement_datetime'),
-      flatTopStorey: getEpcField(certObj, 'flatTopStorey', 'flat-top-storey', 'flat_top_storey'),
-      extensionCount: getEpcField(certObj, 'extensionCount', 'extension-count', 'extension_count'),
-      mainheatcEnvEff: getEpcField(certObj, 'mainheatcEnvEff', 'mainheatc-env-eff', 'mainheatc_env_eff'),
-      lmkKey: getEpcField(certObj, 'lmkKey', 'lmk-key', 'lmk_key') ?? certificateNumber,
-      windTurbineCount: getEpcField(certObj, 'windTurbineCount', 'wind-turbine-count', 'wind_turbine_count'),
-      floorLevel: getEpcField(certObj, 'floorLevel', 'floor-level', 'floor_level'),
-      expiryDate,
-    };
-  } catch (err: any) {
-    logs.push(`[EPC] Error occurred during EPC data fetch: ${err?.message || String(err)}`);
-    return null;
-  }
-}
-
-// Planning applications and constraints from the official Planning Data API and PlanIt.
-// These sources are complementary: Planning Data is authoritative for constraints, while
-// PlanIt provides broader application coverage across local authority portals.
-const PLANNING_CONSTRAINT_DATASETS = [
-  'conservation-area',
-  'listed-building',
-  'green-belt',
-  'flood-risk-zone',
-  'article-4-direction-area',
-  'tree-preservation-zone'
-];
-
-function planningDateYearsAgo(years: number): string {
-  const date = new Date();
-  date.setUTCFullYear(date.getUTCFullYear() - years);
-  return date.toISOString().slice(0, 10);
-}
-
-function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const radians = (value: number) => value * Math.PI / 180;
-  const dLat = radians(lat2 - lat1);
-  const dLng = radians(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function normalizedPlanningKey(item: any): string {
-  const reference = String(item.reference || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
-  if (reference && reference !== 'na' && reference !== 'recorded') return `ref:${reference}`;
-  return `fallback:${[item.application, item.address, item.date]
-    .map(value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
-    .join(':')}`;
-}
-
-function mergePlanningApplications(groups: any[][]): any[] {
-  const merged = new Map<string, any>();
-  for (const item of groups.flat()) {
-    const key = normalizedPlanningKey(item);
-    const existing = merged.get(key);
-    if (!existing) {
-      merged.set(key, item);
-      continue;
-    }
-    const preferred = Object.values(item).filter(Boolean).length > Object.values(existing).filter(Boolean).length ? item : existing;
-    merged.set(key, {
-      ...existing,
-      ...preferred,
-      source: Array.from(new Set([existing.source, item.source].filter(Boolean))).join(' + ')
-    });
-  }
-  return Array.from(merged.values()).sort((a, b) => {
-    const activeDifference = Number(Boolean(b.isActive)) - Number(Boolean(a.isActive));
-    if (activeDifference) return activeDifference;
-    const scale = (value: string) => value === 'Large' ? 2 : value === 'Medium' ? 1 : 0;
-    const scaleDifference = scale(b.applicationSize) - scale(a.applicationSize);
-    if (scaleDifference) return scaleDifference;
-    return String(b.rawDate || '').localeCompare(String(a.rawDate || ''));
-  });
-}
-
-async function fetchPlanningDataApplications(
-  uprn: string,
-  coords: { latitude: number; longitude: number } | null,
-  logs: string[]
-): Promise<any[]> {
-  if (!uprn && !coords) return [];
-  const params = new URLSearchParams({ dataset: 'planning-application', limit: '50' });
-  if (uprn) params.set('q', uprn);
-  else if (coords) {
-    params.set('latitude', String(coords.latitude));
-    params.set('longitude', String(coords.longitude));
-  }
-  params.append('exclude_field', 'geometry');
-
-  try {
-    const res = await fetch(`https://www.planning.data.gov.uk/entity.json?${params}`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(6000)
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rawData: any = await res.json();
-    return (rawData.entities || []).map((entity: any) => {
-      const rawDate = String(getEpcField(entity, 'decision-date', 'start-date') || '');
-      const reference = String(getEpcField(entity, 'reference') || 'N/A');
-      const decision = String(getEpcField(entity, 'planning-application-status', 'status') || 'Unknown');
-      return {
-        application: String(getEpcField(entity, 'description', 'name') || 'No description available'),
-        address: String(getEpcField(entity, 'site-address', 'address', 'location') || '').trim() || undefined,
-        decision,
-        date: rawDate || 'Unknown',
-        rawDate,
-        reference,
-        url: `https://www.planning.data.gov.uk/entity/${getEpcField(entity, 'entity') || ''}`,
-        source: 'Planning Data',
-        distanceKm: 0,
-        isActive: /pending|undecided|consultation|submitted/i.test(decision)
-      };
-    });
-  } catch (err: any) {
-    logs.push(`[PLANNING:Planning Data] Applications unavailable (${err?.message || err})`);
-    return [];
-  }
-}
-
-async function fetchPlanningConstraints(
-  coords: { latitude: number; longitude: number } | null,
-  logs: string[]
-): Promise<any[]> {
-  if (!coords) return [];
-  const params = new URLSearchParams({
-    latitude: String(coords.latitude),
-    longitude: String(coords.longitude),
-    limit: '100'
-  });
-  PLANNING_CONSTRAINT_DATASETS.forEach(dataset => params.append('dataset', dataset));
-  ['entity', 'dataset', 'name', 'reference', 'quality', 'flood-risk-level', 'listed-building-grade']
-    .forEach(field => params.append('field', field));
-
-  try {
-    const res = await fetch(`https://www.planning.data.gov.uk/entity.json?${params}`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(6000)
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rawData: any = await res.json();
-    return (rawData.entities || []).map((entity: any) => ({
-      dataset: String(entity.dataset || 'planning-constraint'),
-      name: String(entity.name || entity.reference || 'Recorded constraint'),
-      reference: String(entity.reference || 'N/A'),
-      quality: String(entity.quality || 'not stated'),
-      detail: entity['listed-building-grade']
-        ? `Grade ${entity['listed-building-grade']}`
-        : entity['flood-risk-level']
-          ? `Flood Risk Zone ${entity['flood-risk-level']}`
-          : undefined,
-      url: `https://www.planning.data.gov.uk/entity/${entity.entity || ''}`
-    }));
-  } catch (err: any) {
-    logs.push(`[PLANNING:Planning Data] Constraints unavailable (${err?.message || err})`);
-    return [];
-  }
-}
-
-async function fetchPlanItApplications(
-  coords: { latitude: number; longitude: number } | null,
-  logs: string[],
-  radiusKm: number,
-  years: number,
-  significantOnly = false
-): Promise<any[]> {
-  if (!coords) return [];
-  const params = new URLSearchParams({
-    lat: String(coords.latitude),
-    lng: String(coords.longitude),
-    krad: String(radiusKm),
-    start_date: planningDateYearsAgo(years),
-    end_date: new Date().toISOString().slice(0, 10),
-    pg_sz: '50',
-    sort: '-start_date',
-    select: 'name,uid,description,address,postcode,url,app_size,app_state,app_type,start_date,decided_date,other_fields,link,location',
-    compress: 'on'
-  });
-  if (significantOnly) params.set('app_size', 'Large,Medium');
-
-  try {
-    const res = await fetch(`https://www.planit.org.uk/api/applics/json?${params}`, {
-      headers: { Accept: 'application/json', 'User-Agent': 'UKHomePack.com/1.0 property-report lookup' },
-      signal: AbortSignal.timeout(7000)
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rawData: any = await res.json();
-    if (rawData.error) throw new Error(String(rawData.error));
-    const records = (rawData.records || []).map((record: any) => {
-      const decision = String(record.other_fields?.decision || record.app_state || record.other_fields?.status || 'Unknown');
-      const rawDate = String(record.decided_date || record.start_date || '');
-      const point = record.location?.coordinates;
-      const calculatedDistance = Array.isArray(point) && point.length >= 2
-        ? distanceKm(coords.latitude, coords.longitude, Number(point[1]), Number(point[0]))
-        : undefined;
-      const addressCandidates = [
-        record.address,
-        record.other_fields?.site_address,
-        record.other_fields?.siteAddress,
-        record.other_fields?.address,
-        record.other_fields?.location_address
-      ];
-      const applicationAddress = addressCandidates
-        .map(value => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '')
-        .find(Boolean);
-      return {
-        application: String(record.description || 'No description available'),
-        decision,
-        date: rawDate || 'Unknown',
-        rawDate,
-        reference: String(record.uid || record.reference || record.name || 'N/A'),
-        url: String(record.url || record.link || ''),
-        address: applicationAddress || undefined,
-        distanceKm: calculatedDistance,
-        applicationType: record.app_type ? String(record.app_type) : undefined,
-        applicationSize: record.app_size ? String(record.app_size) : undefined,
-        source: 'PlanIt',
-        isActive: /pending|undecided|consultation|submitted/i.test(String(record.app_state || record.other_fields?.status || ''))
-      };
-    });
-    const withinRadius = records.filter((record: any) => isWithinPlanningRadius(record.distanceKm));
-    if (withinRadius.length !== records.length) {
-      logs.push(`[PLANNING:PlanIt] Excluded ${records.length - withinRadius.length} records outside the verified ${PLANNING_RADIUS_MILES}-mile radius or without coordinates`);
-    }
-    return withinRadius;
-  } catch (err: any) {
-    logs.push(`[PLANNING:PlanIt] ${radiusKm}km search unavailable (${err?.message || err})`);
-    return [];
-  }
-}
-
-async function fetchPlanningHistory(
-  uprn: string,
-  coords: { latitude: number; longitude: number } | null,
-  street: string,
-  scope: PlanningScope,
-  logs: string[]
-) {
-  const [officialApplications, constraints, recentApplications, significantApplications] = await Promise.all([
-    trackTiming('Planning Data applications', logs, () => fetchPlanningDataApplications(uprn, coords, logs)),
-    trackTiming('Planning Data constraints', logs, () => fetchPlanningConstraints(coords, logs)),
-    trackTiming('PlanIt nearby applications', logs, () => fetchPlanItApplications(coords, logs, PLANNING_RADIUS_KM, 2)),
-    trackTiming('PlanIt significant applications', logs, () => fetchPlanItApplications(coords, logs, PLANNING_RADIUS_KM, 5, true))
-  ]);
-  const allApplications = mergePlanningApplications([officialApplications, recentApplications, significantApplications]);
-  const applications = filterPlanningApplicationsForScope(allApplications, scope, street);
-  const scopeDescription = scope === 'radius'
-    ? `within ${PLANNING_RADIUS_MILES} miles`
-    : `linked to the property or recorded on ${street || 'the same street'}`;
-  logs.push(`[PLANNING] ${applications.length} unique applications ${scopeDescription}; ${constraints.length} point constraints found`);
-  return {
-    applications,
-    constraints,
-    coverage: {
-      scope,
-      radiusMiles: scope === 'radius' ? PLANNING_RADIUS_MILES : undefined,
-      applications: scope === 'radius'
-        ? `property-linked Planning Data records plus all verified PlanIt applications within ${PLANNING_RADIUS_MILES} miles; recent applications cover 2 years and significant schemes cover 5 years`
-        : `property-linked Planning Data records plus verified PlanIt applications recorded on ${street || 'the property street'}; recent applications cover 2 years and significant schemes cover 5 years`,
-      constraints: 'Planning Data point intersection; absence of a result does not guarantee no constraint exists'
-    }
-  };
-}
 
 // Land Registry Fetching
 async function fetchLandRegistryData(houseNumberOrName: string, street: string, postcode: string, logs: string[]) {
@@ -2263,7 +1608,7 @@ async function fetchGroundedLocalData(
     const detail = [
       verifiedSpeed,
       ofcomMobileCount ? `${ofcomMobileCount} mobile networks` : networkCount ? `${networkCount} mobile networks` : null
-    ].filter(Boolean).join(' • ') || 'Ofcom lookup completed';
+    ].filter(Boolean).join(' • ') || 'No exact coverage record returned';
     onStepProgress?.('connectivity', 'completed', detail);
     return { ofcom, siginfo };
   });
@@ -3512,7 +2857,7 @@ async function generateHomePackDossier(
 
   const epcPromise = trackTiming('EPC lookup', logs, () => fetchEpcData(fullStreet, postcode, logs))
     .then(res => {
-      const detail = res?.rating ? `Band ${res.rating}` : 'Search complete';
+      const detail = res?.rating ? `${res.registerType === 'non-domestic' ? 'Non-domestic ' : ''}Band ${res.rating}` : 'No exact certificate returned';
       onStepProgress?.('epc', 'completed', detail);
       return res;
     })
@@ -3563,11 +2908,12 @@ async function generateHomePackDossier(
       () => fetchPlanningHistory(epcResult?.uprn || '', coords, street || '', options.planningScope || 'street', logs)
     ))
     .then(result => {
-      onStepProgress?.('planning', 'completed', `${result.applications.length} applications • ${result.constraints.length} constraints`);
+      const incomplete = result.coverage.sources.some(source => source.status !== 'available');
+      onStepProgress?.('planning', 'completed', `${incomplete ? 'Partial coverage • ' : ''}${result.applications.length} applications • ${result.constraints.length} constraints`);
       return result;
     })
     .catch(() => {
-      onStepProgress?.('planning', 'completed', 'Registers checked');
+      onStepProgress?.('planning', 'completed', 'Planning lookup unavailable');
       return { applications: [], constraints: [], coverage: undefined };
     });
 
@@ -3585,7 +2931,7 @@ async function generateHomePackDossier(
         riskOfFloodingFromSurfaceWater: "Not assessed by this source",
         riskOfFloodingFromGroundwater: "Not assessed by this source",
         riskOfFloodingFromReservoirs: "Check Environment Agency map",
-        activeWarnings: "No active warnings"
+        activeWarnings: "Warning status not verified - check the Environment Agency service"
       };
     });
 
@@ -3682,23 +3028,29 @@ async function runHomePackJob(job: HomePackJob) {
 
   try {
     const result = await generateHomePackDossier(job.address, onStepProgress, { planningScope: job.planningScope || 'street' });
+    job.completedAt = Date.now();
+    const saved = await saveReport(jobOwners.get(job.id)!, { ...job, result });
+    (job as any).reportId = saved.id;
+    (job as any).reportHash = saved.hash;
     job.status = 'completed';
     job.progress = 100;
     job.currentStep = 'Complete';
     job.result = result;
     job.completedAt = Date.now();
     job.updatedAt = Date.now();
+    await saveJob(jobOwners.get(job.id)!, job, saved.id);
   } catch (err: any) {
     console.error(`[Job ${job.id}] Generation error:`, err);
     job.status = 'failed';
     job.error = err?.message || 'Report generation failed';
     job.updatedAt = Date.now();
+    await saveJob(jobOwners.get(job.id)!, job).catch(error => console.error('Failed to persist job failure', error));
   }
 }
 
 // Start background HomePack generation job
 const jobOwners = new Map<string, string>();
-app.post('/api/homepack/start', authenticate, requireProperty, (req, res) => {
+app.post('/api/homepack/start', authenticate, requireProperty, async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   const { houseNumber, street, town, postcode } = req.body || {};
   if (!postcode) {
@@ -3733,6 +3085,12 @@ app.post('/api/homepack/start', authenticate, requireProperty, (req, res) => {
     updatedAt: Date.now()
   };
 
+  const existing = [...homePackJobs.values()].find(candidate => candidate.status === 'processing' && jobOwners.get(candidate.id) === res.locals.uid && candidate.planningScope === job.planningScope && JSON.stringify(candidate.address) === JSON.stringify(job.address));
+  if (existing) return res.json({ jobId: existing.id, job: existing });
+  try { await saveJob(res.locals.uid, job); } catch (error) {
+    console.error('Unable to persist report job', error);
+    return res.status(503).json({ error: 'Report storage is unavailable. Please try again.' });
+  }
   homePackJobs.set(jobId, job);
   jobOwners.set(jobId, res.locals.uid);
   // Launch asynchronous execution in background
@@ -3742,14 +3100,36 @@ app.post('/api/homepack/start', authenticate, requireProperty, (req, res) => {
 });
 
 // Poll status of background HomePack generation job
-app.get('/api/homepack/job/:jobId', authenticate, (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
+app.get('/api/homepack/job/:jobId', authenticate, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   const { jobId } = req.params;
-  const job = homePackJobs.get(jobId);
-  if (!job || jobOwners.get(jobId) !== res.locals.uid) {
-    return res.status(404).json({ error: "Job not found" });
+  if (!/^hp_[a-zA-Z0-9_]+$/.test(jobId)) return res.status(404).json({ error: 'Job not found' });
+  try {
+    const memory = jobOwners.get(jobId) === res.locals.uid ? homePackJobs.get(jobId) : null;
+    const job = memory || await readJob(res.locals.uid, jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    res.json({ job, pollAfterMs: memory ? 2000 : 15_000 });
+  } catch (error) { console.error('Job read failed', error); res.status(503).json({ error: 'Unable to retrieve report progress.' }); }
+});
+
+app.get('/api/reports', authenticate, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const at = req.query.afterAt;
+  const id = req.query.afterId;
+  if ((at !== undefined || id !== undefined) && (typeof at !== 'string' || !/^\d{1,16}$/.test(at) || typeof id !== 'string' || !/^[a-f0-9]{64}$/.test(id))) {
+    return res.status(400).json({ error: 'Invalid report cursor.' });
   }
-  res.json({ job });
+  try { res.json(await listReports(res.locals.uid, at ? { at: Number(at), id: String(id) } : undefined)); }
+  catch (error) { console.error('Report history read failed', error); res.status(503).json({ error: 'Unable to load saved reports. Please retry.' }); }
+});
+app.get('/api/reports/:id', authenticate, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!/^[a-f0-9]{64}$/.test(req.params.id)) return res.status(404).json({ error: 'Report not found.' });
+  try {
+    const report = await readReport(res.locals.uid, req.params.id);
+    if (!report) return res.status(404).json({ error: 'Report not found.' });
+    res.json(report);
+  } catch (error) { console.error('Report read failed', error); res.status(503).json({ error: 'Unable to open saved report. Please retry.' }); }
 });
 
 app.post('/api/healthcare/lookup', async (req, res) => {
@@ -3852,7 +3232,9 @@ app.post('/api/get-property-report', authenticate, requireProperty, async (req, 
     const planningScope: PlanningScope = res.locals.hasBusinessAccess && res.locals.profile?.reportSettings?.includeNearbyPlanning
       ? 'radius'
       : 'street';
-    const result = await generateHomePackDossier({ houseNumber, street, town, postcode }, undefined, { planningScope });
+    const address = { houseNumber, street, town, postcode };
+    const result = await generateHomePackDossier(address, undefined, { planningScope });
+    await saveReport(res.locals.uid, { address, result, planningScope, completedAt: Date.now() });
     res.json(result);
   } catch (error: any) {
     console.error("Report generation error:", error);
@@ -3862,6 +3244,11 @@ app.post('/api/get-property-report', authenticate, requireProperty, async (req, 
 
 // Vite middleware for development
 async function startServer() {
+  const cleanup = () => cleanupExpiredJobs().catch(error => console.error('Temporary job cleanup failed:', error.message));
+  // One startup pass, then once daily; no per-report cleanup queries or realtime listeners.
+  void cleanup();
+  setInterval(() => { void cleanup(); }, 24 * 60 * 60 * 1000).unref();
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

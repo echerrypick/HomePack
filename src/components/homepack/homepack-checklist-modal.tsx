@@ -16,12 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useHomePackJob } from '@/contexts/HomePackJobContext';
 
-interface HomePackChecklistModalProps {
-  onViewReport?: () => void;
-}
-
-export function HomePackChecklistModal({ onViewReport }: HomePackChecklistModalProps) {
-  const { activeJob, isModalOpen, closeModal, dismissActiveJob } = useHomePackJob();
+export function HomePackChecklistModal() {
+  const { activeJob, isModalOpen, closeModal, dismissActiveJob, loadReport } = useHomePackJob();
 
   if (!isModalOpen || !activeJob) return null;
 
@@ -190,7 +186,7 @@ export function HomePackChecklistModal({ onViewReport }: HomePackChecklistModalP
               {isCompleted ? (
                 "Official datasets compiled and verified."
               ) : (
-                "You can continue browsing the site. Your progress is saved."
+                "Your report keeps generating while you browse the site."
               )}
             </p>
 
@@ -198,11 +194,11 @@ export function HomePackChecklistModal({ onViewReport }: HomePackChecklistModalP
               {isCompleted ? (
                 <Button
                   onClick={() => {
-                    closeModal();
-                    if (onViewReport) {
-                      onViewReport();
+                    if (activeJob.result) {
+                      loadReport(activeJob.result, activeJob.address);
                     }
                   }}
+                  disabled={!activeJob.result}
                   className="w-full sm:w-auto rounded-xl px-5 h-10 shadow-sm"
                 >
                   <span>View Property Report</span>

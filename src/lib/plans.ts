@@ -1,9 +1,9 @@
 import type { Address } from '../types';
 
 export const PLANS = {
-  report: { name: 'Pay-As-You-Go Report', amount: 999, price: '£9.99' },
-  subscription: { name: 'B2B Pro', amount: 4900, price: '£49' },
-  agency: { name: 'Agency White-Label', amount: 7900, price: '£79' },
+  report: { name: 'Retail property report', amount: 999, price: '£9.99' },
+  subscription: { name: 'Business', amount: 4900, price: '£49' },
+  agency: { name: 'Business Plus', amount: 7900, price: '£79' },
 } as const;
 export type PaidPlan = keyof typeof PLANS;
 

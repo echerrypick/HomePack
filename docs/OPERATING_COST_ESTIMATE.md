@@ -120,3 +120,7 @@ Owner-run Launch illustration: £109 technical cash budget + £20–£100 bookke
 - Firebase database billing/quota: https://firebase.google.com/docs/firestore/pricing
 - Names.co.uk actual renewal lookup: https://www.names.co.uk/support/articles/how-can-i-find-my-domain-renewal-price/
 - UK VAT registration: https://www.gov.uk/register-for-vat
+
+## Database verification — 14 October 2026
+
+The existing named database is Enterprise edition in Native mode, region europe-west1, with free-tier-limited access and billing disabled. Standard-edition document-read prices must not be applied to this database without checking current Enterprise read-unit/write-unit pricing. The report implementation uses compressed bodies, paginated metadata, two minimal explicit indexes and a bounded session cache. Cloud storage is now implemented; a durable generation worker remains planned. Managed TTL requires billing and was not enabled; bounded daily app cleanup removes expired temporary job records. The earlier budget allowances remain planning estimates, not a measured Enterprise database bill.

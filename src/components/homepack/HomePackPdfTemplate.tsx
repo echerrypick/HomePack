@@ -1,3 +1,4 @@
+import { ENVIRONMENTAL_COVERAGE, planningCoverageMessage } from '@/lib/report-coverage';
 import React from 'react';
 import { Home } from 'lucide-react';
 import { Address } from '@/types';
@@ -58,19 +59,24 @@ export function HomePackPdfTemplate({
   const recentStreetSales = propertyData?.recentStreetSales || [];
   const allPlanning = planningHistory || propertyData?.planningHistory || propertyData?.planning || [];
   const planningCoverage = propertyData?.planningCoverage;
+  const applicationCoverage = planningCoverageMessage(planningCoverage, 'applications');
+  const constraintCoverage = planningCoverageMessage(planningCoverage, 'constraints');
   const allPlanningConstraints = propertyData?.planningConstraints || [];
   const floodPlanningConstraint = allPlanningConstraints.find((constraint: any) => constraint?.dataset === 'flood-risk-zone');
   const floodPlanningLabel = floodPlanningConstraint?.detail || floodPlanningConstraint?.name || '';
   const hasPlanningFloodFlag = /zone\s*[23]|medium|high/i.test(String(floodPlanningLabel));
   const epcRating = String(epc?.rating || '').trim().toUpperCase();
-  const epcDescription = epcRating === 'A'
+  const hasEpcRating = /^[A-G]$/.test(epcRating);
+  const commercialEpc = epc?.registerType === 'non-domestic';
+  const expiredEpc = epc?.expiryDate && new Date(epc.expiryDate) < new Date();
+  const epcDescription = commercialEpc ? 'a non-domestic asset rating, not a domestic efficiency score' : epcRating === 'A'
     ? 'excellent thermal efficiency'
     : epcRating === 'B'
       ? 'high thermal performance'
       : epcRating === 'C'
         ? 'good, broadly typical thermal efficiency'
-        : 'standard efficiency with improvement potential';
-  const builtForm = epc?.builtForm || epc?.propertyType || 'Not recorded';
+        : hasEpcRating ? 'lower energy efficiency with improvement potential' : 'energy efficiency has not been assessed';
+  const builtForm = epc?.builtForm || 'Not recorded';
   const todaysPharmacyHours = (() => {
     const hours = String(healthcareData?.pharmacies?.[0]?.openingHours || '');
     const day = new Date().toLocaleDateString('en-GB', { weekday: 'short' });
@@ -85,7 +91,7 @@ export function HomePackPdfTemplate({
     const schools = Array.isArray(propertyData?.schools) ? propertyData.schools : [];
     const primary = schools.filter((school: any) => String(school?.type).toLowerCase().includes('primary')).slice(0, 3);
     const secondary = schools.filter((school: any) => String(school?.type).toLowerCase().includes('secondary')).slice(0, 2);
-    return [...primary, ...secondary];
+    return [...primary, ...secondary, ...schools.filter((school: any) => !primary.includes(school) && !secondary.includes(school))].slice(0, 5);
   }, [propertyData?.schools]);
   const formatDecision = (value: unknown) => {
     const decision = String(value || 'Decision not recorded').trim();
@@ -117,6 +123,14 @@ export function HomePackPdfTemplate({
         #homepack-pdf-template .leaflet-control-container {
           display: none !important;
         }
+        #homepack-pdf-template, #homepack-pdf-template * {
+          font-family: Arial, Helvetica, sans-serif !important;
+          letter-spacing: normal !important;
+          text-shadow: none !important;
+        }
+        #homepack-pdf-template [data-pdf-page] > :last-child { flex-shrink: 0; margin-top: 20px; }
+        #homepack-pdf-template :is(p, span, td, th) { overflow-wrap: anywhere; }
+        #homepack-pdf-template .grid > * { min-width: 0; }
         #homepack-pdf-template {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
@@ -236,6 +250,7 @@ export function HomePackPdfTemplate({
             </div>
             
             <div className="p-5 bg-[#fefce8] border border-[#fef08a] rounded-sm mb-4">
+              <p className="text-xs leading-relaxed text-[#854d0e] mb-3"><strong>Understanding your report:</strong> Your HomePack brings available property records together and highlights checks that need further attention. Coverage varies by source, location and property type. Each section distinguishes a returned finding from an incomplete search or a specialist check that is not included. Missing information is never treated as a clean result.</p>
               <p className="text-xs leading-relaxed text-[#854d0e]">
                 <span className="font-bold">Important Notice:</span> This report is prepared for informational due diligence purposes only. Legal conveyancing title plans, formal building surveys, and statutory local authority searches must still be conducted via a licensed conveyancing solicitor before exchanging contracts.
               </p>
@@ -264,7 +279,7 @@ export function HomePackPdfTemplate({
                 <div className="space-y-2 text-xs leading-relaxed text-[#2d3748]">
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
-                    <span><strong>Energy Efficiency:</strong> Current EPC rating is <strong>{epc?.rating || 'Not recorded'}</strong> (potential to reach <strong>{epc?.potentialRating || 'Not recorded'}</strong>), indicating {epcDescription}.</span>
+                    <span><strong>Energy Efficiency:</strong> Current EPC rating is <strong>{epc?.rating || 'Not recorded'}</strong>{expiredEpc ? ' (expired certificate)' : ''} {hasEpcRating ? <>(potential: <strong>{epc?.potentialRating || 'not recorded'}</strong>), indicating {epcDescription}.</> : <>. No efficiency or improvement conclusion can be drawn without a matched certificate.</>}</span>
                   </p>
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
@@ -272,7 +287,7 @@ export function HomePackPdfTemplate({
                   </p>
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
-                    <span><strong>Flood:</strong> {hasPlanningFloodFlag ? <><strong>{floodPlanningLabel} (probability ignoring defences)</strong>; </> : null}Environment Agency defended rivers/sea rating: <strong>{floodRisk?.riskOfFloodingFromRiversAndSea || 'not returned'}</strong>. Current warning status: <strong>{String(floodRisk?.activeWarnings || 'no active warnings').toLowerCase()}</strong>.</span>
+                    <span><strong>Flood:</strong> {hasPlanningFloodFlag ? <><strong>{floodPlanningLabel} (probability ignoring defences)</strong>; </> : null}Environment Agency defended rivers/sea rating: <strong>{floodRisk?.riskOfFloodingFromRiversAndSea || 'not returned'}</strong>. Current warning status: <strong>{String(floodRisk?.activeWarnings || 'not verified').toLowerCase()}</strong>.</span>
                   </p>
                   <p className="flex gap-2">
                     <span className="text-[#2d4a77] font-bold">•</span>
@@ -299,11 +314,11 @@ export function HomePackPdfTemplate({
                 </div>
                 <div className="p-4 border-b border-[#e2e8f0]">
                   <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Current EPC Rating</p>
-                  <p className="text-2xl font-serif font-bold text-[#2d4a77]">{epc?.rating || 'Not recorded'} <span className="text-xs text-muted-foreground font-sans font-normal">(Potential: {epc?.potentialRating || 'Not recorded'})</span></p>
+                  <p className="text-2xl font-serif font-bold text-[#2d4a77]">{hasEpcRating ? epcRating : 'Unavailable'}<br /><span className="text-xs text-muted-foreground font-sans font-normal">(Potential: {epc?.potentialRating || 'Not recorded'})</span></p>
                 </div>
                 <div className="p-4 border-r border-[#e2e8f0]">
                   <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Flood Risk Level</p>
-                  <p className="text-2xl font-serif font-bold text-emerald-700">{floodRisk?.riskOfFloodingFromRiversAndSea || 'Low'}</p>
+                  <p className="text-2xl font-serif font-bold text-emerald-700">{floodRisk?.riskOfFloodingFromRiversAndSea || 'Not assessed'}</p>
                 </div>
                 <div className="p-4">
                   <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Council Tax Band</p>
@@ -318,7 +333,7 @@ export function HomePackPdfTemplate({
                 <div className="grid grid-cols-2 divide-x divide-y divide-[#e2e8f0]">
                   <div className="p-3 flex justify-between">
                     <span className="text-muted-foreground">Property Type:</span>
-                    <span className="font-semibold">{epc?.propertyType || 'House'}</span>
+                    <span className="font-semibold">{epc?.propertyType || primaryTransaction?.propertyType || 'Not recorded'}</span>
                   </div>
                   <div className="p-3 flex justify-between">
                     <span className="text-muted-foreground">Built Form:</span>
@@ -326,7 +341,7 @@ export function HomePackPdfTemplate({
                   </div>
                   <div className="p-3 flex justify-between">
                     <span className="text-muted-foreground">Tenure:</span>
-                    <span className="font-semibold">{primaryTransaction?.estateType || 'Freehold'}</span>
+                    <span className="font-semibold">{primaryTransaction?.estateType || 'Not recorded'}</span>
                   </div>
                   <div className="p-3 flex justify-between">
                     <span className="text-muted-foreground">Billing Authority:</span>
@@ -369,6 +384,7 @@ export function HomePackPdfTemplate({
                   />
                 </div>
               )}
+              {propertyData.coordinates && <p className="text-[9px] text-muted-foreground mb-3">Map data © OpenStreetMap contributors. Property position may be approximate.</p>}
 
               {/* Nearest Educational Institutions */}
               <div className="mb-3">
@@ -504,7 +520,7 @@ export function HomePackPdfTemplate({
               <div className="border border-[#e2e8f0] mb-5">
                 <div className="grid grid-cols-3 bg-white text-xs">
                   <div className="p-3 border-r border-b border-[#e2e8f0] text-muted-foreground">Tenure</div>
-                  <div className="p-3 border-r border-b border-[#e2e8f0] font-bold">{primaryTransaction?.estateType || 'Freehold'}</div>
+                  <div className="p-3 border-r border-b border-[#e2e8f0] font-bold">{primaryTransaction?.estateType || 'Not recorded'}</div>
                   <div className="p-3 border-b border-[#e2e8f0] text-muted-foreground">Latest recorded sale: {primaryTransaction ? new Date(primaryTransaction.transactionDate).toLocaleDateString('en-GB') : 'N/A'}</div>
                   
                   <div className="p-3 border-r border-b border-[#e2e8f0] text-muted-foreground">Property type</div>
@@ -621,6 +637,10 @@ export function HomePackPdfTemplate({
                 <p className="text-[#e2e8f0] text-xs">Official government registered energy performance rating, thermal efficiency assessment, and projected heating expenditure.</p>
               </div>
 
+              {commercialEpc && <div className="p-3 mb-4 border border-[#fef08a] bg-[#fefce8] text-xs text-[#854d0e] leading-relaxed"><strong>Non-domestic EPC{expiredEpc ? ' - expired' : ''}.</strong> This certificate covers commercial premises. Its asset score uses a different scale from a domestic EPC; domestic potential ratings and household heating-cost estimates are not supplied. {expiredEpc ? 'Treat this as a historical record and obtain a current certificate.' : ''}</div>}
+              {!hasEpcRating && <div className="p-4 mb-5 border border-[#fef08a] bg-[#fefce8] text-sm text-[#854d0e] leading-relaxed">
+                <strong>No matching domestic EPC was returned.</strong> This does not establish that no certificate exists. Verify the address on the government energy certificate register; commercial premises use the non-domestic register. Energy ratings, floor area and heating costs below remain unavailable.
+              </div>}
               <div className="grid grid-cols-2 gap-0 border border-[#e2e8f0] mb-5">
                 <div className="p-5 bg-[#f0fdf4] border-r border-[#e2e8f0]">
                   <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1">Current Energy Rating</p>
@@ -628,7 +648,7 @@ export function HomePackPdfTemplate({
                     <p className="text-5xl font-serif font-bold text-emerald-700">{epc?.rating || '-'}</p>
                     {epc?.currentEnergyEfficiency && (
                       <span className="text-sm font-bold text-emerald-800">
-                        Score: {epc.currentEnergyEfficiency}/100
+                        {commercialEpc ? 'Asset score' : 'Score'}: {epc.currentEnergyEfficiency}{commercialEpc ? '' : '/100'}
                       </span>
                     )}
                   </div>
@@ -644,7 +664,7 @@ export function HomePackPdfTemplate({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#3b5987] font-medium mt-1">Clear cost-effective improvement pathway identified</p>
+                  <p className="text-xs text-[#3b5987] font-medium mt-1">{epc?.potentialRating ? 'Potential rating from the matched certificate' : 'No improvement assessment available'}</p>
                 </div>
               </div>
 
@@ -664,6 +684,18 @@ export function HomePackPdfTemplate({
                 <strong>EPC verification:</strong> {epc?.address1 || `${address.houseNumber} ${address.street}`}, {epc?.postcode || address.postcode} • Certificate: {epc?.lmkKey || 'not recorded'} • Lodged: {epc?.lodgementDate ? new Date(epc.lodgementDate).toLocaleDateString('en-GB') : 'not recorded'}. Cost figures use the certificate's assessment-date prices and are not current tariffs.
               </div>
 
+              {commercialEpc ? <>
+                <h3 className="text-sm font-bold text-[#2d4a77] mb-2">Commercial building assessment</h3>
+                <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
+                  {[
+                    ['Assessment method', epc?.assessmentMethod],
+                    ['Building complexity', epc?.buildingComplexity],
+                    ['Main heating fuel', epc?.mainFuel],
+                    ['Building environment', epc?.buildingEnvironment],
+                  ].map(([label, value]) => <div key={label} className="grid grid-cols-3 p-3"><span className="text-muted-foreground">{label}</span><span className="col-span-2 font-semibold text-[#2d4a77]">{value || 'Not supplied by this certificate'}</span></div>)}
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">Domestic wall/roof specifications, household heating costs and potential energy scores are not provided by this commercial certificate and have not been inferred.</p>
+              </> : <>
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Building fabric specifications & energy costs</h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
                 <div className="grid grid-cols-3 p-2">
@@ -695,9 +727,10 @@ export function HomePackPdfTemplate({
                   <span className="col-span-2 font-semibold text-[#2d4a77]">{formatCo2Tonnes(epc?.co2EmissionsCurrent, 'Not recorded')}</span>
                 </div>
               </div>
+              </>}
 
               <div className="p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded text-xs text-[#4a5568]">
-                <span className="font-semibold">EPC Note:</span> Energy Performance Certificates remain legally valid for 10 years from the date of assessment ({epc?.expiryDate ? `valid until ${new Date(epc.expiryDate).toLocaleDateString('en-GB')}` : 'standard statutory validity'}). Recommended efficiency improvements may qualify for local green energy support schemes.
+                <span className="font-semibold">Certificate status:</span> {epc?.expiryDate ? `${expiredEpc ? 'Expired on' : 'Expiry date'} ${new Date(epc.expiryDate).toLocaleDateString('en-GB')}.` : 'No expiry date returned.'} Check the official register for the latest certificate. Missing recommendations and costs are not estimated.
               </div>
             </div>
 
@@ -746,15 +779,16 @@ export function HomePackPdfTemplate({
               <p className="text-[9px] text-muted-foreground mb-1">Source and data date: {councilTax?.source || `VOA band and ${councilTax?.authority || 'local authority'} charges`} ({councilTax?.year || 'year not recorded'}). Standard charge before discounts, exemptions, reductions, premiums or account adjustments.</p>
               {councilTax?.chargeNote && <p className="text-[9px] text-amber-800 mb-3">{councilTax.chargeNote}</p>}
 
+              {!/^[A-I]$/i.test(String(councilTax?.band || '')) && <p className="text-xs p-3 mb-4 bg-[#fefce8] border border-[#fef08a] text-[#854d0e]">The VOA lookup did not return an exact property match. No band or bill has been estimated. Confirm the address with the VOA; commercial premises may be subject to business rates instead.</p>}
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Multi-source flood risk assessment</h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Rivers and Sea Flooding</span>
-                  <span className="col-span-2 font-bold text-emerald-700">{floodRisk?.riskOfFloodingFromRiversAndSea || 'Very Low / Low'}</span>
+                  <span className="col-span-2 font-bold text-emerald-700">{floodRisk?.riskOfFloodingFromRiversAndSea || 'Not assessed'}</span>
                 </div>
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Surface Water Flooding</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{floodRisk?.riskOfFloodingFromSurfaceWater || 'Low Risk'}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{floodRisk?.riskOfFloodingFromSurfaceWater || 'Not assessed'}</span>
                 </div>
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Groundwater & Reservoirs</span>
@@ -771,7 +805,7 @@ export function HomePackPdfTemplate({
 
               <div className="p-3.5 bg-[#f0fdf4] border border-[#bbf7d0] rounded text-xs text-emerald-800 mb-5">
                 <p className="font-bold mb-0.5">Active Flood Status</p>
-                <p>{floodRisk?.activeWarnings || 'No active flood warnings or alerts currently in force for this catchment area.'}</p>
+                <p>{floodRisk?.activeWarnings || 'Warning status was not returned; check the Environment Agency service.'}</p>
               </div>
 
               <div className="p-3.5 bg-[#f0f7ff] border border-[#d1e3f8] rounded text-xs text-[#2d4a77]">
@@ -795,25 +829,28 @@ export function HomePackPdfTemplate({
               <h2 className="text-2xl font-serif font-bold text-[#2d4a77] mb-2">6. Environmental Hazards & Planning History</h2>
               <div className="bg-[#2d4a77] p-4 rounded-sm mb-5 text-white">
                 <h3 className="text-base font-serif font-bold mb-1">Environmental hazards and planning checks</h3>
-                <p className="text-[#e2e8f0] text-xs">Screening for radon gas, mining subsidence, ground stability, and recorded local planning applications.</p>
+                <p className="text-[#e2e8f0] text-xs">Available planning records, environmental coverage and guidance on further property-specific checks.</p>
               </div>
 
-              <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Environmental hazards screening</h3>
+              <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Environmental coverage & recommended checks</h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-5">
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Radon Gas Risk</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{radonRisk?.riskLevel || 'Unknown - check ukradon.org'}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{radonRisk?.riskLevel && !/unknown/i.test(radonRisk.riskLevel) ? radonRisk.riskLevel : ENVIRONMENTAL_COVERAGE.radon.title}</span>
                 </div>
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Coal Mining Reporting Area</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{coalMining?.isReportingArea ? 'Within designated coal mining reporting boundary' : coalMining?.description && !/not assessed|unavailable/i.test(coalMining.description) ? 'Outside designated coal mining reporting area' : 'Not assessed by an official property-level source'}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{coalMining?.isReportingArea ? 'Within designated coal mining reporting boundary' : coalMining?.description && !/not assessed|unavailable/i.test(coalMining.description) ? 'Outside designated coal mining reporting area' : ENVIRONMENTAL_COVERAGE.mining.title}</span>
                 </div>
                 <div className="grid grid-cols-3 p-3">
                   <span className="text-muted-foreground font-medium">Natural Ground Stability</span>
-                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(propertyData.groundStability, 'Not assessed - obtain a licensed ground stability search if required')}</span>
+                  <span className="col-span-2 font-semibold text-[#2d4a77]">{dataOrNA(propertyData.groundStability, ENVIRONMENTAL_COVERAGE.ground.title)}</span>
                 </div>
               </div>
 
+              <div className="p-3 mb-4 border border-[#e2e8f0] bg-[#f8fafc] text-[10px] leading-relaxed text-[#4a5568]">
+                <strong>About these checks:</strong> Property-specific radon, mining and licensed ground-stability searches are not included in the connected sources for this report. No risk conclusion is drawn where a result is missing. Check the official UKradon map, the mining search service and discuss any further searches with your surveyor or conveyancer.
+              </div>
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Planning constraints at this location</h3>
               <div className="border border-[#fde68a] bg-[#fffbeb] rounded-sm divide-y divide-[#fde68a] text-xs mb-4">
                 {allPlanningConstraints.slice(0, 3).map((constraint: any, i: number) => (
@@ -827,7 +864,7 @@ export function HomePackPdfTemplate({
                 ))}
                 {allPlanningConstraints.length === 0 && (
                   <div className="p-3 text-[10px] text-[#4a5568]">
-                    No intersecting records were returned by the selected Planning Data datasets. This does not confirm that the property is constraint-free.
+                    <strong>{constraintCoverage.title}.</strong> {constraintCoverage.detail}
                   </div>
                 )}
               </div>
@@ -857,18 +894,24 @@ export function HomePackPdfTemplate({
                 })}
                 {allPlanning.length === 0 && (
                   <div className="p-4 text-center">
-                    <p className="text-xs font-semibold text-[#2d4a77] mb-1">No applications returned by the available sources</p>
+                    <p className="text-xs font-semibold text-[#2d4a77] mb-1">{applicationCoverage.title}</p>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      This does not confirm that no planning activity exists; local register coverage can vary.
+                      {applicationCoverage.detail}
                     </p>
                   </div>
                 )}
               </div>
 
+              {allPlanning.length > 0 && applicationCoverage.incomplete && <p className="text-[10px] text-[#92400e] mb-3">{applicationCoverage.detail}</p>}
+              {allPlanningConstraints.length > 0 && constraintCoverage.incomplete && <p className="text-[10px] text-[#92400e] mb-3">{constraintCoverage.detail}</p>}
+              {allPlanning.length > 3 && <p className="text-[10px] text-[#4a5568] mb-3">Showing {Math.min(3, allPlanning.length)} of {allPlanning.length} matching applications. The full list is available in your online report.</p>}
+              {allPlanningConstraints.length > 3 && <p className="text-[10px] text-[#4a5568] mb-3">Showing {Math.min(3, allPlanningConstraints.length)} of {allPlanningConstraints.length} returned constraints. See your online report for all entries.</p>}
+              {planningCoverage?.scope === 'street' && Boolean(planningCoverage.excludedByScope) && <p className="text-[10px] text-[#4a5568] mb-3">{planningCoverage.excludedByScope} nearby applications were outside the property-and-same-street scope of this report.</p>}
               <div className="p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded text-xs text-[#4a5568]">
                 <span className="font-semibold">Planning Advice:</span> Alterations, single-storey extensions, and changes of use remain subject to local planning policies, permitted development limits, and conservation area restrictions.
               </div>
-              <p className="text-[9px] text-muted-foreground mt-2">Source and data date: Planning Data constraints and PlanIt/local-authority applications, checked {new Date().toLocaleDateString('en-GB')}.</p>
+              {planningCoverage?.applications && <p className="text-[9px] text-muted-foreground mt-2">Search scope: {planningCoverage.applications}.</p>}
+              <p className="text-[9px] text-muted-foreground mt-2">Sources: Planning Data and PlanIt. {planningCoverage?.checkedAt ? `Search run: ${new Date(planningCoverage.checkedAt).toLocaleDateString('en-GB')}.` : 'Original search status/date not recorded.'}</p>
             </div>
 
             <div className="w-full flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
@@ -905,18 +948,19 @@ export function HomePackPdfTemplate({
               <div className="grid grid-cols-4 gap-2 mb-4 text-center">
                 <div className="p-3 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Safety Assessment</p>
-                  <p className="text-sm font-bold text-emerald-700">{crimeData?.benchmarks?.safetyRating || 'Low Crime Area'}</p>
-                  <p className="text-[10px] text-muted-foreground">Index: {crimeData?.benchmarks?.safetyScore ?? 82}/100</p>
+                  <p className="text-sm font-bold text-[#2d4a77]">{crimeData?.benchmarks?.safetyRating || 'Not assessed'}</p>
+                  <p className="text-[10px] text-muted-foreground">Index: {crimeData?.benchmarks?.safetyScore ?? 'Unavailable'}/100</p>
                 </div>
                 <div className="p-3 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Local Crime Rate</p>
-                  <p className="text-base font-bold text-[#2d4a77]">{crimeData?.benchmarks?.localAnnualRatePer1000 ?? crimeData?.benchmarks?.localAnnualRatePer1k ?? '54.2'}</p>
+                  <p className="text-base font-bold text-[#2d4a77]">{crimeData?.benchmarks?.localAnnualRatePer1000 ?? crimeData?.benchmarks?.localAnnualRatePer1k ?? 'Unavailable'}</p>
                   <p className="text-[10px] text-muted-foreground">per 1k residents/yr</p>
                 </div>
                 <div className="p-3 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">vs Force Benchmark</p>
                   {(() => {
-                    const diff = crimeData?.benchmarks?.vsForceDifferencePercent ?? crimeData?.benchmarks?.diffVsForce ?? -15;
+                    const diff = crimeData?.benchmarks?.vsForceDifferencePercent ?? crimeData?.benchmarks?.diffVsForce ?? null;
+                    if (diff === null) return <p className="text-xs text-muted-foreground">Not calculated</p>;
                     return (
                       <p className={`text-sm font-bold ${diff <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
                         {diff <= 0 ? `${Math.abs(diff)}% Below` : `+${diff}% Above`}
@@ -924,20 +968,21 @@ export function HomePackPdfTemplate({
                     );
                   })()}
                   <p className="text-[10px] text-muted-foreground truncate" title={crimeData?.benchmarks?.forceName || crimeData?.policeForce?.name}>
-                    {crimeData?.benchmarks?.forceName ? String(crimeData.benchmarks.forceName).replace(/Police|Constabulary/gi, '').trim() : 'Force'} ({crimeData?.benchmarks?.forceRatePer1000 ?? crimeData?.benchmarks?.forceAnnualRatePer1k ?? '71'}/1k)
+                    {crimeData?.benchmarks?.forceName ? String(crimeData.benchmarks.forceName).replace(/Police|Constabulary/gi, '').trim() : 'Force'} ({crimeData?.benchmarks?.forceRatePer1000 ?? crimeData?.benchmarks?.forceAnnualRatePer1k ?? 'Unavailable'}/1k)
                   </p>
                 </div>
                 <div className="p-3 bg-[#f0f7ff] border border-[#d1e3f8] rounded-sm">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">vs England & Wales</p>
                   {(() => {
-                    const diffNat = crimeData?.benchmarks?.vsNationalDifferencePercent ?? crimeData?.benchmarks?.diffVsNational ?? -20;
+                    const diffNat = crimeData?.benchmarks?.vsNationalDifferencePercent ?? crimeData?.benchmarks?.diffVsNational ?? null;
+                    if (diffNat === null) return <p className="text-xs text-muted-foreground">Not calculated</p>;
                     return (
                       <p className={`text-sm font-bold ${diffNat <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
                         {diffNat <= 0 ? `${Math.abs(diffNat)}% Below` : `+${diffNat}% Above`}
                       </p>
                     );
                   })()}
-                  <p className="text-[10px] text-muted-foreground">National: {crimeData?.benchmarks?.nationalRatePer1000 ?? crimeData?.benchmarks?.nationalAnnualRatePer1k ?? '85.5'}/1k</p>
+                  <p className="text-[10px] text-muted-foreground">National: {crimeData?.benchmarks?.nationalRatePer1000 ?? crimeData?.benchmarks?.nationalAnnualRatePer1k ?? 'Unavailable'}/1k</p>
                 </div>
               </div>
 
@@ -1023,24 +1068,12 @@ export function HomePackPdfTemplate({
                 {/* Trend bars */}
                 {(() => {
                   const trendsList = crimeData?.monthlyTrends || crimeData?.trends || [];
+                  if (!trendsList.length) return <p className="text-xs text-muted-foreground p-3">No verified monthly crime counts were returned.</p>;
                   const trendCount = (item: any) => Number(item.totalCrimes ?? item.count ?? 0);
                   const maxVal = Math.max(...trendsList.map(trendCount), 20);
                   return (
                     <div className="h-28 flex items-end justify-between gap-1.5 pt-4 pb-1 border-b border-[#e2e8f0]">
-                      {(trendsList.length > 0 ? trendsList : [
-                        { month: 'Jan', count: 12 },
-                        { month: 'Feb', count: 10 },
-                        { month: 'Mar', count: 14 },
-                        { month: 'Apr', count: 11 },
-                        { month: 'May', count: 15 },
-                        { month: 'Jun', count: 13 },
-                        { month: 'Jul', count: 16 },
-                        { month: 'Aug', count: 12 },
-                        { month: 'Sep', count: 11 },
-                        { month: 'Oct', count: 13 },
-                        { month: 'Nov', count: 10 },
-                        { month: 'Dec', count: 9 },
-                      ]).map((t: any, i: number) => {
+                      {trendsList.map((t: any, i: number) => {
                         const cnt = trendCount(t);
                         const isPublished = t.isPublished !== false;
                         const heightPercent = isPublished ? Math.min(100, Math.max(12, Math.round((cnt / maxVal) * 100))) : 8;
@@ -1156,6 +1189,7 @@ export function HomePackPdfTemplate({
                 </div>
               </div>
 
+              {(!broadband?.maxDownloadSpeed || /not available|unknown/i.test(broadband.maxDownloadSpeed)) && <p className="text-xs p-3 mb-4 bg-[#fefce8] border border-[#fef08a] text-[#854d0e]">No verified speed record was matched to this exact address. A neighbouring or combined-premises record is not substituted. Check the full premises address with Ofcom or the provider.</p>}
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Mobile network availability (4 UK Operators)</h3>
               <div className="space-y-2 mb-4">
                 {(propertyData.mobile || []).slice(0, 4).map((m: any, i: number) => {

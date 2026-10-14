@@ -46,3 +46,35 @@
 - Confirm whether browser-only history is acceptable for launch or durable report history is required. The current pricing promises saved history, so durable storage is recommended before launch.
 
 Technical payment reference: https://docs.stripe.com/api/customer_portal/configurations/create
+
+## Update — 14 October 2026: Firestore report history
+
+Cloud report storage and account history are now implemented and tested against the existing named database using isolated temporary records (removed after testing). Compact paginated summaries, compressed on-demand payloads, unchanged-body write avoidance and a bounded per-session cache reduce reads and storage. Job start and terminal states persist; interrupted generation is retryable but still needs a durable worker queue for automatic recovery. See `FIRESTORE_STORAGE.md`.
+
+Rules testing/deployment and index/TTL deployment remain blocked by the available identity's permissions. No rules, index or TTL changes were deployed. The Firebase console signed-in account also requests project-owner management access. This supersedes the browser-only-report-storage blocker above, but does not remove the queue, permissions, payment or other launch blockers.
+
+## Deployment update — 14 October 2026
+
+The named database uses Enterprise edition in Native mode, in europe-west1. All 21 Firebase Rules API tests passed; the protected-field/report security rules were published and read back successfully. Two minimal Enterprise indexes (history and temporary-job expiry) were built and verified READY. A post-deployment live test confirmed storage, pagination, account isolation and expired-job cleanup. All temporary fixtures were removed. Managed TTL is unavailable while billing is disabled; the app now performs a bounded indexed cleanup at startup and daily, retaining saved reports. No billing plan was changed. This supersedes the permission/index deployment blocker in the preceding update. Durable worker execution and the remaining payment/launch checks are still required.
+
+Temporary Firebase Rules Admin and Cloud Datastore Index Admin roles were removed after deployment; original runtime roles were preserved and verified in IAM.
+
+## Stripe connection update — 14 October 2026
+
+Stripe test credentials are valid, local webhook forwarding is running, and the signing secret is stored privately. Local payment simulation has been replaced by Stripe sandbox checkout. Test billing data is isolated from live customer/entitlement records. Test catalog and portal configuration passed against Stripe; signed webhook acceptance and invalid-signature rejection passed. Sandbox API checks confirmed all three GBP prices, same-checkout reuse, replacement of an abandoned Pro checkout when Agency is selected, unpaid access denial and cross-account session rejection. Temporary test identities/order records were removed and unpaid sessions expired. No real payments were made. Full card checkout/delivery, renewal, plan-change, cancellation, refund/dispute and live deployment checks remain required. This supersedes the earlier missing-test-key setup blocker, not the end-to-end payment launch blocker.
+
+## PDF/data review — 14 October 2026
+
+The supplied 21 High View Close report exposed a domestic-only EPC lookup. The exact address is present in the non-domestic register; its certificate UPRN also resolves the combined-premises Ofcom broadband/mobile record. Generation now checks the non-domestic register when domestic search has no exact result. Certificate selection requires the requested premises instead of silently choosing a neighbour or the only postcode result. Non-domestic asset scores, absent potential ratings and certificate expiry are labelled explicitly; no default energy band is invented. The verified commercial certificate used in this review expired on 6 January 2026.
+
+The VOA lookup still has no exact council-tax match; business rates may apply and must be verified. Radon, coal mining and ground stability remain unassessed where no official property-level integration is connected. An empty planning response is not proof that no applications or constraints exist.
+
+PDF export now waits for fonts/images, isolates its typography from the website, preserves A4 proportions, restores the hidden template even on errors, and rejects body/footer collisions or vertically overflowing pages instead of silently cropping them. The reviewed ten-page report and missing-data variant were exported through the shared production exporter. Reopening an older saved report does not refresh its dataset: regenerate it to obtain the new EPC/connectivity lookup. Further coverage testing remains necessary for other properties and unusually long source records.
+
+## Planning coverage and report wording — 15 October 2026
+
+Live checks found PlanIt initially returning HTTP 503, then responding successfully. At High View Close the connected sources returned 17 unique applications within 0.3 miles; none matched the standard property/same-street scope. A central London control returned four Planning Data constraints. These checks verify positive record flow and scope filtering, not comprehensive local-authority coverage or provider uptime.
+
+Planning source failures are now persisted as incomplete coverage, independently of successful empty results. Missing coordinates, malformed responses and bounded/truncated responses are identified. Search timestamps, scope and nearby records excluded by the street scope are retained in compact report metadata. The standard scope no longer treats a nearby application at the same coordinate as property-linked without an explicit property link. The PDF identifies its three-entry planning summary and refers to the full online list when more records exist.
+
+Online reports/PDFs distinguish no matching results, incomplete searches and specialist checks not included in the connected sources. Older saved reports without source-status metadata show coverage as unverified. Pricing/features explain that licensed radon, mining and ground-stability searches are not included. Summary instructions receive planning source status and must not infer clearance from missing data. Provider reliability and fuller authority coverage remain launch considerations; an unavailable application service must not be marketed as a completed planning-history search.

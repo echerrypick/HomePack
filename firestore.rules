@@ -55,10 +55,6 @@ service cloud.firestore {
       return request.resource.data.keys().hasAll(fields);
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
@@ -124,6 +120,11 @@ service cloud.firestore {
       // Only admins can delete users.
       allow delete: if isAdmin();
     }
+
+    // Reports and temporary job records are served only by the authenticated server.
+    // Admin SDK bypasses these rules; API paths are always scoped to the verified UID.
+    match /users/{userId}/reports/{document=**} { allow read, write: if false; }
+    match /users/{userId}/reportJobs/{jobId} { allow read, write: if false; }
 
     match /searchLogs/{logId} {
       // Only admins can read search logs.

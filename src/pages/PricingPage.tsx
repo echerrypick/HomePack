@@ -28,9 +28,9 @@ export default function PricingPage() {
     {
       id: "b2c",
       category: "consumer" as const,
-      badge: "Direct-to-Consumer (B2C)",
+      badge: "Retail",
       badgeColor: "bg-emerald-600 hover:bg-emerald-600 text-white",
-      title: "Pay-As-You-Go Report",
+      title: "Retail",
       price: PLANS.report.price,
       period: "/ property",
       description: "One property report and PDF download. Each different property requires a new £9.99 payment before generation.",
@@ -53,9 +53,9 @@ export default function PricingPage() {
     {
       id: "b2b_pro",
       category: "business" as const,
-      badge: "B2B Software Subscription",
+      badge: "Business membership",
       badgeColor: "bg-primary/10 text-primary",
-      title: "B2B Pro",
+      title: "Business",
       price: PLANS.subscription.price,
       period: "/ month",
       description: "Unlimited property reports for estate agents and mortgage brokers using the latest available source data.",
@@ -70,7 +70,7 @@ export default function PricingPage() {
         "Search History Log with instant re-download",
         "Latest available data, subject to source coverage"
       ],
-      buttonText: profile?.role === 'subscription' ? 'Current Active Plan' : profile?.stripeSubscriptionId ? 'Downgrade to B2B Pro (£49/mo)' : 'Subscribe to B2B Pro (£49/mo)',
+      buttonText: profile?.role === 'subscription' ? 'Current Active Plan' : profile?.stripeSubscriptionId ? 'Downgrade to Business (£49/mo)' : 'Subscribe to Business (£49/mo)',
       buttonAction: () => handleActivatePlan('subscription', 'business'),
       isCurrent: profile?.role === 'subscription',
       isPopular: true,
@@ -79,15 +79,15 @@ export default function PricingPage() {
     {
       id: "b2b_agency",
       category: "business" as const,
-      badge: "White-Labelling Enterprise",
+      badge: "Business Plus membership",
       badgeColor: "bg-primary/10 text-primary",
-      title: "Agency White-Label",
+      title: "Business Plus",
       price: PLANS.agency.price,
       period: "/ month",
       description: "Reports with your agency branding. Upload your agency logo, custom colour palette, and agent bio for client-ready presentation.",
       targetAudience: "Established estate agencies, brokerages, and property firms delivering branded reports to clients.",
       features: [
-        "Everything included in B2B Pro tier",
+        "Everything included in Business",
         "Custom agency logo on the PDF cover",
         "Custom Brand Colours (Primary & Accent palette match)",
         "Agent Bio, direct phone, email & website sign-off",
@@ -96,7 +96,7 @@ export default function PricingPage() {
         "Single account with saved agency branding",
         "Email support"
       ],
-      buttonText: profile?.role === 'agency' ? 'Current Active Plan' : profile?.stripeSubscriptionId ? 'Upgrade to White-Label (£79/mo)' : 'Activate White-Label (£79/mo)',
+      buttonText: profile?.role === 'agency' ? 'Current Active Plan' : profile?.stripeSubscriptionId ? 'Upgrade to Business Plus (£79/mo)' : 'Choose Business Plus (£79/mo)',
       buttonAction: () => handleActivatePlan('agency', 'business'),
       isCurrent: profile?.role === 'agency',
       isPopular: false,
@@ -121,7 +121,7 @@ export default function PricingPage() {
             Clear, Transparent Property Intelligence
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed">
-            Whether you need a single deep-dive due diligence report on your dream home or a white-labelled SaaS subscription for your agency, we have the right tier for you.
+            Choose Retail for a one-off property report, Business for unlimited reports, or Business Plus to add your company branding.
           </p>
 
           {/* Filter Pills */}
@@ -142,7 +142,7 @@ export default function PricingPage() {
                 filterType === 'consumer' ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Regular Customers (B2C)
+              Retail
             </button>
             <button
               onClick={() => setFilterType('business')}
@@ -151,11 +151,12 @@ export default function PricingPage() {
                 filterType === 'business' ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Businesses & Agents (B2B)
+              Business
             </button>
           </div>
         </PageHero>
 
+        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Reports bring together available public-source records. Coverage varies by property and provider; incomplete checks are identified. Licensed radon, mining and ground-stability searches are not included.</p>
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-10 max-w-7xl mx-auto pt-8 pb-12 items-stretch">
           {filteredPlans.map((plan, index) => {
@@ -265,8 +266,8 @@ export default function PricingPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Badge className="bg-primary/10 text-primary font-semibold">White-Label Feature</Badge>
-                <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">£79/month SaaS</span>
+                <Badge className="bg-primary/10 text-primary font-semibold">Company branding</Badge>
+                <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">Business Plus · £79/month</span>
               </div>
               <h3 className="text-xl font-bold font-sans text-primary dark:text-foreground">
                 Present UK Property HomePack Reports in your agency's branding
@@ -284,7 +285,7 @@ export default function PricingPage() {
                 onClick={() => handleActivatePlan('agency', 'business')}
                 disabled={profile?.role === 'agency'}
               >
-                {profile?.role === 'agency' ? 'Active' : 'Upgrade to White-Label'}
+                {profile?.role === 'agency' ? 'Active' : 'Upgrade to Business Plus'}
               </Button>
             </div>
           </div>

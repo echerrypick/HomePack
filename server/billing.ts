@@ -8,13 +8,21 @@ import config from '../firebase-applet-config.json';
 import { PLANS, propertyKey, validAddress, hasPropertyAccess, hasBusinessAccess, hasDevelopmentBusinessAccess, type PaidPlan } from '../src/lib/plans';
 import { getBillingMode } from './billing-mode';
 import { subscriptionPlan } from './subscription-plan';
+import { stripeTestMode, billingCollections, mergeBillingProfile } from './billing-environment';
 
-function database() {
+export function database() {
   const app = getApps()[0] || initializeApp({
     projectId: config.projectId,
     credential: process.env.FIREBASE_SERVICE_ACCOUNT_JSON ? cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)) : applicationDefault(),
   });
   return getFirestore(app, config.firestoreDatabaseId || '(default)');
+}
+function billingUser(uid: string) { return database().collection(billingCollections().users).doc(uid); }
+function billingOrder(id: string) { return database().collection(billingCollections().orders).doc(id); }
+async function billingProfile(uid: string) {
+  const base = (await database().doc(`users/${uid}`).get()).data();
+  if (!stripeTestMode()) return base;
+  return mergeBillingProfile(base, (await billingUser(uid).get()).data(), true);
 }
 function stripe() {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET || !process.env.APP_URL) {
@@ -80,7 +88,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 export async function requireProperty(req: Request, res: Response, next: NextFunction) {
   if (!validAddress(req.body)) return res.status(400).json({ error: 'Enter a complete, valid property address.' });
   try {
-    const profile = (await database().doc(`users/${res.locals.uid}`).get()).data();
+    const profile = await billingProfile(res.locals.uid);
     const allowed = hasPropertyAccess(profile, req.body, Date.now(), getBillingMode().developmentSimulation);
     if (!allowed) return res.status(402).json({ error: 'Payment of £9.99 is required for this property.', paymentRequired: true });
     res.locals.profile = profile;
@@ -95,7 +103,7 @@ export async function requireProperty(req: Request, res: Response, next: NextFun
 
 export async function requireBusiness(_req: Request, res: Response, next: NextFunction) {
   try {
-    const profile = (await database().doc(`users/${res.locals.uid}`).get()).data();
+    const profile = await billingProfile(res.locals.uid);
     if (hasBusinessAccess(profile) || (getBillingMode().developmentSimulation && hasDevelopmentBusinessAccess(profile))) return next();
     res.status(403).json({ error: 'An active business subscription is required.' });
   } catch { res.status(503).json({ error: 'Unable to verify your subscription.' }); }
@@ -108,7 +116,7 @@ async function syncSubscription(id: string) {
   const price = subscription.items.data[0]?.price;
   const plan = price && subscriptionPlan(price, subscription.metadata.plan);
   if (!uid || !plan || subscription.items.data.length !== 1) throw new Error('Unrecognised subscription price.');
-  const ref = database().doc(`users/${uid}`);
+  const ref = billingUser(uid);
   await database().runTransaction(async tx => {
     const profile = (await tx.get(ref)).data();
     if (profile?.stripeSubscriptionId && profile.stripeSubscriptionId !== id && (profile.subscriptionCreatedAt || 0) >= subscription.created) return;
@@ -133,14 +141,14 @@ async function fulfil(sessionId: string, expectedUid?: string) {
   if (!uid || (expectedUid && uid !== expectedUid)) throw new Error('Checkout does not belong to this account.');
   if (session.status !== 'complete' || session.payment_status !== 'paid') return { paid: false };
   if (plan === 'report') {
-    const orderRef = database().doc(`checkoutOrders/${orderId}`);
+    const orderRef = billingOrder(orderId);
     let address: any;
     await database().runTransaction(async tx => {
       const order = (await tx.get(orderRef)).data();
       if (!order || order.uid !== uid || order.sessionId !== session.id || session.amount_total !== PLANS.report.amount || session.currency !== 'gbp') throw new Error('Unable to verify this order.');
       address = order.address;
       if (order.paid) return;
-      tx.set(database().doc(`users/${uid}`), {
+      tx.set(billingUser(uid), {
         purchasedPropertyKeys: FieldValue.arrayUnion(propertyKey(address)),
         purchasedReports: FieldValue.arrayUnion(`${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`),
         ...(session.customer ? { stripeCustomerId: typeof session.customer === 'string' ? session.customer : session.customer.id } : {}),
@@ -154,7 +162,7 @@ async function fulfil(sessionId: string, expectedUid?: string) {
   const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
   if (!subscriptionId) throw new Error('Subscription was not found.');
   await syncSubscription(subscriptionId);
-  if (orderId) await database().doc(`checkoutOrders/${orderId}`).set({ paid: true }, { merge: true });
+  if (orderId) await billingOrder(orderId).set({ paid: true }, { merge: true });
   return { paid: true, plan };
 }
 
@@ -166,6 +174,7 @@ export function registerPaymentWebhook(app: express.Express) {
     try {
       event = stripe().webhooks.constructEvent(req.body, req.headers['stripe-signature'] as string, process.env.STRIPE_WEBHOOK_SECRET!);
     } catch { return res.status(400).json({ error: 'Invalid payment signature.' }); }
+    if (event.livemode !== !stripeTestMode()) return res.status(400).json({ error: 'Payment environment mismatch.' });
     try {
       if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) await fulfil((event.data.object as Stripe.Checkout.Session).id);
       if (['customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type)) await syncSubscription((event.data.object as Stripe.Subscription).id);
@@ -181,13 +190,23 @@ export function registerBillingRoutes(app: express.Express) {
       enabled: mode.enabled,
       available: mode.paymentsAvailable,
       developmentSimulation: mode.developmentSimulation,
+      testMode: stripeTestMode(),
     });
+  });
+  app.get('/api/billing/profile', authenticate, async (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!stripeTestMode()) return res.json({ testMode: false, profile: null });
+    try {
+      const profile = await billingProfile(res.locals.uid);
+      const fields = ['role', 'accountType', 'purchasedPropertyKeys', 'purchasedReports', 'stripeCustomerId', 'stripeSubscriptionId', 'subscriptionStatus', 'subscriptionExpiresAt', 'subscriptionCancelAtPeriodEnd', 'subscriptionPlan'];
+      res.json({ testMode: true, profile: Object.fromEntries(fields.filter(field => profile?.[field] !== undefined).map(field => [field, profile[field]])) });
+    } catch { res.status(503).json({ error: 'Unable to load test membership status.' }); }
   });
   app.post('/api/billing/access', authenticate, requireProperty, (_req, res) => res.json({ allowed: true }));
   app.post('/api/profile/report-settings', authenticate, async (req, res) => {
     try {
       const uid = res.locals.uid as string;
-      const profile = (await database().doc(`users/${uid}`).get()).data();
+      const profile = await billingProfile(uid);
       const businessAllowed = hasBusinessAccess(profile) || (
         getBillingMode().developmentSimulation && hasDevelopmentBusinessAccess(profile)
       );
@@ -208,7 +227,7 @@ export function registerBillingRoutes(app: express.Express) {
       const plan = req.body.plan as PaidPlan;
       if (!Object.hasOwn(PLANS, plan) || (plan === 'report' && !validAddress(req.body.address))) return res.status(400).json({ error: 'Select a valid plan and property.' });
       const uid = res.locals.uid as string;
-      const profile = (await database().doc(`users/${uid}`).get()).data();
+      const profile = await billingProfile(uid);
 
       if (mode.developmentSimulation) {
         const simulatedSessionId = `dev_${randomUUID()}`;
@@ -255,11 +274,15 @@ export function registerBillingRoutes(app: express.Express) {
       }
       if (plan === 'report' && profile?.purchasedPropertyKeys?.includes(propertyKey(req.body.address))) return res.json({ alreadyPurchased: true });
       const orderId = createHash('sha256').update(`${uid}:${plan === 'report' ? 'report' : 'membership'}:${plan === 'report' ? propertyKey(req.body.address) : 'membership'}`).digest('hex');
-      const ref = database().doc(`checkoutOrders/${orderId}`);
+      const ref = billingOrder(orderId);
       const previous = (await ref.get()).data();
       if (previous?.sessionId && !previous.paid) {
         const pending = await client.checkout.sessions.retrieve(previous.sessionId);
-        if (pending.status === 'open') return res.json({ url: pending.url });
+        if (pending.status === 'open') {
+          if (pending.metadata?.plan === plan) return res.json({ url: pending.url });
+          // An abandoned checkout for another membership must not charge the old price.
+          await client.checkout.sessions.expire(pending.id);
+        }
         if (pending.status === 'complete') return res.json({ url: `${process.env.APP_URL}/payment?session_id=${pending.id}` });
       }
       const attempt = await database().runTransaction(async tx => {
@@ -291,7 +314,7 @@ export function registerBillingRoutes(app: express.Express) {
   app.post('/api/billing/portal', authenticate, async (_req, res) => {
     if (!getBillingMode().enabled) return res.status(503).json({ error: 'Payments are disabled for local development.' });
     try {
-      const profile = (await database().doc(`users/${res.locals.uid}`).get()).data();
+      const profile = await billingProfile(res.locals.uid);
       if (!profile?.stripeCustomerId) return res.status(400).json({ error: 'No billing account is available yet.' });
       const session = await portalSession(stripe(), profile.stripeCustomerId);
       res.json({ url: session.url });

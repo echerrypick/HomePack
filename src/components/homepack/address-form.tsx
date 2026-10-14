@@ -42,7 +42,7 @@ export function AddressForm({ onAddressSubmit, isLoading, error }: AddressFormPr
       <CardHeader>
         <CardTitle className="text-2xl font-bold tracking-tight">Create your Property Info Pack</CardTitle>
         <CardDescription>
-          Enter the complete property address. Pay-as-you-go reports cost £9.99 per property; payment is required before generation for each new property.
+          Enter the complete property address. Retail reports cost £9.99 per property; payment is required before generation for each new property.
         </CardDescription>
       </CardHeader>
       <CardContent>

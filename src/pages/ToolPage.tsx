@@ -8,7 +8,7 @@ import { Address, ReportResult } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHomePackJob } from '@/contexts/HomePackJobContext';
 import { db, handleFirestoreError, OperationType } from '@/firebase';
-import { doc, updateDoc, arrayUnion, increment } from 'firebase/firestore';
+import { doc, updateDoc, increment } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,7 @@ type Step = 'address' | 'report';
 
 export default function ToolPage() {
   const { user, profile, loading } = useAuth();
-  const { activeJob, openModal, startJob, recentReports, loadReport, dismissActiveJob } = useHomePackJob();
+  const { activeJob, openModal, startJob, recentReports, loadReport, openSavedReport, dismissActiveJob } = useHomePackJob();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -56,7 +56,7 @@ export default function ToolPage() {
 
   // When activeJob completes, if the user is on ToolPage, automatically show the report
   useEffect(() => {
-    if (location.state?.startNewHomePack) return;
+    if (location.state?.startNewHomePack || location.state?.report) return;
     if (activeJob?.status === 'completed' && activeJob.result) {
       setReportData(activeJob.result);
       setSelectedAddress(activeJob.address);
@@ -97,19 +97,9 @@ export default function ToolPage() {
       await startJob(address);
 
       // Update user search count and history in Firestore
-      const addressStr = `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`;
-      const sanitizedAddress = addressStr.replace(/\./g, '_');
       const path = `users/${user.uid}`;
       try {
-        await updateDoc(doc(db, 'users', user.uid), {
-          searchCount: increment(1),
-          searchedAddresses: arrayUnion(addressStr),
-          searchHistory: arrayUnion({
-            address: addressStr,
-            timestamp: new Date().toISOString()
-          }),
-          [`propertyReportCounts.${sanitizedAddress}`]: increment(1)
-        });
+        await updateDoc(doc(db, 'users', user.uid), { searchCount: increment(1) });
       } catch (firestoreErr) {
         handleFirestoreError(firestoreErr, OperationType.UPDATE, path);
       }
@@ -168,7 +158,7 @@ export default function ToolPage() {
           <DialogHeader>
             <DialogTitle>Payment required for this property</DialogTitle>
             <DialogDescription>
-              Pay-as-you-go access covers one property. A separate £9.99 payment is required before generating a report for a different address.
+              Retail access covers one property. A separate £9.99 payment is required before generating a report for a different address.
             </DialogDescription>
           </DialogHeader>
           {paymentPromptAddress && (
@@ -241,10 +231,7 @@ export default function ToolPage() {
                       <div
                         key={item.id}
                         onClick={() => {
-                          setSelectedAddress(item.address);
-                          setReportData(item.result);
-                          setStep('report');
-                          setIsFromHistory(false);
+                          void openSavedReport(item);
                         }}
                         className="group flex items-center justify-between p-3.5 rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-md cursor-pointer transition-all"
                       >

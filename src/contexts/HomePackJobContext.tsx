@@ -5,9 +5,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { authenticatedFetch } from '@/lib/billing-client';
 import { useAuth } from './AuthContext';
 
-const ACTIVE_JOB_KEY = 'homepack_active_job_id';
-const RECENT_REPORTS_KEY = 'homepack_recent_reports';
-
 function unwrapLinkedDataValues(value: any): any {
   if (Array.isArray(value)) return value.map(unwrapLinkedDataValues);
   if (!value || typeof value !== 'object') return value;
@@ -27,13 +24,21 @@ interface SavedReportSummary {
   addressString: string;
   address: Address;
   completedAt: number;
-  result: ReportResult;
+  result?: ReportResult;
+  hash?: string;
+  planningScope?: 'street' | 'radius';
 }
 
 interface HomePackJobContextType {
   activeJob: HomePackJob | null;
   isModalOpen: boolean;
   recentReports: SavedReportSummary[];
+  historyLoading: boolean;
+  historyError: string | null;
+  hasMoreReports: boolean;
+  refreshReports: () => Promise<void>;
+  loadMoreReports: () => Promise<void>;
+  openSavedReport: (report: SavedReportSummary, fromHistory?: boolean) => Promise<void>;
   startJob: (address: Address) => Promise<string>;
   openModal: () => void;
   closeModal: () => void;
@@ -76,28 +81,59 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Helper to persist recent reports
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<{ at: number; id: string } | null>(null);
+  const cursorRef = useRef(nextCursor);
+  cursorRef.current = nextCursor;
+  const historyRequest = useRef(false);
+  const historyLoaded = useRef(false);
+  const pollDelay = useRef(2000);
+  const reportCache = useRef(new Map<string, { hash?: string; result: ReportResult }>());
+  const reportRequests = useRef(new Map<string, Promise<any>>());
+  const fetchReports = useCallback(async (more = false) => {
+    if (!user || historyRequest.current) return;
+    historyRequest.current = true;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const cursor = more ? cursorRef.current : null;
+      const query = cursor ? `?afterAt=${cursor.at}&afterId=${cursor.id}` : '';
+      const response = await authenticatedFetch(`/api/reports${query}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to load report history.');
+      setRecentReports(previous => {
+        const cloudAddresses = new Set(data.reports.map((item: SavedReportSummary) => item.addressString.toLowerCase()));
+        const local = (more ? previous : previous.filter(item => item.result)).filter(item => !item.result || !cloudAddresses.has(item.addressString.toLowerCase()));
+        const combined = [...data.reports, ...local];
+        const seen = new Set<string>();
+        return combined.sort((a, b) => b.completedAt - a.completedAt).filter(item => {
+          const key = item.id;
+          if (seen.has(key)) return false;
+          seen.add(key); return true;
+        });
+      });
+      setNextCursor(data.nextCursor);
+      historyLoaded.current = true;
+    } catch (error: any) { setHistoryError(error.message); }
+    finally { historyRequest.current = false; setHistoryLoading(false); }
+  }, [user?.uid]);
+  const refreshReports = useCallback(() => fetchReports(), [fetchReports]);
+  const loadMoreReports = useCallback(() => fetchReports(true), [fetchReports]);
+  useEffect(() => {
+    if (!historyLoaded.current && ['/tool', '/profile', '/history'].includes(location.pathname)) void refreshReports();
+  }, [refreshReports, location.pathname]);
+
   const saveRecentReport = useCallback((job: HomePackJob) => {
     if (!job.result) return;
-    const addressStr = `${job.address.houseNumber} ${job.address.street}, ${job.address.town}, ${job.address.postcode}`.trim();
-    const entry: SavedReportSummary = {
-      id: job.id,
-      addressString: addressStr,
-      address: job.address,
-      completedAt: job.completedAt || Date.now(),
-      result: job.result
-    };
-
-    setRecentReports(prev => {
-      const filtered = prev.filter(p => p.id !== job.id && p.addressString !== addressStr);
-      const updated = [entry, ...filtered].slice(0, 20);
-      try {
-        localStorage.setItem(RECENT_REPORTS_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to save to localStorage:', e);
-      }
-      return updated;
-    });
+    const id = (job as any).reportId;
+    const hash = (job as any).reportHash;
+    if (id) {
+      reportCache.current.set(id, { hash, result: job.result });
+      while (reportCache.current.size > 5) reportCache.current.delete(reportCache.current.keys().next().value!);
+    }
+    const entry: SavedReportSummary = { id: id || job.id, hash, planningScope: (job as any).planningScope, addressString: `${job.address.houseNumber} ${job.address.street}, ${job.address.town}, ${job.address.postcode}`.trim(), address: job.address, completedAt: job.completedAt || Date.now(), ...(!id ? { result: job.result } : {}) };
+    setRecentReports(previous => [entry, ...previous.filter(item => item.id !== entry.id && (!item.result || item.addressString !== entry.addressString))]);
   }, []);
 
   // Poll a job by ID
@@ -114,13 +150,14 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
       }
       const data = unwrapLinkedDataValues(await res.json());
       const updatedJob: HomePackJob = data.job;
+      pollDelay.current = data.pollAfterMs || 2000;
 
       setActiveJob(updatedJob);
 
       if (updatedJob.status === 'completed') {
         localStorage.removeItem(ACTIVE_JOB_KEY);
         if (pollTimerRef.current) {
-          clearInterval(pollTimerRef.current);
+          clearTimeout(pollTimerRef.current);
           pollTimerRef.current = null;
         }
 
@@ -142,7 +179,7 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
       } else if (updatedJob.status === 'failed') {
         localStorage.removeItem(ACTIVE_JOB_KEY);
         if (pollTimerRef.current) {
-          clearInterval(pollTimerRef.current);
+          clearTimeout(pollTimerRef.current);
           pollTimerRef.current = null;
         }
         toast.error(`Property report generation failed`, {
@@ -162,24 +199,26 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
     }
   }, [pollJob]);
 
-  // Setup interval polling when activeJob is processing
+  // Sequential polling avoids overlapping requests; hidden tabs and database fallback poll less often.
   useEffect(() => {
     if (activeJob && activeJob.status === 'processing') {
       if (!pollTimerRef.current) {
-        pollTimerRef.current = setInterval(() => {
-          pollJob(activeJob.id);
-        }, 1200);
+        const tick = async () => {
+          await pollJob(activeJob.id);
+          if (pollTimerRef.current) pollTimerRef.current = setTimeout(tick, document.hidden ? 30_000 : pollDelay.current);
+        };
+        pollTimerRef.current = setTimeout(tick, pollDelay.current);
       }
     } else {
       if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
+        clearTimeout(pollTimerRef.current);
         pollTimerRef.current = null;
       }
     }
 
     return () => {
       if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
+        clearTimeout(pollTimerRef.current);
         pollTimerRef.current = null;
       }
     };
@@ -215,7 +254,29 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
   };
 
   const loadReport = (report: ReportResult, address: Address, fromHistory: boolean = false) => {
+    setIsModalOpen(false);
     navigate('/tool', { state: { report: unwrapLinkedDataValues(report), address, fromHistory } });
+  };
+
+  const openSavedReport = async (entry: SavedReportSummary, fromHistory = false) => {
+    try {
+      if (entry.result) { loadReport(entry.result, entry.address, fromHistory); return; }
+      const cached = reportCache.current.get(entry.id);
+      if (cached && cached.hash === entry.hash) { loadReport(cached.result, entry.address, fromHistory); return; }
+      let request = reportRequests.current.get(entry.id);
+      if (!request) {
+        request = authenticatedFetch(`/api/reports/${entry.id}`).then(async response => {
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Unable to open report.');
+          return data;
+        }).finally(() => reportRequests.current.delete(entry.id));
+        reportRequests.current.set(entry.id, request);
+      }
+      const data = await request;
+      reportCache.current.set(entry.id, { hash: data.hash, result: data.result });
+      while (reportCache.current.size > 5) reportCache.current.delete(reportCache.current.keys().next().value!);
+      loadReport(data.result, data.address, fromHistory);
+    } catch (error: any) { toast.error(error.message || 'Unable to open saved report. Please retry.'); }
   };
 
   return (
@@ -224,6 +285,7 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
         activeJob,
         isModalOpen,
         recentReports,
+        historyLoading, historyError, hasMoreReports: Boolean(nextCursor), refreshReports, loadMoreReports, openSavedReport,
         startJob,
         openModal,
         closeModal,

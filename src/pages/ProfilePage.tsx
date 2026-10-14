@@ -43,6 +43,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { billingRequest } from '@/lib/billing-client';
 import { PLANS, membershipAccountType } from '@/lib/plans';
 import './profile.css';
+import { useHomePackJob } from '@/contexts/HomePackJobContext';
 
 const ROLE_DISPLAY_NAMES: Record<string, { label: string; color: string; desc: string }> = {
   admin: {
@@ -51,17 +52,17 @@ const ROLE_DISPLAY_NAMES: Record<string, { label: string; color: string; desc: s
     desc: 'Unrestricted administrative access across all system tools and user accounts.'
   },
   agency: {
-    label: 'Agency White-Label (£79/mo)',
+    label: 'Business Plus (£79/mo)',
     color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-900/50',
-    desc: 'Full enterprise tier with unlimited searches, custom agency logo & brand colours, and agent bio on all reports.'
+    desc: 'Unlimited reports with your company logo, colours and contact details.'
   },
   subscription: {
-    label: 'B2B Pro Subscriber (£49/mo)',
+    label: 'Business (£49/mo)',
     color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50',
     desc: 'Professional tier with unlimited property searches, PDF exports, and an optional all-planning search within 0.3 miles.'
   },
   free: {
-    label: 'Pay-As-You-Go Account',
+    label: 'Retail account',
     color: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800',
     desc: '£9.99 for one property report. Each new property requires payment before generation.'
   }
@@ -79,6 +80,7 @@ const SUGGESTED_ROLES = [
 ];
 
 export default function ProfilePage() {
+  const { recentReports, openSavedReport, historyLoading, historyError } = useHomePackJob();
   const navigate = useNavigate();
   const { user, profile, loading } = useAuth();
   const [isResetting, setIsResetting] = useState(false);
@@ -251,6 +253,7 @@ export default function ProfilePage() {
 
   const currentAccountType = membershipAccountType(profile, Date.now(), developmentSimulation);
   const hasActiveBusinessPlan = currentAccountType === 'business';
+  const accountPlanName = profile?.role === 'admin' ? 'Administrator' : hasActiveBusinessPlan ? (profile?.role === 'agency' ? 'Business Plus' : 'Business') : 'Retail';
   const roleInfo = ROLE_DISPLAY_NAMES[hasActiveBusinessPlan ? profile?.role || 'free' : 'free'] || ROLE_DISPLAY_NAMES.free;
   const memberSince = profile?.createdAt 
     ? new Date(profile.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -270,7 +273,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="site-page-heading text-2xl sm:text-3xl font-bold tracking-tight">Your Profile & Account</h1>
                 <Badge variant="outline" className={currentAccountType === 'business' ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-emerald-50 text-emerald-700 border-emerald-300'}>
-                  {currentAccountType === 'business' ? 'Business / B2B' : 'Regular Customer / B2C'}
+                  {accountPlanName}
                 </Badge>
 
               </div>
@@ -317,8 +320,8 @@ export default function ProfilePage() {
 
         <dl className="profile-stats" aria-label="Account activity summary">
           {[
-            {icon: User, label: 'Account type', value: currentAccountType === 'business' ? 'Business / Professional (B2B)' : 'Regular Customer (B2C)'},
-            {icon: FileText, label: 'Properties purchased', value: `${profile?.purchasedPropertyKeys?.length || 0} properties`},
+            {icon: User, label: 'Account type', value: `${accountPlanName} account`},
+            {icon: FileText, label: 'Reports purchased', value: `${profile?.purchasedPropertyKeys?.length || 0} reports`},
             {icon: Search, label: 'Searches performed', value: `${profile?.searchCount ?? 0} searches`},
             {icon: Calendar, label: 'Member since', value: memberSince},
           ].map(({icon: Icon, label, value}) => <div key={label}><span className="profile-round-icon"><Icon aria-hidden="true" /></span><div><dt>{label}</dt><dd>{value}</dd></div></div>)}
@@ -332,7 +335,7 @@ export default function ProfilePage() {
                 <div>
                   <CardTitle className="text-lg font-bold flex items-center gap-2">
                     <Layers className="h-5 w-5 text-primary" />
-                    Account Classification & Features
+                    Your plan
                   </CardTitle>
                   <CardDescription className="mt-1">
                     Your account type follows your membership. Business access begins after verified payment.
@@ -340,19 +343,19 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="profile-membership-actions">
-                  <span className={`profile-membership-status ${hasActiveBusinessPlan ? 'profile-membership-business' : ''}`}><span className="profile-round-icon">{hasActiveBusinessPlan ? <Building2 /> : <User />}</span><span><strong>{hasActiveBusinessPlan ? 'Business / Professional (B2B)' : 'Regular Customer (B2C)'}</strong><small>{hasActiveBusinessPlan ? 'Active membership' : 'One-off property reports'}</small></span></span>
-                  {profile?.role !== 'admin' && <Button asChild variant={hasActiveBusinessPlan ? 'outline' : 'default'}><Link to="/pricing">{hasActiveBusinessPlan ? 'Change membership' : 'Upgrade to a business membership'}<ArrowRight className="h-4 w-4" /></Link></Button>}
+                  <span className={`profile-membership-status ${hasActiveBusinessPlan ? 'profile-membership-business' : ''}`}><span className="profile-round-icon">{hasActiveBusinessPlan ? <Building2 /> : <User />}</span><span><strong>{accountPlanName}</strong><small>{hasActiveBusinessPlan ? 'Active membership' : 'One-off property reports'}</small></span></span>
+                  {profile?.role !== 'admin' && <Button asChild variant={hasActiveBusinessPlan ? 'outline' : 'default'}><Link to="/pricing">{hasActiveBusinessPlan ? 'Change membership' : 'Compare business plans'}<ArrowRight className="h-4 w-4" /></Link></Button>}
                 </div>
               </div>
             </CardHeader>
 
             <CardContent className="pt-5 space-y-6">
-              {profile?.subscriptionCancelAtPeriodEnd && <p role="status" className="profile-cancellation-note">Your subscription ends on {new Date(profile.subscriptionExpiresAt || 0).toLocaleDateString('en-GB')}. No further renewals are scheduled. Business access continues through the paid period, then your account returns to pay-as-you-go.</p>}
+              {profile?.subscriptionCancelAtPeriodEnd && <p role="status" className="profile-cancellation-note">Your subscription ends on {new Date(profile.subscriptionExpiresAt || 0).toLocaleDateString('en-GB')}. No further renewals are scheduled. Business access continues through the paid period, then your account returns to Retail.</p>}
               {profile?.stripeCustomerId && <Button variant="outline" onClick={async () => {
                 try { window.location.assign((await billingRequest('/api/billing/portal', {})).url); }
                 catch (e: any) { toast.error(e.message); }
               }}>Manage billing and cancellation</Button>}
-              {hasActiveBusinessPlan && profile?.stripeCustomerId && !profile.subscriptionCancelAtPeriodEnd && <p className="text-xs text-muted-foreground">To return to pay-as-you-go, cancel your subscription through billing management. Business access continues until the paid period ends; purchased properties remain available.</p>}
+              {hasActiveBusinessPlan && profile?.stripeCustomerId && !profile.subscriptionCancelAtPeriodEnd && <p className="text-xs text-muted-foreground">To return to Retail, cancel your subscription through billing management. Business access continues until the paid period ends; purchased properties remain available.</p>}
               {currentAccountType === 'consumer' ? (
                 /* CONSUMER / B2C ATTRIBUTES */
                 <div className="space-y-4">
@@ -361,18 +364,18 @@ export default function ProfilePage() {
                       <span className="profile-home-icon"><Home aria-hidden="true" /></span>
                       <div className="profile-consumer-copy space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge className="bg-emerald-600 text-white font-semibold text-xs">Direct-to-Consumer (B2C)</Badge>
-                          <span className="text-xs text-muted-foreground font-medium">Pay-as-you-go (£9.99/report)</span>
+                          <Badge className="bg-emerald-600 text-white font-semibold text-xs">Retail</Badge>
+                          <span className="text-xs text-muted-foreground font-medium">£9.99 per report · No subscription</span>
                         </div>
-                        <h4 className="font-semibold text-foreground text-base">Individual Homebuyer & Seller Account</h4>
+                        <h4 className="font-semibold text-foreground text-base">Retail account</h4>
                         <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                          Pay £9.99 for a report on one property with no subscription. Each different property requires payment before generation. Purchased property access is saved to your account.
+                          Pay £9.99 for a report on one property with no subscription. Each different property requires payment before generation. Purchased report access is saved to your account.
                         </p>
                       </div>
                       <Button asChild size="sm" className="profile-new-search shrink-0">
                         <Link to="/tool">
                           <Search className="mr-1.5 h-3.5 w-3.5" />
-                          New Search
+                          Create a property report
                         </Link>
                       </Button>
                     </div>
@@ -383,9 +386,9 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-emerald-600" />
-                        <h4 className="font-semibold text-sm">Purchased properties ({profile?.purchasedPropertyKeys?.length || 0})</h4>
+                        <h4 className="font-semibold text-sm">Purchased reports ({profile?.purchasedPropertyKeys?.length || 0})</h4>
                       </div>
-                      <span className="text-xs text-muted-foreground">Purchased property access</span>
+                      <span className="text-xs text-muted-foreground">Purchased report access</span>
                     </div>
 
                     {(profile?.purchasedPropertyKeys || []).length > 0 ? (
@@ -420,12 +423,12 @@ export default function ProfilePage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <Badge className="bg-blue-600 text-white font-semibold text-xs">B2B Professional Tier</Badge>
+                          <Badge className="bg-blue-600 text-white font-semibold text-xs">Business membership</Badge>
                           <Badge variant="outline" className="text-xs">{roleInfo.label}</Badge>
                         </div>
-                        <h4 className="font-semibold text-foreground text-base">Estate Agent, Broker & Surveyor SaaS</h4>
+                        <h4 className="font-semibold text-foreground text-base">Property reports for your business</h4>
                         <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                          Package unlimited due diligence searches into your firm's daily operations. Upgrade to Enterprise White-Label (£79/mo) to stamp your custom agency logo, branding, and agent bio on all client reports.
+                          Create unlimited property reports for your professional work. Business Plus adds your company logo, colours and contact details to client reports.
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0">
@@ -436,7 +439,7 @@ export default function ProfilePage() {
                           disabled={profile?.role === 'subscription'}
                           className="text-xs h-8"
                         >
-                          {profile?.role === 'subscription' ? '✓ Pro Active' : 'B2B Pro (£49/mo)'}
+                          {profile?.role === 'subscription' ? '✓ Business active' : 'Business (£49/mo)'}
                         </Button>
                         <Button 
                           size="sm" 
@@ -444,7 +447,7 @@ export default function ProfilePage() {
                           onClick={() => handleSwitchSubscriptionPlan('agency')}
                           disabled={profile?.role === 'agency'}
                         >
-                          {profile?.role === 'agency' ? '✓ White-Label Active' : 'White-Label (£79/mo)'}
+                          {profile?.role === 'agency' ? '✓ Business Plus active' : 'Business Plus (£79/mo)'}
                         </Button>
                       </div>
                     </div>
@@ -456,7 +459,7 @@ export default function ProfilePage() {
                       <div className="flex items-center gap-2">
                         <Palette className="h-5 w-5 text-purple-600" />
                         <div>
-                          <h4 className="font-semibold text-foreground text-sm">Agency White-Label Branding Suite</h4>
+                          <h4 className="font-semibold text-foreground text-sm">Business Plus Branding Suite</h4>
                           <p className="text-xs text-muted-foreground">Customise client-facing reports with your logo, colours, and direct contact details</p>
                         </div>
                       </div>
@@ -464,7 +467,7 @@ export default function ProfilePage() {
                         <Badge className="bg-purple-600 text-white text-xs">Active on Reports</Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">
-                          Included in White-Label (£79/mo)
+                          Included in Business Plus (£79/mo)
                         </Badge>
                       )}
                     </div>
@@ -706,7 +709,7 @@ export default function ProfilePage() {
                     <div className="pt-3 border-t border-purple-200 dark:border-purple-900/40 space-y-4 bg-purple-50/20 dark:bg-purple-950/10 p-4 rounded-xl">
                       <div className="flex items-center gap-2">
                         <Palette className="h-4 w-4 text-purple-600" />
-                        <span className="font-semibold text-sm text-foreground">B2B White-Label Report Customization</span>
+                        <span className="font-semibold text-sm text-foreground">Business Plus report branding</span>
                         <Badge className="bg-purple-600 text-white text-[10px]">Client PDF Branding</Badge>
                       </div>
 
@@ -1041,17 +1044,17 @@ export default function ProfilePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              {profile?.propertyReportCounts && Object.keys(profile.propertyReportCounts).length > 0 ? (
+              {recentReports.length > 0 ? (
                 <div className="space-y-3">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Recent Properties Generated
                   </Label>
                   <div className="grid gap-2">
-                    {Object.entries(profile.propertyReportCounts).slice(0, 5).map(([address, count]) => (
-                      <div key={address} className="flex justify-between items-center p-2.5 bg-muted/40 rounded-lg border border-border/60 text-sm">
-                        <span className="truncate mr-4 font-medium">{address.replace(/_/g, '.')}</span>
+                    {recentReports.slice(0, 5).map((report) => (
+                      <div key={report.id} className="flex justify-between items-center p-2.5 bg-muted/40 rounded-lg border border-border/60 text-sm">
+                        <span className="truncate mr-4 font-medium">{report.addressString}</span>
                         <Badge variant="secondary" className="shrink-0 font-normal text-xs">
-                          {count} {count === 1 ? 'report' : 'reports'}
+                          <button onClick={() => void openSavedReport(report, true)}>Open report</button>
                         </Badge>
                       </div>
                     ))}
@@ -1059,7 +1062,7 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground text-sm">
-                  No property reports generated yet.
+                  {historyLoading ? 'Loading saved reports…' : historyError || 'No property reports generated yet.'}
                 </div>
               )}
 

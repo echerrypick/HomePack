@@ -19,7 +19,7 @@ export default function FeaturesPage() {
           <FeatureCard icon={<Landmark className="h-8 w-8 text-primary" />} title="Council Tax" description="Available valuation bands and annual charges, with source and tax-year information." />
           <FeatureCard icon={<Search className="h-8 w-8 text-primary" />} title="Schools & Healthcare" description="Nearby schools and available inspection records, plus NHS provider information. Confirm school admissions and patient registration directly." />
           <FeatureCard icon={<Zap className="h-8 w-8 text-primary" />} title="Broadband & Mobile" description="Available broadband speed estimates and mobile coverage predictions. Actual availability and performance may differ." />
-          <FeatureCard icon={<Shield className="h-8 w-8 text-primary" />} title="Crime & Environment" description="Published Police.uk records and available radon and coal-mining information, with missing data clearly identified." />
+          <FeatureCard icon={<Shield className="h-8 w-8 text-primary" />} title="Crime & Environment" description="Published Police.uk records, available flood-risk findings and guidance on specialist radon, mining and ground-stability checks. Property-specific specialist searches are not included." />
           <FeatureCard 
             icon={<Landmark className="h-8 w-8 text-primary" />}
             title="Land Registry Integration"
@@ -38,7 +38,7 @@ export default function FeaturesPage() {
           <FeatureCard 
             icon={<ClipboardList className="h-8 w-8 text-primary" />}
             title="Planning History"
-            description="Track past planning applications, decisions, and references to see how a property has evolved over time."
+            description="Review matching applications from connected planning sources within the stated area and date ranges. Source coverage and incomplete searches are identified; this is not a complete local-authority planning history."
           />
           <FeatureCard 
             icon={<Search className="h-8 w-8 text-primary" />}
@@ -51,7 +51,7 @@ export default function FeaturesPage() {
             description="Upload property photos and get AI-generated condition reports to identify potential maintenance issues."
           />
         </div>
-        <p className="mt-10 text-muted-foreground">Reports use the latest available records, which may lag current conditions. Source coverage varies across the UK. AI photo observations are available to business subscribers and do not replace a professional survey. Agency White-Label adds custom report branding.</p>
+        <p className="mt-10 text-muted-foreground">Reports use the latest available records, which may lag current conditions. Source coverage varies across the UK. AI photo observations are available to business subscribers and do not replace a professional survey. Business Plus adds custom report branding.</p>
       </main>
       <Footer />
     </div>
