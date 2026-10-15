@@ -647,7 +647,11 @@ async function fetchLandRegistryData(houseNumberOrName: string, street: string, 
         "Accept": "application/sparql-results+json",
       },
       body: `query=${encodeURIComponent(sparqlQuery)}`,
-      signal: AbortSignal.timeout(6000),
+      // The public SPARQL service can be noticeably slower from hosted
+      // environments than it is during local development. Report generation
+      // is already asynchronous, so allow enough time for a valid response
+      // rather than silently presenting an empty price-history section.
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
@@ -730,12 +734,16 @@ async function fetchRecentStreetSales(
 
   if (!street) return [];
 
-  const locationPattern = town
-    ? `?addrURI lrcommon:town ?town .
-      VALUES ?town { "${town}" }`
-    : outwardCode
-      ? `OPTIONAL { ?addrURI lrcommon:town ?town . }
+  // Land Registry's `town` is commonly the postal town rather than the town
+  // entered by the customer (for example, Etwall addresses are recorded as
+  // Derby). Prefer the postcode district when it is available so valid sales
+  // on the requested street are not discarded by that naming difference.
+  const locationPattern = outwardCode
+    ? `OPTIONAL { ?addrURI lrcommon:town ?town . }
       FILTER(STRSTARTS(REPLACE(UCASE(STR(?postcode)), " ", ""), "${outwardCode}"))`
+    : town
+      ? `?addrURI lrcommon:town ?town .
+      VALUES ?town { "${town}" }`
       : '';
 
   const sparqlQuery = `
@@ -780,7 +788,7 @@ async function fetchRecentStreetSales(
         'Accept': 'application/sparql-results+json',
       },
       body: `query=${encodeURIComponent(sparqlQuery)}`,
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
