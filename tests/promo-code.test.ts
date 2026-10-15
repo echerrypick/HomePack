@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discountedReportAmount, generatePromoCode, isValidPromoCode, normalizePromoCode, promoCodeId } from '../server/promo-code';
+import { discountedReportAmount, generatePromoCode, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from '../server/promo-code';
 
 test('complimentary report codes normalize consistently and hash to one identifier', () => {
   assert.equal(normalizePromoCode(' ukhp-ab12-cd34 '), 'UKHP-AB12-CD34');
@@ -13,6 +13,15 @@ test('percentage codes calculate the payable report price in pence', () => {
   assert.equal(discountedReportAmount(999, 50), 500);
   assert.throws(() => discountedReportAmount(999, 0));
   assert.throws(() => discountedReportAmount(999, 100));
+});
+
+test('offer codes can target one or more products while free codes stay retail-only', () => {
+  assert.deepEqual(normalizePromoProducts(['subscription', 'agency', 'invalid'], 'discount'), ['subscription', 'agency']);
+  assert.deepEqual(normalizePromoProducts(['agency'], 'free'), ['report']);
+  assert.equal(promoAppliesTo(['subscription'], 'subscription'), true);
+  assert.equal(promoAppliesTo(['subscription'], 'agency'), false);
+  assert.equal(promoAppliesTo(undefined, 'report'), true);
+  assert.equal(promoAppliesTo(undefined, 'subscription'), false);
 });
 
 test('generated complimentary report codes are valid and unique', () => {

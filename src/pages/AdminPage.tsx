@@ -29,6 +29,15 @@ type PromoCodeRecord = {
   claimedByEmail?: string;
   reservedByEmail?: string;
   address?: string;
+  products?: PromoProduct[];
+  claimedProduct?: PromoProduct;
+};
+
+type PromoProduct = 'report' | 'subscription' | 'agency';
+const PROMO_PRODUCT_LABELS: Record<PromoProduct, string> = {
+  report: 'Retail report',
+  subscription: 'Business',
+  agency: 'Business Plus',
 };
 
 export default function AdminPage() {
@@ -42,6 +51,7 @@ export default function AdminPage() {
   const [discountPercent, setDiscountPercent] = useState('20');
   const [customCode, setCustomCode] = useState('');
   const [codeQuantity, setCodeQuantity] = useState('1');
+  const [promoProducts, setPromoProducts] = useState<PromoProduct[]>(['report']);
   const [promoTestMode, setPromoTestMode] = useState(false);
 
   const loadPromoCodes = async () => {
@@ -83,6 +93,7 @@ export default function AdminPage() {
         discountPercent: promoKind === 'discount' ? Number(discountPercent) : 100,
         code: customCode.trim() || undefined,
         quantity: customCode.trim() ? 1 : Number(codeQuantity),
+        products: promoProducts,
       });
       toast.success(`${result.codes.length} ${promoKind === 'free' ? 'free-report' : `${discountPercent}%-off`} code${result.codes.length === 1 ? '' : 's'} created`);
       setCustomCode('');
@@ -155,8 +166,8 @@ export default function AdminPage() {
           <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2"><TicketPercent className="h-5 w-5 text-primary" />Report offer codes</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">Create single-use codes for a free report or a percentage discount. Every code is tied to the property selected when it is claimed.</p>
+                <CardTitle className="flex items-center gap-2"><TicketPercent className="h-5 w-5 text-primary" />Offer codes</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Create single-use codes for selected products. Free codes unlock one Retail report; percentage codes can apply to Retail, Business, Business Plus, or any combination.</p>
               </div>
               {promoTestMode && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">Stripe sandbox codes</Badge>}
             </div>
@@ -165,7 +176,11 @@ export default function AdminPage() {
             <div className="grid gap-4 rounded-xl border bg-muted/20 p-4 md:grid-cols-5 md:items-end">
               <label className="space-y-1.5 text-sm font-medium">
                 Offer type
-                <Select value={promoKind} onValueChange={value => setPromoKind(value as 'free' | 'discount')}>
+                <Select value={promoKind} onValueChange={value => {
+                  const nextKind = value as 'free' | 'discount';
+                  setPromoKind(nextKind);
+                  if (nextKind === 'free') setPromoProducts(['report']);
+                }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="free">Free report</SelectItem>
@@ -185,7 +200,28 @@ export default function AdminPage() {
                 Quantity
                 <Input type="number" min="1" max="50" disabled={Boolean(customCode.trim())} value={codeQuantity} onChange={event => setCodeQuantity(event.target.value)} />
               </label>
-              <Button className="md:col-span-5 md:w-fit" disabled={creatingPromo} onClick={handleCreatePromoCodes}>
+              <fieldset className="space-y-2 md:col-span-5">
+                <legend className="text-sm font-medium">Eligible products</legend>
+                <div className="flex flex-wrap gap-4 rounded-lg border bg-background p-3">
+                  {(Object.entries(PROMO_PRODUCT_LABELS) as [PromoProduct, string][]).map(([product, label]) => {
+                    const disabled = promoKind === 'free' && product !== 'report';
+                    const checked = promoProducts.includes(product);
+                    return <label key={product} className={`flex items-center gap-2 text-sm ${disabled ? 'text-muted-foreground' : 'cursor-pointer'}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={event => setPromoProducts(current => event.target.checked
+                          ? [...new Set([...current, product])]
+                          : current.filter(item => item !== product))}
+                      />
+                      {label}
+                    </label>;
+                  })}
+                </div>
+                {promoKind === 'free' && <p className="text-xs text-muted-foreground">A free code always unlocks one Retail report. Use a percentage code for Business membership offers.</p>}
+              </fieldset>
+              <Button className="md:col-span-5 md:w-fit" disabled={creatingPromo || promoProducts.length === 0} onClick={handleCreatePromoCodes}>
                 <Plus className="h-4 w-4" />{creatingPromo ? 'Creating…' : 'Create code(s)'}
               </Button>
             </div>
@@ -210,11 +246,15 @@ export default function AdminPage() {
                               <Badge variant={record.status === 'claimed' ? 'secondary' : 'outline'}>{record.kind === 'discount' ? `${record.discountPercent}% off` : 'Free report'}</Badge>
                               {record.status === 'reserved' && <Badge variant="outline" className="border-amber-300 text-amber-700">Checkout pending</Badge>}
                             </div>
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {(record.products?.length ? record.products : ['report']).map(product => <Badge key={product} variant="outline" className="font-normal">{PROMO_PRODUCT_LABELS[product]}</Badge>)}
+                            </div>
                             <p className="mt-1 text-xs text-muted-foreground">Created {new Date(record.createdAt).toLocaleString('en-GB')}</p>
                           </div>
                           <Button size="icon-sm" variant="ghost" aria-label={`Copy ${record.code}`} onClick={() => copyCode(record.code)}><Copy className="h-4 w-4" /></Button>
                         </div>
                         {record.address && <p className="mt-2 break-words text-xs"><span className="font-semibold">Property:</span> {record.address}</p>}
+                        {record.status === 'claimed' && record.claimedProduct && record.claimedProduct !== 'report' && <p className="mt-2 text-xs"><span className="font-semibold">Claimed for:</span> {PROMO_PRODUCT_LABELS[record.claimedProduct]}</p>}
                         {(record.claimedByEmail || record.reservedByEmail) && <p className="mt-1 break-all text-xs"><span className="font-semibold">Customer:</span> {record.claimedByEmail || record.reservedByEmail}</p>}
                         {record.claimedAt && <p className="mt-1 text-xs text-muted-foreground">Claimed {new Date(record.claimedAt).toLocaleString('en-GB')}</p>}
                       </div>

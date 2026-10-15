@@ -124,10 +124,11 @@ export default function ToolPage() {
     setIsRedeemingPromo(true);
     setPromoError('');
     try {
-      const result = await billingRequest('/api/promo-codes/redeem', { code: promoCode, address: paymentPromptAddress });
+      const result = await billingRequest('/api/promo-codes/redeem', { code: promoCode, plan: 'report', address: paymentPromptAddress });
       if (result.requiresPayment) {
         sessionStorage.setItem('homepack_promo_code', result.code);
         sessionStorage.setItem('homepack_promo_discount', String(result.discountPercent));
+        sessionStorage.setItem('homepack_promo_plan', 'report');
         navigate('/payment?plan=report&discount=1');
         return;
       }

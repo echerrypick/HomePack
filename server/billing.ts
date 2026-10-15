@@ -10,7 +10,7 @@ import { PLANS, propertyKey, validAddress, hasPropertyAccess, hasBusinessAccess,
 import { getBillingMode } from './billing-mode';
 import { subscriptionPlan } from './subscription-plan';
 import { stripeTestMode, billingCollections, mergeBillingProfile } from './billing-environment';
-import { discountedReportAmount, generatePromoCode, isValidPromoCode, normalizePromoCode, promoCodeId } from './promo-code';
+import { discountedReportAmount, generatePromoCode, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from './promo-code';
 
 export function database() {
   const app = getApps()[0] || initializeApp({
@@ -197,7 +197,26 @@ async function fulfil(sessionId: string, expectedUid?: string) {
   const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
   if (!subscriptionId) throw new Error('Subscription was not found.');
   await syncSubscription(subscriptionId);
-  if (orderId) await billingOrder(orderId).set({ paid: true }, { merge: true });
+  if (orderId) {
+    const orderRef = billingOrder(orderId);
+    await database().runTransaction(async tx => {
+      const order = (await tx.get(orderRef)).data();
+      if (!order || order.uid !== uid || order.sessionId !== session.id || order.plan !== plan) throw new Error('Unable to verify this membership order.');
+      if (order.paid) return;
+      if (order.promoCodeId) {
+        const promoRef = promotionCode(order.promoCodeId);
+        const promotion = (await tx.get(promoRef)).data();
+        if (!promotion || promotion.status !== 'reserved' || promotion.reservedBy !== uid || promotion.orderId !== orderId) {
+          throw new Error('The discount code reservation could not be verified.');
+        }
+        tx.update(promoRef, {
+          status: 'claimed', claimedAt: new Date().toISOString(), claimedBy: uid,
+          claimedByEmail: order.email || '', claimedProduct: plan, sessionId: session.id,
+        });
+      }
+      tx.update(orderRef, { paid: true });
+    });
+  }
   return { paid: true, plan };
 }
 
@@ -247,7 +266,7 @@ export function registerBillingRoutes(app: express.Express) {
         codes: snapshot.docs.map(document => ({ id: document.id, ...document.data() })),
       });
     } catch {
-      res.status(503).json({ error: 'Unable to load complimentary report codes.' });
+      res.status(503).json({ error: 'Unable to load offer codes.' });
     }
   });
   app.post('/api/admin/promo-codes', authenticate, requireAdmin, async (req, res) => {
@@ -255,6 +274,7 @@ export function registerBillingRoutes(app: express.Express) {
       const requestedCode = normalizePromoCode(req.body?.code);
       const kind = req.body?.kind === 'discount' ? 'discount' : 'free';
       const discountPercent = kind === 'discount' ? Number.parseInt(String(req.body?.discountPercent || ''), 10) : 100;
+      const products = normalizePromoProducts(req.body?.products, kind);
       const quantity = requestedCode ? 1 : Math.min(50, Math.max(1, Number.parseInt(String(req.body?.quantity || 1), 10) || 1));
       if (requestedCode && !isValidPromoCode(requestedCode)) {
         return res.status(400).json({ error: 'Codes must be 8–32 characters using letters, numbers and optional hyphens.' });
@@ -262,6 +282,7 @@ export function registerBillingRoutes(app: express.Express) {
       if (kind === 'discount' && (!Number.isInteger(discountPercent) || discountPercent < 1 || discountPercent > 99)) {
         return res.status(400).json({ error: 'Choose a percentage discount between 1% and 99%.' });
       }
+      if (products.length === 0) return res.status(400).json({ error: 'Select at least one eligible product.' });
 
       const codes = requestedCode ? [requestedCode] : Array.from({ length: quantity }, () => generatePromoCode());
       const uniqueCodes = [...new Set(codes)];
@@ -279,6 +300,7 @@ export function registerBillingRoutes(app: express.Express) {
         code: uniqueCodes[index],
         kind,
         discountPercent,
+        products,
         status: 'available',
         createdAt,
         createdBy: res.locals.uid,
@@ -287,21 +309,23 @@ export function registerBillingRoutes(app: express.Express) {
       await batch.commit();
       res.status(201).json({ codes: uniqueCodes, createdAt, testMode: stripeTestMode() || getBillingMode().developmentSimulation });
     } catch {
-      res.status(503).json({ error: 'Unable to create complimentary report codes.' });
+      res.status(503).json({ error: 'Unable to create offer codes.' });
     }
   });
   app.post('/api/promo-codes/redeem', authenticate, async (req, res) => {
     const code = normalizePromoCode(req.body?.code);
+    const plan = req.body?.plan as PaidPlan;
     const address = req.body?.address;
-    if (!isValidPromoCode(code)) return res.status(400).json({ error: 'Enter a valid complimentary report code.' });
-    if (!validAddress(address)) return res.status(400).json({ error: 'Enter a complete, valid property address.' });
+    if (!isValidPromoCode(code)) return res.status(400).json({ error: 'Enter a valid offer code.' });
+    if (!Object.hasOwn(PLANS, plan)) return res.status(400).json({ error: 'Select a valid product.' });
+    if (plan === 'report' && !validAddress(address)) return res.status(400).json({ error: 'Enter a complete, valid property address.' });
 
     try {
       const uid = res.locals.uid as string;
       const codeRef = promotionCode(promoCodeId(code));
       const userRef = billingUser(uid);
-      const addressKey = propertyKey(address);
-      const addressLabel = `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`;
+      const addressKey = plan === 'report' ? propertyKey(address) : '';
+      const addressLabel = plan === 'report' ? `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}` : '';
 
       const result = await database().runTransaction(async tx => {
         const [codeSnapshot, profileSnapshot] = await Promise.all([tx.get(codeRef), tx.get(userRef)]);
@@ -313,13 +337,17 @@ export function registerBillingRoutes(app: express.Express) {
         if (!codeSnapshot.exists || codeData?.status !== 'available') {
           throw Object.assign(new Error('This code is invalid or has already been claimed.'), { statusCode: 409 });
         }
-        if (hasPropertyAccess(profile, address, Date.now(), getBillingMode().developmentSimulation)) {
+        if (!promoAppliesTo(codeData.products, plan)) {
+          throw Object.assign(new Error(`This code is not valid for ${PLANS[plan].name}.`), { statusCode: 409 });
+        }
+        if (plan === 'report' && hasPropertyAccess(profile, address, Date.now(), getBillingMode().developmentSimulation)) {
           return { alreadyOwned: true };
         }
 
         if (codeData.kind === 'discount') {
           return { alreadyOwned: false, requiresPayment: true, discountPercent: Number(codeData.discountPercent) };
         }
+        if (plan !== 'report') throw Object.assign(new Error('Complimentary codes apply to Retail reports only.'), { statusCode: 409 });
 
         const claimedAt = new Date().toISOString();
         tx.update(codeRef, {
@@ -341,7 +369,7 @@ export function registerBillingRoutes(app: express.Express) {
 
       if (result.alreadyOwned) return res.status(409).json({ error: 'This account already has access to that property, so the code was not used.' });
       if (result.requiresPayment) {
-        return res.json({ redeemed: false, requiresPayment: true, discountPercent: result.discountPercent, code, address });
+        return res.json({ redeemed: false, requiresPayment: true, discountPercent: result.discountPercent, code, plan, address });
       }
       res.json({ redeemed: true, requiresPayment: false, discountPercent: 100, address });
     } catch (error: any) {
@@ -375,7 +403,7 @@ export function registerBillingRoutes(app: express.Express) {
       if (!Object.hasOwn(PLANS, plan) || (plan === 'report' && !validAddress(req.body.address))) return res.status(400).json({ error: 'Select a valid plan and property.' });
       const uid = res.locals.uid as string;
       const profile = await billingProfile(uid);
-      const submittedPromoCode = plan === 'report' ? normalizePromoCode(req.body?.promoCode) : '';
+      const submittedPromoCode = normalizePromoCode(req.body?.promoCode);
       if (submittedPromoCode && !isValidPromoCode(submittedPromoCode)) return res.status(400).json({ error: 'Enter a valid discount code.' });
 
       let discountPercent = 0;
@@ -385,11 +413,11 @@ export function registerBillingRoutes(app: express.Express) {
         promoId = promoCodeId(submittedPromoCode);
         const promoSnapshot = await promotionCode(promoId).get();
         const promotion = promoSnapshot.data();
-        if (!promotion || promotion.kind !== 'discount' || promotion.status === 'claimed') {
-          return res.status(409).json({ error: 'This discount code is invalid or has already been claimed.' });
+        if (!promotion || promotion.kind !== 'discount' || promotion.status === 'claimed' || !promoAppliesTo(promotion.products, plan)) {
+          return res.status(409).json({ error: 'This discount code is invalid, not valid for this product, or has already been claimed.' });
         }
         discountPercent = Number(promotion.discountPercent);
-        reportAmount = discountedReportAmount(PLANS.report.amount, discountPercent);
+        if (plan === 'report') reportAmount = discountedReportAmount(PLANS.report.amount, discountPercent);
       }
 
       if (mode.developmentSimulation) {
@@ -404,8 +432,8 @@ export function registerBillingRoutes(app: express.Express) {
             if (promoId) {
               const promoRef = promotionCode(promoId);
               const promotion = (await tx.get(promoRef)).data();
-              if (!promotion || promotion.kind !== 'discount' || promotion.status !== 'available') {
-                throw Object.assign(new Error('This discount code is invalid or has already been claimed.'), { statusCode: 409 });
+              if (!promotion || promotion.kind !== 'discount' || promotion.status !== 'available' || !promoAppliesTo(promotion.products, plan)) {
+                throw Object.assign(new Error('This discount code is invalid, not valid for this product, or has already been claimed.'), { statusCode: 409 });
               }
               tx.update(promoRef, {
                 status: 'claimed', claimedAt: new Date().toISOString(), claimedBy: uid,
@@ -429,18 +457,32 @@ export function registerBillingRoutes(app: express.Express) {
         }
 
         const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
-        await database().doc(`users/${uid}`).set({
-          developmentSubscriptionPlan: plan,
-          developmentSubscriptionExpiresAt: expiresAt,
-          developmentSubscriptionId: simulatedSessionId,
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
+        await database().runTransaction(async tx => {
+          if (promoId) {
+            const promoRef = promotionCode(promoId);
+            const promotion = (await tx.get(promoRef)).data();
+            if (!promotion || promotion.kind !== 'discount' || promotion.status !== 'available' || !promoAppliesTo(promotion.products, plan)) {
+              throw Object.assign(new Error('This discount code is invalid, not valid for this product, or has already been claimed.'), { statusCode: 409 });
+            }
+            tx.update(promoRef, {
+              status: 'claimed', claimedAt: new Date().toISOString(), claimedBy: uid,
+              claimedByEmail: res.locals.email || '', claimedProduct: plan, simulated: true,
+            });
+          }
+          tx.set(database().doc(`users/${uid}`), {
+            developmentSubscriptionPlan: plan,
+            developmentSubscriptionExpiresAt: expiresAt,
+            developmentSubscriptionId: simulatedSessionId,
+            updatedAt: new Date().toISOString(),
+          }, { merge: true });
+        });
         return res.json({ simulated: true, completed: true, paid: true, sessionId: simulatedSessionId, plan });
       }
 
       if (!mode.enabled) return res.status(503).json({ error: 'Payments are disabled.' });
       const client = stripe();
       if (plan !== 'report' && profile?.stripeSubscriptionId) {
+        if (promoId) return res.status(409).json({ error: 'Membership offer codes apply to new memberships only and cannot be used for a plan change.' });
         const existing = await client.subscriptions.retrieve(profile.stripeSubscriptionId);
         if (!['canceled', 'incomplete_expired'].includes(existing.status)) {
           const customer = typeof existing.customer === 'string' ? existing.customer : existing.customer.id;
@@ -471,14 +513,17 @@ export function registerBillingRoutes(app: express.Express) {
           const now = Date.now();
           const sameReservation = promotion?.status === 'reserved' && promotion?.reservedBy === uid && promotion?.orderId === orderId;
           const expiredReservation = promotion?.status === 'reserved' && Number(promotion?.reservationExpiresAt || 0) <= now;
-          if (!promotion || promotion.kind !== 'discount' || (!sameReservation && promotion.status !== 'available' && !expiredReservation)) {
+          if (!promotion || promotion.kind !== 'discount' || !promoAppliesTo(promotion.products, plan) || (!sameReservation && promotion.status !== 'available' && !expiredReservation)) {
             throw Object.assign(new Error('This discount code is currently unavailable or has already been claimed.'), { statusCode: 409 });
           }
           tx.update(promoRef, {
             status: 'reserved', reservedAt: new Date().toISOString(), reservedBy: uid,
             reservedByEmail: res.locals.email || '', reservationExpiresAt: now + 31 * 60 * 1000,
-            orderId, propertyKey: propertyKey(req.body.address),
-            address: `${req.body.address.houseNumber} ${req.body.address.street}, ${req.body.address.town}, ${req.body.address.postcode}`,
+            orderId, claimedProduct: plan,
+            ...(plan === 'report' ? {
+              propertyKey: propertyKey(req.body.address),
+              address: `${req.body.address.houseNumber} ${req.body.address.street}, ${req.body.address.town}, ${req.body.address.postcode}`,
+            } : { propertyKey: FieldValue.delete(), address: FieldValue.delete() }),
             sessionId: FieldValue.delete(),
           });
           reservedPromo = { ref: promoRef, uid, orderId };
@@ -491,11 +536,23 @@ export function registerBillingRoutes(app: express.Express) {
       });
       const metadata = { uid, plan, orderId, ...(promoId ? { promoCodeId: promoId } : {}) };
       const prices = plan === 'report' ? null : await membershipPrices(client);
+      const membershipCoupon = promoId && plan !== 'report'
+        ? await client.coupons.create({
+            percent_off: discountPercent,
+            duration: 'once',
+            max_redemptions: 1,
+            name: `${discountPercent}% off first UKHomePack ${PLANS[plan].name} payment`,
+            metadata: { promoCodeId: promoId, plan },
+          }, { idempotencyKey: `ukhomepack_offer_${promoId}_${plan}` })
+        : null;
       const session = await client.checkout.sessions.create({
         mode: plan === 'report' ? 'payment' : 'subscription',
         payment_method_types: ['card'],
         line_items: plan !== 'report' ? [{ quantity: 1, price: prices![plan].id }] : [{ quantity: 1, price_data: { currency: 'gbp', unit_amount: reportAmount, product_data: { name: promoId ? `${PLANS[plan].name} (${discountPercent}% discount)` : PLANS[plan].name },  } }],
-        metadata, ...(plan === 'report' ? {} : { subscription_data: { metadata } }),
+        metadata, ...(plan === 'report' ? {} : {
+          subscription_data: { metadata },
+          ...(membershipCoupon ? { discounts: [{ coupon: membershipCoupon.id }] } : {}),
+        }),
         ...(profile?.stripeCustomerId ? { customer: profile.stripeCustomerId } : { customer_email: profile?.email, ...(plan === 'report' ? { customer_creation: 'always' as const } : {}) }),
         success_url: `${process.env.APP_URL}/payment?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.APP_URL}/payment?plan=${plan}&cancelled=1`,
@@ -511,7 +568,7 @@ export function registerBillingRoutes(app: express.Express) {
           await database().runTransaction(async tx => {
             const current = (await tx.get(reservedPromo!.ref)).data();
             if (current?.status === 'reserved' && current.reservedBy === reservedPromo!.uid && current.orderId === reservedPromo!.orderId && !current.sessionId) {
-              tx.update(reservedPromo!.ref, { status: 'available', reservedAt: FieldValue.delete(), reservedBy: FieldValue.delete(), reservedByEmail: FieldValue.delete(), reservationExpiresAt: FieldValue.delete(), orderId: FieldValue.delete(), propertyKey: FieldValue.delete(), address: FieldValue.delete() });
+              tx.update(reservedPromo!.ref, { status: 'available', reservedAt: FieldValue.delete(), reservedBy: FieldValue.delete(), reservedByEmail: FieldValue.delete(), reservationExpiresAt: FieldValue.delete(), orderId: FieldValue.delete(), claimedProduct: FieldValue.delete(), propertyKey: FieldValue.delete(), address: FieldValue.delete() });
             }
           });
         } catch { /* The reservation expires automatically after 30 minutes. */ }

@@ -10,7 +10,8 @@ import { billingRequest } from '@/lib/billing-client';
 import { PLANS, type PaidPlan, validAddress } from '@/lib/plans';
 import type { Address } from '@/types';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, TicketPercent } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 export default function PaymentPage() {
   const { user, loading } = useAuth();
@@ -21,8 +22,11 @@ export default function PaymentPage() {
   const [address] = useState<Address | null>(() => {
     try { const saved = JSON.parse(sessionStorage.getItem('homepack_checkout_address') || 'null'); return validAddress(saved) ? saved : null; } catch { return null; }
   });
-  const [promoCode] = useState(() => sessionStorage.getItem('homepack_promo_code') || '');
-  const [promoDiscount] = useState(() => {
+  const savedPromoApplies = sessionStorage.getItem('homepack_promo_plan') === plan;
+  const [promoCode, setPromoCode] = useState(() => savedPromoApplies ? sessionStorage.getItem('homepack_promo_code') || '' : '');
+  const [promoInput, setPromoInput] = useState(() => savedPromoApplies ? sessionStorage.getItem('homepack_promo_code') || '' : '');
+  const [promoDiscount, setPromoDiscount] = useState(() => {
+    if (!savedPromoApplies) return 0;
     const value = Number.parseInt(sessionStorage.getItem('homepack_promo_discount') || '0', 10);
     return Number.isInteger(value) && value > 0 && value < 100 ? value : 0;
   });
@@ -50,6 +54,23 @@ export default function PaymentPage() {
   }, []);
   const available = billingStatus?.available ?? false;
   const canCheckout = available || Boolean(billingStatus?.developmentSimulation);
+  const applyPromoCode = async () => {
+    if (!promoInput.trim()) return;
+    setBusy(true); setError('');
+    try {
+      const result = await billingRequest('/api/promo-codes/redeem', { code: promoInput, plan, address });
+      if (result.redeemed && result.address) {
+        window.dispatchEvent(new Event('homepack-billing-updated'));
+        navigate('/tool', { replace: true, state: { paidAddress: result.address } });
+        return;
+      }
+      setPromoCode(result.code);
+      setPromoDiscount(Number(result.discountPercent));
+      sessionStorage.setItem('homepack_promo_code', result.code);
+      sessionStorage.setItem('homepack_promo_discount', String(result.discountPercent));
+      sessionStorage.setItem('homepack_promo_plan', plan);
+    } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+  };
   const verify = async () => {
     setBusy(true); setError('');
     try {
@@ -64,7 +85,7 @@ export default function PaymentPage() {
   const checkout = async () => {
     setBusy(true); setError('');
     try {
-      const result = await billingRequest('/api/billing/checkout', { plan, address, ...(plan === 'report' && promoCode ? { promoCode } : {}) });
+      const result = await billingRequest('/api/billing/checkout', { plan, address, ...(promoCode ? { promoCode } : {}) });
       if (result.alreadyPurchased) navigate('/tool', { state: { paidAddress: address } });
       else if (result.completed && result.simulated) {
         if (result.address) setCompletedAddress(result.address);
@@ -77,6 +98,7 @@ export default function PaymentPage() {
     sessionStorage.removeItem('homepack_checkout_address');
     sessionStorage.removeItem('homepack_promo_code');
     sessionStorage.removeItem('homepack_promo_discount');
+    sessionStorage.removeItem('homepack_promo_plan');
     if (completedAddress) navigate('/tool', { replace: true, state: { paidAddress: completedAddress } });
     else navigate('/profile', { replace: true });
   };
@@ -107,15 +129,34 @@ export default function PaymentPage() {
       <h2 className="text-2xl font-bold">{sessionId ? 'Payment status' : PLANS[plan].name}</h2>
       {!sessionId && <>
         <p className="text-4xl font-bold">
-          {plan === 'report' && promoDiscount
-            ? `£${(Math.round(PLANS.report.amount * (100 - promoDiscount) / 100) / 100).toFixed(2)}`
+          {promoDiscount
+            ? `£${(Math.round(PLANS[plan].amount * (100 - promoDiscount) / 100) / 100).toFixed(2)}`
             : PLANS[plan].price}
           <span className="text-base font-normal">{plan === 'report' ? ' for one property' : ' / month'}</span>
         </p>
-        {plan === 'report' && promoDiscount > 0 && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-700">{promoDiscount}% discount code applied. Standard price £9.99.</p>}
+        {promoDiscount > 0 && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-700">{promoDiscount}% discount code applied. {plan === 'report' ? 'Standard price £9.99.' : `This applies to the first monthly payment; subsequent months renew at ${PLANS[plan].price}.`}</p>}
         {plan === 'report' ? <><p>Payment unlocks a report for this property only. Each different property requires a separate £9.99 payment before generation. You can return to your purchased property without paying again.</p><p className="font-semibold">{address ? `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}` : 'Choose a property to continue.'}</p></> : <p>Monthly subscription with unlimited property reports. Renews monthly until cancelled. Manage billing and cancellation from your profile. Existing members can review a plan change in Stripe: upgrades are prorated, downgrades take effect at the next renewal, and cancellation ends renewal while retaining access through the paid period.</p>}
       </>}
       {!sessionId && <p className="text-sm text-muted-foreground leading-relaxed">Your report brings together available public-source records. Coverage varies by property and provider, and incomplete checks are identified. Licensed radon, mining and ground-stability searches are not included.</p>}
+      {!sessionId && user && (
+        <div className="space-y-3 rounded-xl border p-4">
+          <div className="flex items-center gap-2"><TicketPercent className="h-4 w-4 text-primary" /><p className="font-semibold">Offer code</p></div>
+          <div className="flex gap-2">
+            <Input aria-label="Offer code" value={promoInput} onChange={event => {
+              setPromoInput(event.target.value.toUpperCase());
+              if (promoCode) {
+                setPromoCode('');
+                setPromoDiscount(0);
+                sessionStorage.removeItem('homepack_promo_code');
+                sessionStorage.removeItem('homepack_promo_discount');
+                sessionStorage.removeItem('homepack_promo_plan');
+              }
+            }} placeholder="Enter code" autoComplete="off" />
+            <Button variant="outline" disabled={busy || !promoInput.trim()} onClick={applyPromoCode}>{busy ? 'Checking…' : 'Apply'}</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">The code must be eligible for {PLANS[plan].name}. Membership discounts apply to the first monthly payment.</p>
+        </div>
+      )}
       {params.has('cancelled') && <p>Checkout was cancelled. No new report has been generated.</p>}
       {billingStatus?.testMode && !billingStatus.developmentSimulation && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><p className="font-semibold">Stripe test mode</p><p>No real money is charged. Test purchases and memberships are separate from live access.</p></div>}
       {billingStatus?.developmentSimulation ? (

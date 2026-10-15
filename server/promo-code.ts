@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 const PROMO_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+export type PromoProduct = 'report' | 'subscription' | 'agency';
+const PROMO_PRODUCTS = new Set<PromoProduct>(['report', 'subscription', 'agency']);
 
 export function normalizePromoCode(value: unknown): string {
   return String(value || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -25,4 +27,15 @@ export function discountedReportAmount(fullAmount: number, discountPercent: numb
     throw new Error('Discount percentage must be between 1 and 99.');
   }
   return Math.max(1, Math.round(fullAmount * (100 - discountPercent) / 100));
+}
+
+export function normalizePromoProducts(value: unknown, kind: 'free' | 'discount'): PromoProduct[] {
+  if (kind === 'free') return ['report'];
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((product): product is PromoProduct => PROMO_PRODUCTS.has(product as PromoProduct)))];
+}
+
+export function promoAppliesTo(products: unknown, plan: PromoProduct): boolean {
+  const normalized = Array.isArray(products) ? products : ['report'];
+  return normalized.includes(plan);
 }
