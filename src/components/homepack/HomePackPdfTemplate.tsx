@@ -853,13 +853,13 @@ export function HomePackPdfTemplate({
               </div>
               <h3 className="text-sm font-serif font-bold text-[#2d4a77] mb-2">Planning constraints at this location</h3>
               <div className="border border-[#fde68a] bg-[#fffbeb] rounded-sm divide-y divide-[#fde68a] text-xs mb-4">
-                {allPlanningConstraints.slice(0, 3).map((constraint: any, i: number) => (
+                {allPlanningConstraints.slice(0, 2).map((constraint: any, i: number) => (
                   <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 p-2.5 items-start">
                     <div className="min-w-0">
                       <p className="font-bold text-[#92400e] capitalize">{String(constraint.dataset || 'Planning constraint').replace(/-/g, ' ')}</p>
-                      <p className="text-[10px] text-[#4a5568] break-words">{constraint.detail || constraint.name || 'Recorded constraint'}</p>
+                      <p className="text-[10px] text-[#4a5568] break-words line-clamp-2">{constraint.detail || constraint.name || 'Recorded constraint'}</p>
                     </div>
-                    <span className="text-[9px] text-[#78716c]">Ref: {constraint.reference || 'N/A'}</span>
+                    <span className="text-[9px] text-[#78716c] max-w-[150px] truncate">Ref: {constraint.reference || 'N/A'}</span>
                   </div>
                 ))}
                 {allPlanningConstraints.length === 0 && (
@@ -873,7 +873,7 @@ export function HomePackPdfTemplate({
                 {planningCoverage?.scope === 'radius' ? 'Planning applications within 0.3 miles' : 'Planning applications at the property and on this street'}
               </h3>
               <div className="border border-[#e2e8f0] rounded-sm divide-y divide-[#e2e8f0] text-xs mb-4">
-                {allPlanning.slice(0, 3).map((p: any, i: number) => {
+                {allPlanning.slice(0, 2).map((p: any, i: number) => {
                   const title = p.application || p.proposal || p.description || 'Planning Application';
                   const decision = formatDecision(p.decision || p.status);
                   const ref = p.reference || p.ref || 'Recorded';
@@ -884,7 +884,7 @@ export function HomePackPdfTemplate({
                         <span className="font-bold text-[#2d4a77] leading-tight line-clamp-2 pr-2">{title}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-[#f0f7ff] text-[#2d4a77] shrink-0">{decision}</span>
                       </div>
-                      <p className="text-[10px] text-[#4a5568] mb-1 break-words">Site: {p.address || 'Address not published in source record'}</p>
+                      <p className="text-[10px] text-[#4a5568] mb-1 break-words line-clamp-1">Site: {p.address || 'Address not published in source record'}</p>
                       <div className="flex justify-between text-muted-foreground text-[11px]">
                         <span>Ref: {ref}{p.distanceKm !== undefined ? Number(p.distanceKm) === 0 ? ' - property-linked' : ` - ${(Number(p.distanceKm) * 0.621371).toFixed(2)} miles away` : ''}</span>
                         <span>{date}</span>
@@ -904,8 +904,8 @@ export function HomePackPdfTemplate({
 
               {allPlanning.length > 0 && applicationCoverage.incomplete && <p className="text-[10px] text-[#92400e] mb-3">{applicationCoverage.detail}</p>}
               {allPlanningConstraints.length > 0 && constraintCoverage.incomplete && <p className="text-[10px] text-[#92400e] mb-3">{constraintCoverage.detail}</p>}
-              {allPlanning.length > 3 && <p className="text-[10px] text-[#4a5568] mb-3">Showing {Math.min(3, allPlanning.length)} of {allPlanning.length} matching applications. The full list is available in your online report.</p>}
-              {allPlanningConstraints.length > 3 && <p className="text-[10px] text-[#4a5568] mb-3">Showing {Math.min(3, allPlanningConstraints.length)} of {allPlanningConstraints.length} returned constraints. See your online report for all entries.</p>}
+              {allPlanning.length > 2 && <p className="text-[10px] text-[#4a5568] mb-2">Showing {Math.min(2, allPlanning.length)} of {allPlanning.length} matching applications. The full list is available in your online report.</p>}
+              {allPlanningConstraints.length > 2 && <p className="text-[10px] text-[#4a5568] mb-2">Showing {Math.min(2, allPlanningConstraints.length)} of {allPlanningConstraints.length} returned constraints. See your online report for all entries.</p>}
               {planningCoverage?.scope === 'street' && Boolean(planningCoverage.excludedByScope) && (
                 <div className="p-2.5 mb-3 border border-[#bfdbfe] bg-[#eff6ff] rounded text-[10px] leading-relaxed text-[#1e3a5f]">
                   <span className="font-semibold">Nearby planning activity:</span> {planningCoverage.excludedByScope} application{planningCoverage.excludedByScope === 1 ? ' was' : 's were'} found within 0.3 miles but outside this report’s property-and-same-street scope. Eligible business members can enable the 0.3-mile search.
