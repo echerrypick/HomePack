@@ -81,7 +81,7 @@ export default function PaymentPage() {
           <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
             <CheckCircle2 className="h-8 w-8" />
           </div>
-          <DialogTitle className="text-center">{(billingStatus?.developmentSimulation || billingStatus?.testMode) ? 'Test payment journey complete' : 'Payment complete'}</DialogTitle>
+          <DialogTitle className="text-center">Payment complete</DialogTitle>
           <DialogDescription className="text-center">
             {completedAddress
               ? 'This property is now unlocked for your account. You can generate the report without another payment for the same address.'

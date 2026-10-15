@@ -823,6 +823,7 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
     const planningLogs = logs.filter(log => log.startsWith('[PLANNING'));
     const applicationCoverage = planningCoverageMessage(coverage, 'applications');
     const constraintCoverage = planningCoverageMessage(coverage, 'constraints');
+    const excludedNearbyApplications = coverage?.scope === 'street' ? Number(coverage.excludedByScope || 0) : 0;
     const formatDecision = (value: string) => {
       if (/grant|approv/i.test(value) && /condition/i.test(value)) return 'Approved with conditions';
       if (/grant|approv/i.test(value)) return 'Approved';
@@ -919,12 +920,19 @@ function PlanningHistoryDisplay({ planningHistory, constraints = [], coverage, u
                 </div>
             ) : (
                 <div className="p-4 rounded-xl bg-muted/30 border border-dashed border-border text-center space-y-1">
-                    <p className="text-sm font-medium text-foreground">{applicationCoverage.title}</p>
+                    <p className="text-sm font-medium text-foreground">{excludedNearbyApplications > 0 ? 'No property or same-street applications matched' : applicationCoverage.title}</p>
                     <p className="text-xs text-muted-foreground">{applicationCoverage.detail}</p>
                 </div>
             )}
 
-            {coverage?.scope === 'street' && Boolean(coverage.excludedByScope) && <p className="text-xs text-muted-foreground">{coverage.excludedByScope} nearby application{coverage.excludedByScope === 1 ? ' was' : 's were'} outside this report’s property-and-same-street scope. Those records are not included in the application list above.</p>}
+            {excludedNearbyApplications > 0 && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-950">
+                <p className="font-semibold">Nearby planning activity was found</p>
+                <p className="mt-1">
+                  {excludedNearbyApplications} application{excludedNearbyApplications === 1 ? ' was' : 's were'} found within 0.3 miles, but {excludedNearbyApplications === 1 ? 'it was' : 'they were'} not at the property or recorded on the same street, so {excludedNearbyApplications === 1 ? 'it is' : 'they are'} outside this report’s scope. Eligible business members can enable the 0.3-mile planning search in <Link className="font-medium underline" to="/profile">Profile settings</Link>. <Link className="font-medium underline" to="/pricing">View business plans</Link>.
+                </p>
+              </div>
+            )}
             <a href="https://www.gov.uk/search-register-planning-decisions" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">Find the local authority planning register <ExternalLink className="h-3 w-3" /></a>
             {coverage?.checkedAt && <p className="text-xs text-muted-foreground">Search run: {new Date(coverage.checkedAt).toLocaleString('en-GB')}.</p>}
             {coverage && <p className="text-[10px] text-muted-foreground leading-relaxed">Coverage: {coverage.applications}. Constraints use {coverage.constraints.toLowerCase()}.</p>}

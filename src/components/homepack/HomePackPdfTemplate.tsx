@@ -906,7 +906,11 @@ export function HomePackPdfTemplate({
               {allPlanningConstraints.length > 0 && constraintCoverage.incomplete && <p className="text-[10px] text-[#92400e] mb-3">{constraintCoverage.detail}</p>}
               {allPlanning.length > 3 && <p className="text-[10px] text-[#4a5568] mb-3">Showing {Math.min(3, allPlanning.length)} of {allPlanning.length} matching applications. The full list is available in your online report.</p>}
               {allPlanningConstraints.length > 3 && <p className="text-[10px] text-[#4a5568] mb-3">Showing {Math.min(3, allPlanningConstraints.length)} of {allPlanningConstraints.length} returned constraints. See your online report for all entries.</p>}
-              {planningCoverage?.scope === 'street' && Boolean(planningCoverage.excludedByScope) && <p className="text-[10px] text-[#4a5568] mb-3">{planningCoverage.excludedByScope} nearby applications were outside the property-and-same-street scope of this report.</p>}
+              {planningCoverage?.scope === 'street' && Boolean(planningCoverage.excludedByScope) && (
+                <div className="p-2.5 mb-3 border border-[#bfdbfe] bg-[#eff6ff] rounded text-[10px] leading-relaxed text-[#1e3a5f]">
+                  <span className="font-semibold">Nearby planning activity:</span> {planningCoverage.excludedByScope} application{planningCoverage.excludedByScope === 1 ? ' was' : 's were'} found within 0.3 miles but outside this report’s property-and-same-street scope. Eligible business members can enable the 0.3-mile search.
+                </div>
+              )}
               <div className="p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded text-xs text-[#4a5568]">
                 <span className="font-semibold">Planning Advice:</span> Alterations, single-storey extensions, and changes of use remain subject to local planning policies, permitted development limits, and conservation area restrictions.
               </div>
