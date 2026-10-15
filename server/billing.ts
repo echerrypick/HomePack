@@ -10,7 +10,7 @@ import { PLANS, propertyKey, validAddress, hasPropertyAccess, hasBusinessAccess,
 import { getBillingMode } from './billing-mode';
 import { subscriptionPlan } from './subscription-plan';
 import { stripeTestMode, billingCollections, mergeBillingProfile } from './billing-environment';
-import { discountedReportAmount, generatePromoCode, isRedeemablePromoStatus, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from './promo-code';
+import { discountedReportAmount, generatePromoCode, isDeletablePromoStatus, isRedeemablePromoStatus, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from './promo-code';
 
 export function database() {
   const app = getApps()[0] || initializeApp({
@@ -339,6 +339,24 @@ export function registerBillingRoutes(app: express.Express) {
       res.json({ code: { id, ...updated } });
     } catch (error: any) {
       res.status(error?.statusCode || 503).json({ error: error?.statusCode ? error.message : 'Unable to update the offer code.' });
+    }
+  });
+  app.delete('/api/admin/promo-codes/:id', authenticate, requireAdmin, async (req, res) => {
+    const id = String(req.params.id || '');
+    if (!/^[a-f0-9]{64}$/.test(id)) return res.status(400).json({ error: 'Select a valid offer code.' });
+    try {
+      const codeRef = promotionCode(id);
+      await database().runTransaction(async tx => {
+        const snapshot = await tx.get(codeRef);
+        if (!snapshot.exists) throw Object.assign(new Error('Offer code not found.'), { statusCode: 404 });
+        if (!isDeletablePromoStatus(snapshot.data()?.status)) {
+          throw Object.assign(new Error('Only codes that have not been issued can be deleted.'), { statusCode: 409 });
+        }
+        tx.delete(codeRef);
+      });
+      res.json({ deleted: true });
+    } catch (error: any) {
+      res.status(error?.statusCode || 503).json({ error: error?.statusCode ? error.message : 'Unable to delete the offer code.' });
     }
   });
   app.post('/api/promo-codes/redeem', authenticate, async (req, res) => {

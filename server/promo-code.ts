@@ -44,3 +44,7 @@ export function promoAppliesTo(products: unknown, plan: PromoProduct): boolean {
 export function isRedeemablePromoStatus(status: unknown): status is 'available' | 'issued' {
   return status === 'available' || status === 'issued';
 }
+
+export function isDeletablePromoStatus(status: unknown): status is 'available' {
+  return status === 'available';
+}

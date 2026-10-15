@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { toast } from 'sonner';
-import { Shield, Users, Activity, Settings, FileText, TicketPercent, Copy, Plus } from 'lucide-react';
+import { Shield, Users, Activity, Settings, FileText, TicketPercent, Copy, Plus, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { billingRequest } from '@/lib/billing-client';
 
@@ -120,6 +120,20 @@ export default function AdminPage() {
       await loadPromoCodes();
     } catch (error: any) {
       toast.error(error.message || 'Unable to update the offer code');
+    } finally {
+      setUpdatingPromoId('');
+    }
+  };
+
+  const deletePromoCode = async (record: PromoCodeRecord) => {
+    if (!window.confirm(`Delete offer code ${record.code}? This cannot be undone.`)) return;
+    setUpdatingPromoId(record.id);
+    try {
+      await billingRequest(`/api/admin/promo-codes/${record.id}`, undefined, 'DELETE');
+      toast.success(`${record.code} deleted`);
+      await loadPromoCodes();
+    } catch (error: any) {
+      toast.error(error.message || 'Unable to delete the offer code');
     } finally {
       setUpdatingPromoId('');
     }
@@ -282,7 +296,10 @@ export default function AdminPage() {
                             <Button size="icon-sm" variant="ghost" aria-label={`Copy ${record.code}`} onClick={() => copyCode(record.code)}><Copy className="h-4 w-4" /></Button>
                           </div>
                         </div>
-                        {record.status === 'available' && <Button className="mt-3 w-full" size="sm" variant="outline" disabled={updatingPromoId === record.id} onClick={() => setPromoIssued(record, true)}>{updatingPromoId === record.id ? 'Updating…' : 'Mark as issued'}</Button>}
+                        {record.status === 'available' && <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+                          <Button size="sm" variant="outline" disabled={updatingPromoId === record.id} onClick={() => setPromoIssued(record, true)}>{updatingPromoId === record.id ? 'Updating…' : 'Mark as issued'}</Button>
+                          <Button size="icon-sm" variant="outline" className="text-destructive hover:text-destructive" disabled={updatingPromoId === record.id} aria-label={`Delete ${record.code}`} onClick={() => deletePromoCode(record)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>}
                         {record.status === 'issued' && <Button className="mt-3 w-full" size="sm" variant="ghost" disabled={updatingPromoId === record.id} onClick={() => setPromoIssued(record, false)}>{updatingPromoId === record.id ? 'Updating…' : 'Return to available'}</Button>}
                         {record.address && <p className="mt-2 break-words text-xs"><span className="font-semibold">Property:</span> {record.address}</p>}
                         {record.issuedAt && <p className="mt-2 text-xs text-muted-foreground">Issued {new Date(record.issuedAt).toLocaleString('en-GB')}</p>}
