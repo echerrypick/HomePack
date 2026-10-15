@@ -439,7 +439,13 @@ export interface CrimeData {
 export type PropertyData = {
   address: string;
   landRegistry: LandRegistryResult[];
+  landRegistryCoverage?: {
+    status: 'available' | 'no_match' | 'unavailable';
+    checkedAt?: string;
+    detail?: string;
+  };
   recentStreetSales?: LandRegistryResult[];
+  recentStreetSalesStatus?: 'available' | 'no_match' | 'unavailable';
   epc: EpcData;
   floodRisk: FloodRiskData;
   planningHistory: PlanningHistoryItem[];

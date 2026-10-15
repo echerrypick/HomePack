@@ -1055,7 +1055,7 @@ export function ReportDisplay({
   if (!reportData) return null;
 
   const { propertyData, summary, logs } = reportData;
-  const { landRegistry, recentStreetSales, epc, floodRisk, planningHistory, planningConstraints, planningCoverage, councilTax, radonRisk, coalMining, broadband } = propertyData;
+  const { landRegistry, landRegistryCoverage, recentStreetSales, recentStreetSalesStatus, epc, floodRisk, planningHistory, planningConstraints, planningCoverage, councilTax, radonRisk, coalMining, broadband } = propertyData;
 
   // Real-time resilience: if report was cached without healthcare data, asynchronously load it
   const [liveHealthcare, setLiveHealthcare] = useState<HealthcareAccessData | undefined>(propertyData.healthcare);
@@ -1323,8 +1323,16 @@ export function ReportDisplay({
             ) : (
                 <div className="space-y-2">
                   <DataItem label="Title Number" value={"N/A"} />
-                  <DataItem label="Tenure" value={"Data not found"} />
-                  <DataItem label="Recorded Sales" value={"No sales data found in HM Land Registry Price Paid Data"} />
+                  <DataItem label="Tenure" value={landRegistryCoverage?.status === 'unavailable' ? 'Not checked' : 'Not recorded'} />
+                  <DataItem
+                    label="Recorded Sales"
+                    value={landRegistryCoverage?.status === 'unavailable'
+                      ? 'HM Land Registry was temporarily unavailable. Generate the report again to retry.'
+                      : 'No exact-address sale was found in HM Land Registry Price Paid Data.'}
+                  />
+                  {landRegistryCoverage?.checkedAt && (
+                    <p className="text-xs text-muted-foreground">Lookup run: {new Date(landRegistryCoverage.checkedAt).toLocaleString('en-GB')}.</p>
+                  )}
                </div>
             )}
 
@@ -1364,7 +1372,9 @@ export function ReportDisplay({
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  No neighbouring sales were returned for this exact street and town.
+                  {recentStreetSalesStatus === 'unavailable'
+                    ? 'The HM Land Registry street-sales lookup was temporarily unavailable. Generate the report again to retry.'
+                    : 'No neighbouring sales were returned for this exact street and postcode district.'}
                 </div>
               )}
 

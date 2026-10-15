@@ -19,6 +19,7 @@ import { authenticate, requireProperty, requireBusiness, registerBillingRoutes, 
 import { type PlanningScope } from './server/planning-scope';
 import { saveReport, listReports, readReport, saveJob, readJob, cleanupExpiredJobs } from './server/report-store';
 import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-registry-match';
+import { queryLandRegistry } from './server/land-registry-client';
 
 const execPromise = promisify(exec);
 
@@ -640,26 +641,22 @@ async function fetchLandRegistryData(houseNumberOrName: string, street: string, 
   `;
 
   try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/sparql-results+json",
-      },
-      body: `query=${encodeURIComponent(sparqlQuery)}`,
-      // The public SPARQL service can be noticeably slower from hosted
-      // environments than it is during local development. Report generation
-      // is already asynchronous, so allow enough time for a valid response
-      // rather than silently presenting an empty price-history section.
-      signal: AbortSignal.timeout(15000),
+    const queryResult = await queryLandRegistry(endpoint, sparqlQuery, {
+      attempts: 3,
+      timeoutMs: 15000,
+      onLog: message => logs.push(`[LR] ${message}`),
     });
-
-    if (!res.ok) {
-      logs.push(`[LR] Warning: API returned status ${res.status}`);
-      return [];
+    if (queryResult.status === 'unavailable') {
+      return {
+        records: [],
+        coverage: {
+          status: 'unavailable' as const,
+          checkedAt: new Date().toISOString(),
+          detail: 'The official Price Paid Data service was temporarily unavailable after three attempts. Generate the report again to retry.',
+        },
+      };
     }
-    const data = await res.json();
-    const bindings = data.results?.bindings || [];
+    const bindings = queryResult.bindings;
 
     const allRecords = bindings.map((r: any) => {
       const addressParts = [
@@ -705,14 +702,35 @@ async function fetchLandRegistryData(houseNumberOrName: string, street: string, 
 
     if (matchingRecords.length === 0) {
       logs.push(`[LR] No exact PAON/SAON and street match found; postcode-level records were discarded.`);
-      return [];
+      return {
+        records: [],
+        coverage: {
+          status: 'no_match' as const,
+          checkedAt: new Date().toISOString(),
+          detail: 'The official service responded, but no sale matched this exact house identifier and street.',
+        },
+      };
     }
 
     logs.push(`[LR] Found ${matchingRecords.length} unique transactions (total in postcode: ${deduplicatedRecords.length}).`);
-    return matchingRecords.slice(0, 15);
+    return {
+      records: matchingRecords.slice(0, 15),
+      coverage: {
+        status: 'available' as const,
+        checkedAt: new Date().toISOString(),
+        detail: `${matchingRecords.length} exact-address transaction${matchingRecords.length === 1 ? '' : 's'} returned.`,
+      },
+    };
   } catch (err: any) {
-    logs.push(`[LR] Note: Land Registry fetch skipped or timed out (${err?.message || 'timeout'})`);
-    return [];
+    logs.push(`[LR] Unexpected lookup failure (${err?.message || 'unknown error'}).`);
+    return {
+      records: [],
+      coverage: {
+        status: 'unavailable' as const,
+        checkedAt: new Date().toISOString(),
+        detail: 'The official Price Paid Data service could not be checked. Generate the report again to retry.',
+      },
+    };
   }
 }
 
@@ -732,7 +750,7 @@ async function fetchRecentStreetSales(
   const town = escapeSparqlLiteral(townOrCity.toUpperCase());
   const outwardCode = escapeSparqlLiteral(postcode.replace(/\s+/g, '').slice(0, -3).toUpperCase());
 
-  if (!street) return [];
+  if (!street) return { records: [], status: 'no_match' as const };
 
   // Land Registry's `town` is commonly the postal town rather than the town
   // entered by the customer (for example, Etwall addresses are recorded as
@@ -781,23 +799,15 @@ async function fetchRecentStreetSales(
   logs.push(`[LR Street] Searching recent recorded sales on ${streetName}${townOrCity ? `, ${townOrCity}` : ''}.`);
 
   try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/sparql-results+json',
-      },
-      body: `query=${encodeURIComponent(sparqlQuery)}`,
-      signal: AbortSignal.timeout(15000),
+    const queryResult = await queryLandRegistry(endpoint, sparqlQuery, {
+      attempts: 3,
+      timeoutMs: 15000,
+      onLog: message => logs.push(`[LR Street] ${message}`),
     });
-
-    if (!res.ok) {
-      logs.push(`[LR Street] Warning: API returned status ${res.status}.`);
-      return [];
+    if (queryResult.status === 'unavailable') {
+      return { records: [], status: 'unavailable' as const };
     }
-
-    const data = await res.json();
-    const bindings = data.results?.bindings || [];
+    const bindings = queryResult.bindings;
     const seen = new Set<string>();
     const records = bindings.map((r: any) => ({
       pricePaid: r.pricePaid?.value || '',
@@ -828,10 +838,10 @@ async function fetchRecentStreetSales(
     });
 
     logs.push(`[LR Street] Found ${records.length} neighbouring recorded transactions; returning the latest 10.`);
-    return records.slice(0, 10);
+    return { records: records.slice(0, 10), status: records.length ? 'available' as const : 'no_match' as const };
   } catch (err: any) {
-    logs.push(`[LR Street] Lookup skipped or timed out (${err?.message || 'timeout'}).`);
-    return [];
+    logs.push(`[LR Street] Unexpected lookup failure (${err?.message || 'unknown error'}).`);
+    return { records: [], status: 'unavailable' as const };
   }
 }
 
@@ -2853,20 +2863,27 @@ async function generateHomePackDossier(
 
   const landRegistryPromise = trackTiming('HM Land Registry lookup', logs, () => fetchLandRegistryData(houseNumber || '', street || '', postcode, logs))
     .then(res => {
-      const detail = res && res.length > 0 
-        ? `${res[0].estateType || 'Registered'} (${res.length} recs)` 
-        : 'Checked registers';
+      const detail = res.records.length > 0
+        ? `${res.records[0].estateType || 'Registered'} (${res.records.length} recs)`
+        : res.coverage.status === 'unavailable' ? 'Official service unavailable' : 'No exact match';
       onStepProgress?.('land_registry', 'completed', detail);
       return res;
     })
     .catch(() => {
-      onStepProgress?.('land_registry', 'completed', 'Standard Register');
-      return [];
+      onStepProgress?.('land_registry', 'completed', 'Official service unavailable');
+      return {
+        records: [],
+        coverage: {
+          status: 'unavailable' as const,
+          checkedAt: new Date().toISOString(),
+          detail: 'The official Price Paid Data service could not be checked. Generate the report again to retry.',
+        },
+      };
     });
 
   const recentStreetSalesPromise = trackTiming('HM Land Registry street sales lookup', logs, () =>
     fetchRecentStreetSales(houseNumber || '', street || '', town || '', postcode, logs)
-  ).catch(() => []);
+  ).catch(() => ({ records: [], status: 'unavailable' as const }));
 
   const epcPromise = trackTiming('EPC lookup', logs, () => fetchEpcData(fullStreet, postcode, logs))
     .then(res => {
@@ -2967,7 +2984,7 @@ async function generateHomePackDossier(
       });
   })();
 
-  const [landRegistry, recentStreetSales, epc, floodRisk, coords, groundedData, healthcare, crime, planningData] = await Promise.all([
+  const [landRegistryResult, recentStreetSalesResult, epc, floodRisk, coords, groundedData, healthcare, crime, planningData] = await Promise.all([
     landRegistryPromise,
     recentStreetSalesPromise,
     epcPromise,
@@ -2980,9 +2997,11 @@ async function generateHomePackDossier(
   ]);
 
   const propertyData = {
-    address: landRegistry && landRegistry.length > 0 ? landRegistry[0].addressString : `${street || ''}, ${town || ''}, ${postcode}`.replace(/^,\s*/, ''),
-    landRegistry: landRegistry || [],
-    recentStreetSales: recentStreetSales || [],
+    address: landRegistryResult.records.length > 0 ? landRegistryResult.records[0].addressString : `${street || ''}, ${town || ''}, ${postcode}`.replace(/^,\s*/, ''),
+    landRegistry: landRegistryResult.records,
+    landRegistryCoverage: landRegistryResult.coverage,
+    recentStreetSales: recentStreetSalesResult.records,
+    recentStreetSalesStatus: recentStreetSalesResult.status,
     epc,
     floodRisk,
     planningHistory: planningData.applications || [],

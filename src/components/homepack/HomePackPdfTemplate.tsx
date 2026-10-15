@@ -575,7 +575,11 @@ export function HomePackPdfTemplate({
                     ))}
                     {landRegistry.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-4 py-4 text-center text-muted-foreground italic">No historical transactions found in Land Registry records.</td>
+                        <td colSpan={3} className="px-4 py-4 text-center text-muted-foreground italic">
+                          {propertyData.landRegistryCoverage?.status === 'unavailable'
+                            ? 'HM Land Registry was temporarily unavailable when this report was generated.'
+                            : 'No exact-address transaction was found in HM Land Registry Price Paid Data.'}
+                        </td>
                       </tr>
                     )}
                   </tbody>
