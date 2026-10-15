@@ -14,15 +14,53 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { toast } from 'sonner';
-import { Shield, Users, Activity, Settings, FileText } from 'lucide-react';
+import { Shield, Users, Activity, Settings, FileText, TicketPercent, Copy, Plus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { billingRequest } from '@/lib/billing-client';
+
+type PromoCodeRecord = {
+  id: string;
+  code: string;
+  kind?: 'free' | 'discount';
+  discountPercent?: number;
+  status: 'available' | 'reserved' | 'claimed';
+  createdAt: string;
+  claimedAt?: string;
+  claimedByEmail?: string;
+  reservedByEmail?: string;
+  address?: string;
+};
 
 export default function AdminPage() {
   const { isAdmin, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [promoCodes, setPromoCodes] = useState<PromoCodeRecord[]>([]);
+  const [promoLoading, setPromoLoading] = useState(true);
+  const [creatingPromo, setCreatingPromo] = useState(false);
+  const [promoKind, setPromoKind] = useState<'free' | 'discount'>('free');
+  const [discountPercent, setDiscountPercent] = useState('20');
+  const [customCode, setCustomCode] = useState('');
+  const [codeQuantity, setCodeQuantity] = useState('1');
+  const [promoTestMode, setPromoTestMode] = useState(false);
+
+  const loadPromoCodes = async () => {
+    setPromoLoading(true);
+    try {
+      const result = await billingRequest('/api/admin/promo-codes');
+      setPromoCodes(result.codes || []);
+      setPromoTestMode(Boolean(result.testMode));
+    } catch (error: any) {
+      toast.error(error.message || 'Unable to load report codes');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!isAdmin) return;
+
+    void loadPromoCodes();
 
     const path = 'users';
     const unsubscribe = onSnapshot(collection(db, path), (snapshot) => {
@@ -36,6 +74,30 @@ export default function AdminPage() {
 
     return unsubscribe;
   }, [isAdmin]);
+
+  const handleCreatePromoCodes = async () => {
+    setCreatingPromo(true);
+    try {
+      const result = await billingRequest('/api/admin/promo-codes', {
+        kind: promoKind,
+        discountPercent: promoKind === 'discount' ? Number(discountPercent) : 100,
+        code: customCode.trim() || undefined,
+        quantity: customCode.trim() ? 1 : Number(codeQuantity),
+      });
+      toast.success(`${result.codes.length} ${promoKind === 'free' ? 'free-report' : `${discountPercent}%-off`} code${result.codes.length === 1 ? '' : 's'} created`);
+      setCustomCode('');
+      await loadPromoCodes();
+    } catch (error: any) {
+      toast.error(error.message || 'Unable to create report codes');
+    } finally {
+      setCreatingPromo(false);
+    }
+  };
+
+  const copyCode = async (code: string) => {
+    await navigator.clipboard.writeText(code);
+    toast.success('Code copied');
+  };
 
   const handleRoleChange = async (uid: string, newRole: UserRole) => {
     const path = `users/${uid}`;
@@ -88,6 +150,81 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2"><TicketPercent className="h-5 w-5 text-primary" />Report offer codes</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Create single-use codes for a free report or a percentage discount. Every code is tied to the property selected when it is claimed.</p>
+              </div>
+              {promoTestMode && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">Stripe sandbox codes</Badge>}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 rounded-xl border bg-muted/20 p-4 md:grid-cols-5 md:items-end">
+              <label className="space-y-1.5 text-sm font-medium">
+                Offer type
+                <Select value={promoKind} onValueChange={value => setPromoKind(value as 'free' | 'discount')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free">Free report</SelectItem>
+                    <SelectItem value="discount">Percentage off</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+              <label className="space-y-1.5 text-sm font-medium">
+                Discount
+                <Input type="number" min="1" max="99" disabled={promoKind !== 'discount'} value={discountPercent} onChange={event => setDiscountPercent(event.target.value)} />
+              </label>
+              <label className="space-y-1.5 text-sm font-medium md:col-span-2">
+                Custom code <span className="font-normal text-muted-foreground">(optional)</span>
+                <Input value={customCode} onChange={event => setCustomCode(event.target.value.toUpperCase())} placeholder="Leave blank to generate securely" maxLength={32} />
+              </label>
+              <label className="space-y-1.5 text-sm font-medium">
+                Quantity
+                <Input type="number" min="1" max="50" disabled={Boolean(customCode.trim())} value={codeQuantity} onChange={event => setCodeQuantity(event.target.value)} />
+              </label>
+              <Button className="md:col-span-5 md:w-fit" disabled={creatingPromo} onClick={handleCreatePromoCodes}>
+                <Plus className="h-4 w-4" />{creatingPromo ? 'Creating…' : 'Create code(s)'}
+              </Button>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-2">
+              {([
+                { title: 'Created — not claimed', records: promoCodes.filter(code => code.status !== 'claimed') },
+                { title: 'Claimed', records: promoCodes.filter(code => code.status === 'claimed') },
+              ] as const).map(group => (
+                <div key={group.title} className="min-w-0 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">{group.title}</h3>
+                    <Badge variant="secondary">{group.records.length}</Badge>
+                  </div>
+                  <div className="max-h-96 space-y-2 overflow-y-auto rounded-xl border p-2">
+                    {promoLoading ? <p className="p-4 text-sm text-muted-foreground">Loading codes…</p> : group.records.length === 0 ? <p className="p-4 text-sm text-muted-foreground">No codes in this group.</p> : group.records.map(record => (
+                      <div key={record.id} className="rounded-lg border bg-card p-3 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono font-bold tracking-wide">{record.code}</span>
+                              <Badge variant={record.status === 'claimed' ? 'secondary' : 'outline'}>{record.kind === 'discount' ? `${record.discountPercent}% off` : 'Free report'}</Badge>
+                              {record.status === 'reserved' && <Badge variant="outline" className="border-amber-300 text-amber-700">Checkout pending</Badge>}
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">Created {new Date(record.createdAt).toLocaleString('en-GB')}</p>
+                          </div>
+                          <Button size="icon-sm" variant="ghost" aria-label={`Copy ${record.code}`} onClick={() => copyCode(record.code)}><Copy className="h-4 w-4" /></Button>
+                        </div>
+                        {record.address && <p className="mt-2 break-words text-xs"><span className="font-semibold">Property:</span> {record.address}</p>}
+                        {(record.claimedByEmail || record.reservedByEmail) && <p className="mt-1 break-all text-xs"><span className="font-semibold">Customer:</span> {record.claimedByEmail || record.reservedByEmail}</p>}
+                        {record.claimedAt && <p className="mt-1 text-xs text-muted-foreground">Claimed {new Date(record.claimedAt).toLocaleString('en-GB')}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

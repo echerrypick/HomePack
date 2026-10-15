@@ -12,11 +12,12 @@ import { doc, updateDoc, increment } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Lock, FileText, Info, Loader2, CheckCircle2, ArrowRight, Clock } from 'lucide-react';
+import { Shield, Lock, FileText, Info, Loader2, CheckCircle2, ArrowRight, Clock, TicketPercent } from 'lucide-react';
 import { LoginDialog } from '@/components/auth/LoginDialog';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { authenticatedFetch } from '@/lib/billing-client';
+import { authenticatedFetch, billingRequest } from '@/lib/billing-client';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 type Step = 'address' | 'report';
 
@@ -33,6 +34,9 @@ export default function ToolPage() {
   const [error, setError] = useState<string | null>(null);
   const [isFromHistory, setIsFromHistory] = useState(false);
   const [paymentPromptAddress, setPaymentPromptAddress] = useState<Address | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
+  const [isRedeemingPromo, setIsRedeemingPromo] = useState(false);
 
   // Check if routed from a notification or history with preloaded report
   useEffect(() => {
@@ -75,6 +79,20 @@ export default function ToolPage() {
     }
   }, [user?.uid, location.state?.paidAddress]);
 
+  const beginReport = async (address: Address) => {
+    setSelectedAddress(address);
+    await startJob(address);
+
+    if (user) {
+      const path = `users/${user.uid}`;
+      try {
+        await updateDoc(doc(db, 'users', user.uid), { searchCount: increment(1) });
+      } catch (firestoreErr) {
+        handleFirestoreError(firestoreErr, OperationType.UPDATE, path);
+      }
+    }
+  };
+
   const handleAddressSelect = async (address: Address) => {
     if (!user) {
       setError("Please login to search for properties.");
@@ -84,7 +102,6 @@ export default function ToolPage() {
     setSelectedAddress(address);
     setIsStarting(true);
     setError(null);
-    
     try {
       const access = await authenticatedFetch('/api/billing/access', { method: 'POST', body: JSON.stringify(address) });
       if (access.status === 402) {
@@ -93,21 +110,37 @@ export default function ToolPage() {
         return;
       }
       if (!access.ok) throw new Error((await access.json()).error || 'Unable to check property access.');
-      // Start async background job
-      await startJob(address);
-
-      // Update user search count and history in Firestore
-      const path = `users/${user.uid}`;
-      try {
-        await updateDoc(doc(db, 'users', user.uid), { searchCount: increment(1) });
-      } catch (firestoreErr) {
-        handleFirestoreError(firestoreErr, OperationType.UPDATE, path);
-      }
+      await beginReport(address);
     } catch (e: any) {
       console.error("[CLIENT] Error starting report generation:", e);
       setError(e.message || "Failed to start property report generation. Please try again.");
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  const handlePromoRedeem = async () => {
+    if (!paymentPromptAddress || !promoCode.trim()) return;
+    setIsRedeemingPromo(true);
+    setPromoError('');
+    try {
+      const result = await billingRequest('/api/promo-codes/redeem', { code: promoCode, address: paymentPromptAddress });
+      if (result.requiresPayment) {
+        sessionStorage.setItem('homepack_promo_code', result.code);
+        sessionStorage.setItem('homepack_promo_discount', String(result.discountPercent));
+        navigate('/payment?plan=report&discount=1');
+        return;
+      }
+      sessionStorage.removeItem('homepack_checkout_address');
+      window.dispatchEvent(new Event('homepack-billing-updated'));
+      const unlockedAddress = paymentPromptAddress;
+      setPaymentPromptAddress(null);
+      setPromoCode('');
+      await beginReport(unlockedAddress);
+    } catch (promoFailure: any) {
+      setPromoError(promoFailure.message || 'Unable to redeem this code.');
+    } finally {
+      setIsRedeemingPromo(false);
     }
   };
 
@@ -153,7 +186,7 @@ export default function ToolPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <Dialog open={Boolean(paymentPromptAddress)} onOpenChange={(open) => { if (!open) setPaymentPromptAddress(null); }}>
+      <Dialog open={Boolean(paymentPromptAddress)} onOpenChange={(open) => { if (!open) { setPaymentPromptAddress(null); setPromoCode(''); setPromoError(''); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Payment required for this property</DialogTitle>
@@ -166,9 +199,29 @@ export default function ToolPage() {
               {paymentPromptAddress.houseNumber} {paymentPromptAddress.street}, {paymentPromptAddress.town}, {paymentPromptAddress.postcode}
             </div>
           )}
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-center gap-2">
+              <TicketPercent className="h-4 w-4 text-primary" />
+              <p className="font-semibold">Have a complimentary or discount code?</p>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                aria-label="Complimentary or discount code"
+                value={promoCode}
+                onChange={event => setPromoCode(event.target.value.toUpperCase())}
+                placeholder="Enter code"
+                autoComplete="off"
+              />
+              <Button variant="outline" disabled={!promoCode.trim() || isRedeemingPromo} onClick={handlePromoRedeem}>
+                {isRedeemingPromo ? 'Checking…' : 'Apply'}
+              </Button>
+            </div>
+            {promoError && <p role="alert" className="text-sm text-destructive">{promoError}</p>}
+            <p className="text-xs text-muted-foreground">Free-report codes unlock this property now. Percentage codes apply the reduced price at checkout.</p>
+          </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setPaymentPromptAddress(null)}>Cancel</Button>
-            <Button onClick={() => navigate('/payment?plan=report')}>Continue to payment — £9.99</Button>
+            <Button onClick={() => { sessionStorage.removeItem('homepack_promo_code'); sessionStorage.removeItem('homepack_promo_discount'); navigate('/payment?plan=report'); }}>Continue to payment — £9.99</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

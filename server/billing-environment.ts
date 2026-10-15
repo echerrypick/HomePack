@@ -2,7 +2,9 @@ export function stripeTestMode(env: Record<string, string | undefined> = process
   return /^(sk|rk)_test_/.test(env.STRIPE_SECRET_KEY || '');
 }
 export function billingCollections(env: Record<string, string | undefined> = process.env) {
-  return stripeTestMode(env) ? { users: 'stripeTestUsers', orders: 'stripeTestOrders' } : { users: 'users', orders: 'checkoutOrders' };
+  return stripeTestMode(env)
+    ? { users: 'stripeTestUsers', orders: 'stripeTestOrders', promoCodes: 'stripeTestPromoCodes' }
+    : { users: 'users', orders: 'checkoutOrders', promoCodes: 'promoCodes' };
 }
 export function mergeBillingProfile(base: any, sandbox: any, testMode: boolean) {
   if (!testMode) return base;

@@ -10,6 +10,7 @@ import { PLANS, propertyKey, validAddress, hasPropertyAccess, hasBusinessAccess,
 import { getBillingMode } from './billing-mode';
 import { subscriptionPlan } from './subscription-plan';
 import { stripeTestMode, billingCollections, mergeBillingProfile } from './billing-environment';
+import { discountedReportAmount, generatePromoCode, isValidPromoCode, normalizePromoCode, promoCodeId } from './promo-code';
 
 export function database() {
   const app = getApps()[0] || initializeApp({
@@ -20,6 +21,10 @@ export function database() {
 }
 function billingUser(uid: string) { return database().collection(billingCollections().users).doc(uid); }
 function billingOrder(id: string) { return database().collection(billingCollections().orders).doc(id); }
+function promoCodeCollection() {
+  return getBillingMode().developmentSimulation ? 'stripeTestPromoCodes' : billingCollections().promoCodes;
+}
+function promotionCode(id: string) { return database().collection(promoCodeCollection()).doc(id); }
 async function billingProfile(uid: string) {
   const base = (await database().doc(`users/${uid}`).get()).data();
   if (!stripeTestMode()) return base;
@@ -80,10 +85,24 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   if (!token) return res.status(401).json({ error: 'Please sign in to continue.' });
   try {
     database();
-    res.locals.uid = (await getAuth().verifyIdToken(token)).uid;
+    const decoded = await getAuth().verifyIdToken(token);
+    res.locals.uid = decoded.uid;
+    res.locals.email = decoded.email || '';
+    res.locals.emailVerified = decoded.email_verified === true;
     next();
   } catch {
     res.status(401).json({ error: 'Your session could not be verified. Please sign in again.' });
+  }
+}
+
+async function requireAdmin(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const profile = (await database().doc(`users/${res.locals.uid}`).get()).data();
+    const legacyAdmin = res.locals.emailVerified && res.locals.email === 'echerrypick@btinternet.com';
+    if (profile?.role !== 'admin' && !legacyAdmin) return res.status(403).json({ error: 'Administrator access is required.' });
+    next();
+  } catch {
+    res.status(503).json({ error: 'Unable to verify administrator access.' });
   }
 }
 export async function requireProperty(req: Request, res: Response, next: NextFunction) {
@@ -147,9 +166,23 @@ async function fulfil(sessionId: string, expectedUid?: string) {
     let address: any;
     await database().runTransaction(async tx => {
       const order = (await tx.get(orderRef)).data();
-      if (!order || order.uid !== uid || order.sessionId !== session.id || session.amount_total !== PLANS.report.amount || session.currency !== 'gbp') throw new Error('Unable to verify this order.');
+      const expectedAmount = Number(order?.amount || PLANS.report.amount);
+      if (!order || order.uid !== uid || order.sessionId !== session.id || session.amount_total !== expectedAmount || session.currency !== 'gbp') throw new Error('Unable to verify this order.');
       address = order.address;
       if (order.paid) return;
+      if (order.promoCodeId) {
+        const promoRef = promotionCode(order.promoCodeId);
+        const promotion = (await tx.get(promoRef)).data();
+        if (!promotion || promotion.status !== 'reserved' || promotion.reservedBy !== uid || promotion.orderId !== orderId) {
+          throw new Error('The discount code reservation could not be verified.');
+        }
+        tx.update(promoRef, {
+          status: 'claimed', claimedAt: new Date().toISOString(), claimedBy: uid,
+          claimedByEmail: order.email || '', propertyKey: propertyKey(address),
+          address: `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`,
+          sessionId: session.id,
+        });
+      }
       tx.set(billingUser(uid), {
         purchasedPropertyKeys: FieldValue.arrayUnion(propertyKey(address)),
         purchasedReports: FieldValue.arrayUnion(`${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`),
@@ -205,6 +238,116 @@ export function registerBillingRoutes(app: express.Express) {
     } catch { res.status(503).json({ error: 'Unable to load test membership status.' }); }
   });
   app.post('/api/billing/access', authenticate, requireProperty, (_req, res) => res.json({ allowed: true }));
+  app.get('/api/admin/promo-codes', authenticate, requireAdmin, async (_req, res) => {
+    try {
+      const snapshot = await database().collection(promoCodeCollection()).orderBy('createdAt', 'desc').limit(500).get();
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({
+        testMode: stripeTestMode() || getBillingMode().developmentSimulation,
+        codes: snapshot.docs.map(document => ({ id: document.id, ...document.data() })),
+      });
+    } catch {
+      res.status(503).json({ error: 'Unable to load complimentary report codes.' });
+    }
+  });
+  app.post('/api/admin/promo-codes', authenticate, requireAdmin, async (req, res) => {
+    try {
+      const requestedCode = normalizePromoCode(req.body?.code);
+      const kind = req.body?.kind === 'discount' ? 'discount' : 'free';
+      const discountPercent = kind === 'discount' ? Number.parseInt(String(req.body?.discountPercent || ''), 10) : 100;
+      const quantity = requestedCode ? 1 : Math.min(50, Math.max(1, Number.parseInt(String(req.body?.quantity || 1), 10) || 1));
+      if (requestedCode && !isValidPromoCode(requestedCode)) {
+        return res.status(400).json({ error: 'Codes must be 8–32 characters using letters, numbers and optional hyphens.' });
+      }
+      if (kind === 'discount' && (!Number.isInteger(discountPercent) || discountPercent < 1 || discountPercent > 99)) {
+        return res.status(400).json({ error: 'Choose a percentage discount between 1% and 99%.' });
+      }
+
+      const codes = requestedCode ? [requestedCode] : Array.from({ length: quantity }, () => generatePromoCode());
+      const uniqueCodes = [...new Set(codes)];
+      if (uniqueCodes.length !== quantity) return res.status(503).json({ error: 'A unique code could not be generated. Please try again.' });
+
+      const refs = uniqueCodes.map(code => promotionCode(promoCodeId(code)));
+      const existing = await database().getAll(...refs);
+      if (existing.some(document => document.exists)) {
+        return res.status(409).json({ error: requestedCode ? 'That code already exists.' : 'A unique code could not be generated. Please try again.' });
+      }
+
+      const createdAt = new Date().toISOString();
+      const batch = database().batch();
+      refs.forEach((ref, index) => batch.create(ref, {
+        code: uniqueCodes[index],
+        kind,
+        discountPercent,
+        status: 'available',
+        createdAt,
+        createdBy: res.locals.uid,
+        createdByEmail: res.locals.email || '',
+      }));
+      await batch.commit();
+      res.status(201).json({ codes: uniqueCodes, createdAt, testMode: stripeTestMode() || getBillingMode().developmentSimulation });
+    } catch {
+      res.status(503).json({ error: 'Unable to create complimentary report codes.' });
+    }
+  });
+  app.post('/api/promo-codes/redeem', authenticate, async (req, res) => {
+    const code = normalizePromoCode(req.body?.code);
+    const address = req.body?.address;
+    if (!isValidPromoCode(code)) return res.status(400).json({ error: 'Enter a valid complimentary report code.' });
+    if (!validAddress(address)) return res.status(400).json({ error: 'Enter a complete, valid property address.' });
+
+    try {
+      const uid = res.locals.uid as string;
+      const codeRef = promotionCode(promoCodeId(code));
+      const userRef = billingUser(uid);
+      const addressKey = propertyKey(address);
+      const addressLabel = `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`;
+
+      const result = await database().runTransaction(async tx => {
+        const [codeSnapshot, profileSnapshot] = await Promise.all([tx.get(codeRef), tx.get(userRef)]);
+        const codeData = codeSnapshot.data();
+        const profile = stripeTestMode()
+          ? mergeBillingProfile((await tx.get(database().doc(`users/${uid}`))).data(), profileSnapshot.data(), true)
+          : profileSnapshot.data();
+
+        if (!codeSnapshot.exists || codeData?.status !== 'available') {
+          throw Object.assign(new Error('This code is invalid or has already been claimed.'), { statusCode: 409 });
+        }
+        if (hasPropertyAccess(profile, address, Date.now(), getBillingMode().developmentSimulation)) {
+          return { alreadyOwned: true };
+        }
+
+        if (codeData.kind === 'discount') {
+          return { alreadyOwned: false, requiresPayment: true, discountPercent: Number(codeData.discountPercent) };
+        }
+
+        const claimedAt = new Date().toISOString();
+        tx.update(codeRef, {
+          status: 'claimed',
+          claimedAt,
+          claimedBy: uid,
+          claimedByEmail: res.locals.email || '',
+          propertyKey: addressKey,
+          address: addressLabel,
+        });
+        tx.set(userRef, {
+          purchasedPropertyKeys: FieldValue.arrayUnion(addressKey),
+          purchasedReports: FieldValue.arrayUnion(addressLabel),
+          promotionRedemptions: FieldValue.arrayUnion({ codeId: codeRef.id, code, addressKey, address: addressLabel, claimedAt }),
+          updatedAt: claimedAt,
+        }, { merge: true });
+        return { alreadyOwned: false, requiresPayment: false, discountPercent: 100 };
+      });
+
+      if (result.alreadyOwned) return res.status(409).json({ error: 'This account already has access to that property, so the code was not used.' });
+      if (result.requiresPayment) {
+        return res.json({ redeemed: false, requiresPayment: true, discountPercent: result.discountPercent, code, address });
+      }
+      res.json({ redeemed: true, requiresPayment: false, discountPercent: 100, address });
+    } catch (error: any) {
+      res.status(error?.statusCode || 503).json({ error: error?.statusCode ? error.message : 'Unable to redeem the code. Please try again.' });
+    }
+  });
   app.post('/api/profile/report-settings', authenticate, async (req, res) => {
     try {
       const uid = res.locals.uid as string;
@@ -224,12 +367,30 @@ export function registerBillingRoutes(app: express.Express) {
     }
   });
   app.post('/api/billing/checkout', authenticate, async (req, res) => {
+    let reservedPromo: { ref: ReturnType<typeof promotionCode>; uid: string; orderId: string } | null = null;
+    let checkoutSessionCreated = false;
     try {
       const mode = getBillingMode();
       const plan = req.body.plan as PaidPlan;
       if (!Object.hasOwn(PLANS, plan) || (plan === 'report' && !validAddress(req.body.address))) return res.status(400).json({ error: 'Select a valid plan and property.' });
       const uid = res.locals.uid as string;
       const profile = await billingProfile(uid);
+      const submittedPromoCode = plan === 'report' ? normalizePromoCode(req.body?.promoCode) : '';
+      if (submittedPromoCode && !isValidPromoCode(submittedPromoCode)) return res.status(400).json({ error: 'Enter a valid discount code.' });
+
+      let discountPercent = 0;
+      let promoId = '';
+      let reportAmount: number = PLANS.report.amount;
+      if (submittedPromoCode) {
+        promoId = promoCodeId(submittedPromoCode);
+        const promoSnapshot = await promotionCode(promoId).get();
+        const promotion = promoSnapshot.data();
+        if (!promotion || promotion.kind !== 'discount' || promotion.status === 'claimed') {
+          return res.status(409).json({ error: 'This discount code is invalid or has already been claimed.' });
+        }
+        discountPercent = Number(promotion.discountPercent);
+        reportAmount = discountedReportAmount(PLANS.report.amount, discountPercent);
+      }
 
       if (mode.developmentSimulation) {
         const simulatedSessionId = `dev_${randomUUID()}`;
@@ -238,15 +399,29 @@ export function registerBillingRoutes(app: express.Express) {
           if (hasPropertyAccess(profile, address, Date.now(), true)) {
             return res.json({ alreadyPurchased: true, simulated: true, completed: true, address });
           }
-          const orderId = createHash('sha256').update(`${uid}:${plan}:${propertyKey(address)}`).digest('hex');
+          const orderId = createHash('sha256').update(`${uid}:${plan}:${propertyKey(address)}:${promoId || 'standard'}`).digest('hex');
           await database().runTransaction(async tx => {
+            if (promoId) {
+              const promoRef = promotionCode(promoId);
+              const promotion = (await tx.get(promoRef)).data();
+              if (!promotion || promotion.kind !== 'discount' || promotion.status !== 'available') {
+                throw Object.assign(new Error('This discount code is invalid or has already been claimed.'), { statusCode: 409 });
+              }
+              tx.update(promoRef, {
+                status: 'claimed', claimedAt: new Date().toISOString(), claimedBy: uid,
+                claimedByEmail: res.locals.email || '', propertyKey: propertyKey(address),
+                address: `${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`,
+                simulated: true,
+              });
+            }
             tx.set(database().doc(`users/${uid}`), {
               developmentPurchasedPropertyKeys: FieldValue.arrayUnion(propertyKey(address)),
               developmentPurchasedReports: FieldValue.arrayUnion(`${address.houseNumber} ${address.street}, ${address.town}, ${address.postcode}`),
               updatedAt: new Date().toISOString(),
             }, { merge: true });
             tx.set(database().doc(`checkoutOrders/${orderId}`), {
-              uid, plan, address, sessionId: simulatedSessionId, paid: true,
+              uid, plan, address, sessionId: simulatedSessionId, paid: true, amount: reportAmount,
+              ...(promoId ? { promoCodeId: promoId, discountPercent } : {}),
               simulated: true, completedAt: new Date().toISOString(),
             }, { merge: true });
           });
@@ -274,8 +449,8 @@ export function registerBillingRoutes(app: express.Express) {
           return res.json({ url: session.url });
         }
       }
-      if (plan === 'report' && profile?.purchasedPropertyKeys?.includes(propertyKey(req.body.address))) return res.json({ alreadyPurchased: true });
-      const orderId = createHash('sha256').update(`${uid}:${plan === 'report' ? 'report' : 'membership'}:${plan === 'report' ? propertyKey(req.body.address) : 'membership'}`).digest('hex');
+      if (plan === 'report' && hasPropertyAccess(profile, req.body.address, Date.now(), false)) return res.json({ alreadyPurchased: true });
+      const orderId = createHash('sha256').update(`${uid}:${plan === 'report' ? 'report' : 'membership'}:${plan === 'report' ? propertyKey(req.body.address) : 'membership'}:${promoId || 'standard'}`).digest('hex');
       const ref = billingOrder(orderId);
       const previous = (await ref.get()).data();
       if (previous?.sessionId && !previous.paid) {
@@ -290,23 +465,59 @@ export function registerBillingRoutes(app: express.Express) {
       const attempt = await database().runTransaction(async tx => {
         const existing = (await tx.get(ref)).data();
         const attempt = existing?.attempt || randomUUID();
-        tx.set(ref, { uid, plan, ...(plan === 'report' ? { address: req.body.address } : {}), paid: false, attempt }, { merge: true });
+        if (promoId) {
+          const promoRef = promotionCode(promoId);
+          const promotion = (await tx.get(promoRef)).data();
+          const now = Date.now();
+          const sameReservation = promotion?.status === 'reserved' && promotion?.reservedBy === uid && promotion?.orderId === orderId;
+          const expiredReservation = promotion?.status === 'reserved' && Number(promotion?.reservationExpiresAt || 0) <= now;
+          if (!promotion || promotion.kind !== 'discount' || (!sameReservation && promotion.status !== 'available' && !expiredReservation)) {
+            throw Object.assign(new Error('This discount code is currently unavailable or has already been claimed.'), { statusCode: 409 });
+          }
+          tx.update(promoRef, {
+            status: 'reserved', reservedAt: new Date().toISOString(), reservedBy: uid,
+            reservedByEmail: res.locals.email || '', reservationExpiresAt: now + 31 * 60 * 1000,
+            orderId, propertyKey: propertyKey(req.body.address),
+            address: `${req.body.address.houseNumber} ${req.body.address.street}, ${req.body.address.town}, ${req.body.address.postcode}`,
+            sessionId: FieldValue.delete(),
+          });
+          reservedPromo = { ref: promoRef, uid, orderId };
+        }
+        tx.set(ref, {
+          uid, plan, email: res.locals.email || '', ...(plan === 'report' ? { address: req.body.address, amount: reportAmount } : {}),
+          ...(promoId ? { promoCodeId: promoId, discountPercent } : {}), paid: false, attempt,
+        }, { merge: true });
         return attempt;
       });
-      const metadata = { uid, plan, orderId };
+      const metadata = { uid, plan, orderId, ...(promoId ? { promoCodeId: promoId } : {}) };
       const prices = plan === 'report' ? null : await membershipPrices(client);
       const session = await client.checkout.sessions.create({
         mode: plan === 'report' ? 'payment' : 'subscription',
         payment_method_types: ['card'],
-        line_items: plan !== 'report' ? [{ quantity: 1, price: prices![plan].id }] : [{ quantity: 1, price_data: { currency: 'gbp', unit_amount: PLANS[plan].amount, product_data: { name: PLANS[plan].name },  } }],
+        line_items: plan !== 'report' ? [{ quantity: 1, price: prices![plan].id }] : [{ quantity: 1, price_data: { currency: 'gbp', unit_amount: reportAmount, product_data: { name: promoId ? `${PLANS[plan].name} (${discountPercent}% discount)` : PLANS[plan].name },  } }],
         metadata, ...(plan === 'report' ? {} : { subscription_data: { metadata } }),
         ...(profile?.stripeCustomerId ? { customer: profile.stripeCustomerId } : { customer_email: profile?.email, ...(plan === 'report' ? { customer_creation: 'always' as const } : {}) }),
         success_url: `${process.env.APP_URL}/payment?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.APP_URL}/payment?plan=${plan}&cancelled=1`,
+        ...(promoId ? { expires_at: Math.floor(Date.now() / 1000) + 30 * 60 } : {}),
       }, { idempotencyKey: `${orderId}:${previous?.sessionId ? previous.sessionId : attempt}` });
+      checkoutSessionCreated = true;
       await ref.update({ sessionId: session.id });
+      if (promoId) await promotionCode(promoId).update({ sessionId: session.id });
       res.json({ url: session.url });
-    } catch (error: any) { res.status(503).json({ error: 'Checkout is currently unavailable. Please try again later.' }); }
+    } catch (error: any) {
+      if (reservedPromo && !checkoutSessionCreated) {
+        try {
+          await database().runTransaction(async tx => {
+            const current = (await tx.get(reservedPromo!.ref)).data();
+            if (current?.status === 'reserved' && current.reservedBy === reservedPromo!.uid && current.orderId === reservedPromo!.orderId && !current.sessionId) {
+              tx.update(reservedPromo!.ref, { status: 'available', reservedAt: FieldValue.delete(), reservedBy: FieldValue.delete(), reservedByEmail: FieldValue.delete(), reservationExpiresAt: FieldValue.delete(), orderId: FieldValue.delete(), propertyKey: FieldValue.delete(), address: FieldValue.delete() });
+            }
+          });
+        } catch { /* The reservation expires automatically after 30 minutes. */ }
+      }
+      res.status(error?.statusCode || 503).json({ error: error?.statusCode ? error.message : 'Checkout is currently unavailable. Please try again later.' });
+    }
   });
   app.post('/api/billing/verify', authenticate, async (req, res) => {
     if (!getBillingMode().enabled) return res.status(503).json({ error: 'There is no Stripe payment to verify in local simulation mode.' });
