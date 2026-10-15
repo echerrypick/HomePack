@@ -10,8 +10,8 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
   return fetch(url, { ...options, headers });
 }
 
-export async function billingRequest(url: string, body?: unknown) {
-  const response = await authenticatedFetch(url, { method: body === undefined ? 'GET' : 'POST', ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+export async function billingRequest(url: string, body?: unknown, method?: 'POST' | 'PATCH') {
+  const response = await authenticatedFetch(url, { method: body === undefined ? 'GET' : method || 'POST', ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Unable to complete this request.');
   return data;

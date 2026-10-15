@@ -23,8 +23,9 @@ type PromoCodeRecord = {
   code: string;
   kind?: 'free' | 'discount';
   discountPercent?: number;
-  status: 'available' | 'reserved' | 'claimed';
+  status: 'available' | 'issued' | 'reserved' | 'claimed';
   createdAt: string;
+  issuedAt?: string;
   claimedAt?: string;
   claimedByEmail?: string;
   reservedByEmail?: string;
@@ -47,6 +48,7 @@ export default function AdminPage() {
   const [promoCodes, setPromoCodes] = useState<PromoCodeRecord[]>([]);
   const [promoLoading, setPromoLoading] = useState(true);
   const [creatingPromo, setCreatingPromo] = useState(false);
+  const [updatingPromoId, setUpdatingPromoId] = useState('');
   const [promoKind, setPromoKind] = useState<'free' | 'discount'>('free');
   const [discountPercent, setDiscountPercent] = useState('20');
   const [customCode, setCustomCode] = useState('');
@@ -108,6 +110,19 @@ export default function AdminPage() {
   const copyCode = async (code: string) => {
     await navigator.clipboard.writeText(code);
     toast.success('Code copied');
+  };
+
+  const setPromoIssued = async (record: PromoCodeRecord, issued: boolean) => {
+    setUpdatingPromoId(record.id);
+    try {
+      await billingRequest(`/api/admin/promo-codes/${record.id}/status`, { status: issued ? 'issued' : 'available' }, 'PATCH');
+      toast.success(issued ? `${record.code} marked as issued` : `${record.code} returned to available`);
+      await loadPromoCodes();
+    } catch (error: any) {
+      toast.error(error.message || 'Unable to update the offer code');
+    } finally {
+      setUpdatingPromoId('');
+    }
   };
 
   const handleRoleChange = async (uid: string, newRole: UserRole) => {
@@ -226,9 +241,19 @@ export default function AdminPage() {
               </Button>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               {([
-                { title: 'Created — not claimed', records: promoCodes.filter(code => code.status !== 'claimed') },
+                ['Available to issue', promoCodes.filter(code => code.status === 'available').length],
+                ['Issued', promoCodes.filter(code => code.status === 'issued').length],
+                ['Checkout pending', promoCodes.filter(code => code.status === 'reserved').length],
+                ['Claimed', promoCodes.filter(code => code.status === 'claimed').length],
+              ] as const).map(([label, count]) => <div key={label} className="rounded-xl border bg-muted/20 p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-bold">{count}</p></div>)}
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-3">
+              {([
+                { title: 'Available to issue', records: promoCodes.filter(code => code.status === 'available') },
+                { title: 'Issued or in checkout', records: promoCodes.filter(code => code.status === 'issued' || code.status === 'reserved') },
                 { title: 'Claimed', records: promoCodes.filter(code => code.status === 'claimed') },
               ] as const).map(group => (
                 <div key={group.title} className="min-w-0 space-y-3">
@@ -244,6 +269,8 @@ export default function AdminPage() {
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-mono font-bold tracking-wide">{record.code}</span>
                               <Badge variant={record.status === 'claimed' ? 'secondary' : 'outline'}>{record.kind === 'discount' ? `${record.discountPercent}% off` : 'Free report'}</Badge>
+                              {record.status === 'available' && <Badge variant="outline">Available</Badge>}
+                              {record.status === 'issued' && <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-800">Issued</Badge>}
                               {record.status === 'reserved' && <Badge variant="outline" className="border-amber-300 text-amber-700">Checkout pending</Badge>}
                             </div>
                             <div className="mt-2 flex flex-wrap gap-1">
@@ -251,9 +278,14 @@ export default function AdminPage() {
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">Created {new Date(record.createdAt).toLocaleString('en-GB')}</p>
                           </div>
-                          <Button size="icon-sm" variant="ghost" aria-label={`Copy ${record.code}`} onClick={() => copyCode(record.code)}><Copy className="h-4 w-4" /></Button>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button size="icon-sm" variant="ghost" aria-label={`Copy ${record.code}`} onClick={() => copyCode(record.code)}><Copy className="h-4 w-4" /></Button>
+                          </div>
                         </div>
+                        {record.status === 'available' && <Button className="mt-3 w-full" size="sm" variant="outline" disabled={updatingPromoId === record.id} onClick={() => setPromoIssued(record, true)}>{updatingPromoId === record.id ? 'Updating…' : 'Mark as issued'}</Button>}
+                        {record.status === 'issued' && <Button className="mt-3 w-full" size="sm" variant="ghost" disabled={updatingPromoId === record.id} onClick={() => setPromoIssued(record, false)}>{updatingPromoId === record.id ? 'Updating…' : 'Return to available'}</Button>}
                         {record.address && <p className="mt-2 break-words text-xs"><span className="font-semibold">Property:</span> {record.address}</p>}
+                        {record.issuedAt && <p className="mt-2 text-xs text-muted-foreground">Issued {new Date(record.issuedAt).toLocaleString('en-GB')}</p>}
                         {record.status === 'claimed' && record.claimedProduct && record.claimedProduct !== 'report' && <p className="mt-2 text-xs"><span className="font-semibold">Claimed for:</span> {PROMO_PRODUCT_LABELS[record.claimedProduct]}</p>}
                         {(record.claimedByEmail || record.reservedByEmail) && <p className="mt-1 break-all text-xs"><span className="font-semibold">Customer:</span> {record.claimedByEmail || record.reservedByEmail}</p>}
                         {record.claimedAt && <p className="mt-1 text-xs text-muted-foreground">Claimed {new Date(record.claimedAt).toLocaleString('en-GB')}</p>}

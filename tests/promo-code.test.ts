@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discountedReportAmount, generatePromoCode, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from '../server/promo-code';
+import { discountedReportAmount, generatePromoCode, isRedeemablePromoStatus, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from '../server/promo-code';
 
 test('complimentary report codes normalize consistently and hash to one identifier', () => {
   assert.equal(normalizePromoCode(' ukhp-ab12-cd34 '), 'UKHP-AB12-CD34');
@@ -30,4 +30,11 @@ test('generated complimentary report codes are valid and unique', () => {
   assert.equal(codes.every(isValidPromoCode), true);
   assert.equal(isValidPromoCode('SHORT'), false);
   assert.equal(isValidPromoCode('INVALID CODE!'), false);
+});
+
+test('available and issued codes can be redeemed, but pending and claimed codes cannot', () => {
+  assert.equal(isRedeemablePromoStatus('available'), true);
+  assert.equal(isRedeemablePromoStatus('issued'), true);
+  assert.equal(isRedeemablePromoStatus('reserved'), false);
+  assert.equal(isRedeemablePromoStatus('claimed'), false);
 });

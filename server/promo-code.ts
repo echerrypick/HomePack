@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 
 const PROMO_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export type PromoProduct = 'report' | 'subscription' | 'agency';
+export type PromoStatus = 'available' | 'issued' | 'reserved' | 'claimed';
 const PROMO_PRODUCTS = new Set<PromoProduct>(['report', 'subscription', 'agency']);
 
 export function normalizePromoCode(value: unknown): string {
@@ -38,4 +39,8 @@ export function normalizePromoProducts(value: unknown, kind: 'free' | 'discount'
 export function promoAppliesTo(products: unknown, plan: PromoProduct): boolean {
   const normalized = Array.isArray(products) ? products : ['report'];
   return normalized.includes(plan);
+}
+
+export function isRedeemablePromoStatus(status: unknown): status is 'available' | 'issued' {
+  return status === 'available' || status === 'issued';
 }

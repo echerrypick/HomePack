@@ -10,7 +10,7 @@ import { PLANS, propertyKey, validAddress, hasPropertyAccess, hasBusinessAccess,
 import { getBillingMode } from './billing-mode';
 import { subscriptionPlan } from './subscription-plan';
 import { stripeTestMode, billingCollections, mergeBillingProfile } from './billing-environment';
-import { discountedReportAmount, generatePromoCode, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from './promo-code';
+import { discountedReportAmount, generatePromoCode, isRedeemablePromoStatus, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from './promo-code';
 
 export function database() {
   const app = getApps()[0] || initializeApp({
@@ -312,6 +312,35 @@ export function registerBillingRoutes(app: express.Express) {
       res.status(503).json({ error: 'Unable to create offer codes.' });
     }
   });
+  app.patch('/api/admin/promo-codes/:id/status', authenticate, requireAdmin, async (req, res) => {
+    const id = String(req.params.id || '');
+    const nextStatus = req.body?.status;
+    if (!/^[a-f0-9]{64}$/.test(id) || !['available', 'issued'].includes(nextStatus)) {
+      return res.status(400).json({ error: 'Select a valid offer code status.' });
+    }
+    try {
+      const codeRef = promotionCode(id);
+      const updated = await database().runTransaction(async tx => {
+        const snapshot = await tx.get(codeRef);
+        const current = snapshot.data();
+        if (!snapshot.exists) throw Object.assign(new Error('Offer code not found.'), { statusCode: 404 });
+        if (!isRedeemablePromoStatus(current?.status)) {
+          throw Object.assign(new Error('A code in checkout or already claimed cannot be changed.'), { statusCode: 409 });
+        }
+        if (current?.status === nextStatus) return current;
+        const now = new Date().toISOString();
+        tx.update(codeRef, nextStatus === 'issued' ? {
+          status: 'issued', issuedAt: now, issuedBy: res.locals.uid, issuedByEmail: res.locals.email || '',
+        } : {
+          status: 'available', issuedAt: FieldValue.delete(), issuedBy: FieldValue.delete(), issuedByEmail: FieldValue.delete(),
+        });
+        return { ...current, status: nextStatus, ...(nextStatus === 'issued' ? { issuedAt: now } : { issuedAt: undefined }) };
+      });
+      res.json({ code: { id, ...updated } });
+    } catch (error: any) {
+      res.status(error?.statusCode || 503).json({ error: error?.statusCode ? error.message : 'Unable to update the offer code.' });
+    }
+  });
   app.post('/api/promo-codes/redeem', authenticate, async (req, res) => {
     const code = normalizePromoCode(req.body?.code);
     const plan = req.body?.plan as PaidPlan;
@@ -334,7 +363,7 @@ export function registerBillingRoutes(app: express.Express) {
           ? mergeBillingProfile((await tx.get(database().doc(`users/${uid}`))).data(), profileSnapshot.data(), true)
           : profileSnapshot.data();
 
-        if (!codeSnapshot.exists || codeData?.status !== 'available') {
+        if (!codeSnapshot.exists || !isRedeemablePromoStatus(codeData?.status)) {
           throw Object.assign(new Error('This code is invalid or has already been claimed.'), { statusCode: 409 });
         }
         if (!promoAppliesTo(codeData.products, plan)) {
@@ -413,7 +442,7 @@ export function registerBillingRoutes(app: express.Express) {
         promoId = promoCodeId(submittedPromoCode);
         const promoSnapshot = await promotionCode(promoId).get();
         const promotion = promoSnapshot.data();
-        if (!promotion || promotion.kind !== 'discount' || promotion.status === 'claimed' || !promoAppliesTo(promotion.products, plan)) {
+        if (!promotion || promotion.kind !== 'discount' || (!isRedeemablePromoStatus(promotion.status) && promotion.status !== 'reserved') || !promoAppliesTo(promotion.products, plan)) {
           return res.status(409).json({ error: 'This discount code is invalid, not valid for this product, or has already been claimed.' });
         }
         discountPercent = Number(promotion.discountPercent);
@@ -432,7 +461,7 @@ export function registerBillingRoutes(app: express.Express) {
             if (promoId) {
               const promoRef = promotionCode(promoId);
               const promotion = (await tx.get(promoRef)).data();
-              if (!promotion || promotion.kind !== 'discount' || promotion.status !== 'available' || !promoAppliesTo(promotion.products, plan)) {
+              if (!promotion || promotion.kind !== 'discount' || !isRedeemablePromoStatus(promotion.status) || !promoAppliesTo(promotion.products, plan)) {
                 throw Object.assign(new Error('This discount code is invalid, not valid for this product, or has already been claimed.'), { statusCode: 409 });
               }
               tx.update(promoRef, {
@@ -461,7 +490,7 @@ export function registerBillingRoutes(app: express.Express) {
           if (promoId) {
             const promoRef = promotionCode(promoId);
             const promotion = (await tx.get(promoRef)).data();
-            if (!promotion || promotion.kind !== 'discount' || promotion.status !== 'available' || !promoAppliesTo(promotion.products, plan)) {
+            if (!promotion || promotion.kind !== 'discount' || !isRedeemablePromoStatus(promotion.status) || !promoAppliesTo(promotion.products, plan)) {
               throw Object.assign(new Error('This discount code is invalid, not valid for this product, or has already been claimed.'), { statusCode: 409 });
             }
             tx.update(promoRef, {
@@ -513,13 +542,16 @@ export function registerBillingRoutes(app: express.Express) {
           const now = Date.now();
           const sameReservation = promotion?.status === 'reserved' && promotion?.reservedBy === uid && promotion?.orderId === orderId;
           const expiredReservation = promotion?.status === 'reserved' && Number(promotion?.reservationExpiresAt || 0) <= now;
-          if (!promotion || promotion.kind !== 'discount' || !promoAppliesTo(promotion.products, plan) || (!sameReservation && promotion.status !== 'available' && !expiredReservation)) {
+          if (!promotion || promotion.kind !== 'discount' || !promoAppliesTo(promotion.products, plan) || (!sameReservation && !isRedeemablePromoStatus(promotion.status) && !expiredReservation)) {
             throw Object.assign(new Error('This discount code is currently unavailable or has already been claimed.'), { statusCode: 409 });
           }
+          const reservationPreviousStatus = promotion.status === 'reserved'
+            ? (promotion.reservationPreviousStatus === 'issued' ? 'issued' : 'available')
+            : (promotion.status === 'issued' ? 'issued' : 'available');
           tx.update(promoRef, {
             status: 'reserved', reservedAt: new Date().toISOString(), reservedBy: uid,
             reservedByEmail: res.locals.email || '', reservationExpiresAt: now + 31 * 60 * 1000,
-            orderId, claimedProduct: plan,
+            orderId, claimedProduct: plan, reservationPreviousStatus,
             ...(plan === 'report' ? {
               propertyKey: propertyKey(req.body.address),
               address: `${req.body.address.houseNumber} ${req.body.address.street}, ${req.body.address.town}, ${req.body.address.postcode}`,
@@ -568,7 +600,7 @@ export function registerBillingRoutes(app: express.Express) {
           await database().runTransaction(async tx => {
             const current = (await tx.get(reservedPromo!.ref)).data();
             if (current?.status === 'reserved' && current.reservedBy === reservedPromo!.uid && current.orderId === reservedPromo!.orderId && !current.sessionId) {
-              tx.update(reservedPromo!.ref, { status: 'available', reservedAt: FieldValue.delete(), reservedBy: FieldValue.delete(), reservedByEmail: FieldValue.delete(), reservationExpiresAt: FieldValue.delete(), orderId: FieldValue.delete(), claimedProduct: FieldValue.delete(), propertyKey: FieldValue.delete(), address: FieldValue.delete() });
+              tx.update(reservedPromo!.ref, { status: current.reservationPreviousStatus === 'issued' ? 'issued' : 'available', reservedAt: FieldValue.delete(), reservedBy: FieldValue.delete(), reservedByEmail: FieldValue.delete(), reservationExpiresAt: FieldValue.delete(), reservationPreviousStatus: FieldValue.delete(), orderId: FieldValue.delete(), claimedProduct: FieldValue.delete(), propertyKey: FieldValue.delete(), address: FieldValue.delete() });
             }
           });
         } catch { /* The reservation expires automatically after 30 minutes. */ }
