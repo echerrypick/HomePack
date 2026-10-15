@@ -1,3 +1,4 @@
+import { subscriptionTiming } from './subscription-timing';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -121,15 +122,16 @@ async function syncSubscription(id: string) {
     const profile = (await tx.get(ref)).data();
     if (profile?.stripeSubscriptionId && profile.stripeSubscriptionId !== id && (profile.subscriptionCreatedAt || 0) >= subscription.created) return;
     const active = subscription.status === 'active';
+    const timing = subscriptionTiming(subscription);
     tx.set(ref, {
       ...(profile?.role === 'admin' ? {} : { role: active ? plan : 'free' }),
       accountType: profile?.role === 'admin' || active ? 'business' : 'consumer', stripeSubscriptionId: id,
       subscriptionCreatedAt: subscription.created,
       stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id,
       subscriptionStatus: subscription.status,
-      subscriptionCancelAtPeriodEnd: subscription.cancel_at_period_end,
+      subscriptionCancelAtPeriodEnd: timing.cancellationScheduled,
       subscriptionPlan: plan,
-      subscriptionExpiresAt: Math.max(0, ...subscription.items.data.map(item => item.current_period_end)) * 1000,
+      subscriptionExpiresAt: timing.expiresAt,
       updatedAt: new Date().toISOString(),
     }, { merge: true });
   });
@@ -288,7 +290,7 @@ export function registerBillingRoutes(app: express.Express) {
       const attempt = await database().runTransaction(async tx => {
         const existing = (await tx.get(ref)).data();
         const attempt = existing?.attempt || randomUUID();
-        tx.set(ref, { uid, plan, ...(plan === 'report' ? { address: req.body.address } : {}), paid: existing?.paid || false, attempt }, { merge: true });
+        tx.set(ref, { uid, plan, ...(plan === 'report' ? { address: req.body.address } : {}), paid: false, attempt }, { merge: true });
         return attempt;
       });
       const metadata = { uid, plan, orderId };

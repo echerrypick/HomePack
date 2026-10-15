@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {subscriptionTiming} from '../server/subscription-timing';
+const active={status:'active',cancel_at_period_end:false,items:{data:[{current_period_end:2000}]}};
+test('scheduled cancellation can be expressed as a date after a portal downgrade',()=>{assert.deepEqual(subscriptionTiming({...active,cancel_at:2000}),{cancellationScheduled:true,expiresAt:2000000});assert.equal(subscriptionTiming({...active,cancel_at_period_end:true}).cancellationScheduled,true)});
+test('a fixed cancellation date caps entitlement expiry and cancelled subscriptions have no pending notice',()=>{assert.deepEqual(subscriptionTiming({...active,cancel_at:1500}),{cancellationScheduled:true,expiresAt:1500000});assert.equal(subscriptionTiming({...active,status:'canceled',cancel_at:2000}).cancellationScheduled,false);assert.equal(subscriptionTiming(active).cancellationScheduled,false)});
