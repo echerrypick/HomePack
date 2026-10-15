@@ -228,6 +228,11 @@ async function trackTiming<T>(label: string, logs: string[], operation: () => Pr
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Keep platform health probes inexpensive: no Firestore reads or upstream calls.
+app.get('/healthz', (_req, res) => {
+  res.set('Cache-Control', 'no-store').json({ status: 'ok' });
+});
+
 // Initialize Gemini for Search Grounding lazily
 let aiClient: GoogleGenAI | null = null;
 

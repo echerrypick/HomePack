@@ -1,0 +1,15 @@
+.git
+.env*
+node_modules
+dist
+build
+coverage
+tmp
+.tmp
+output
+*.log
+.DS_Store
+**/*service-account*.json
+**/*firebase-adminsdk*.json
+**/*.pem
+**/*.key
