@@ -381,7 +381,7 @@ export default function SampleReportPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       <main className="site-main container mx-auto px-4 py-12 flex-grow">
-        <PageHero eyebrow="Explore before you buy" illustration="report"><h1 className="site-page-heading">See a HomePack for yourself.</h1><p>Explore the dated sample for 41 Bingley Avenue, Tamworth, B78 3BU. Snapshot checked 27 September 2026.</p><p className="page-hero-footnote">Source records change. Generate a new report for current research and independently verify material findings.</p></PageHero>
+        <PageHero eyebrow="Explore before you buy" illustration="report"><h1 className="site-page-heading">Sample UK property report</h1><p>See how available property and local-area records are presented in this dated sample for 41 Bingley Avenue, Tamworth, B78 3BU. Snapshot checked 27 September 2026.</p><p className="page-hero-footnote">Source records change. Generate a new report for current research and independently verify material findings.</p></PageHero>
         <ReportDisplay 
           address={SAMPLE_ADDRESS} 
           reportData={SAMPLE_REPORT_DATA} 

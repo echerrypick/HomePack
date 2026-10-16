@@ -150,7 +150,7 @@ export default function MobilePage() {
               transition={{ delay: 0.1 }}
               className="site-page-heading text-3xl font-bold tracking-tight mb-3"
             >
-              Mobile Coverage Checker
+              Mobile signal and 5G coverage checker
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0, y: -10 }}
@@ -158,7 +158,7 @@ export default function MobilePage() {
               transition={{ delay: 0.2 }}
               className="text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed"
             >
-              Check official Ofcom mobile coverage for your property. See 4G, 5G, and voice availability across all major UK networks.
+              Check available Ofcom mobile signal predictions for a property address, including voice, 4G and 5G coverage across major UK networks.
             </motion.p>
           </PageHero>
 

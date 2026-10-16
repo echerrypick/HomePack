@@ -53,7 +53,7 @@ export default function CouncilTaxPage() {
       <Header />
       
       <main className="site-main flex-grow flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
-        <PageHero eyebrow="Understand the running costs" icon={<Home />}><h1 className="site-page-heading">Council tax, with the context.</h1><p>Check the official VOA band for an exact property address. Available charges and source details help you plan ahead.</p></PageHero>
+        <PageHero eyebrow="Understand the running costs" icon={<Home />}><h1 className="site-page-heading">Council tax band checker by address</h1><p>Check the official VOA council tax band for an exact UK property address, with available local authority charges and source details.</p></PageHero>
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}

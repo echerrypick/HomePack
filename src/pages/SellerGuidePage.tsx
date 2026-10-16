@@ -14,8 +14,8 @@ export default function SellerGuidePage() {
 
       <main className="site-main container mx-auto px-4 py-12 max-w-4xl flex-grow">
         <PageHero eyebrow="Prepare for your next chapter" illustration="property" icon={<Home />}>
-          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">The Essential Seller's Guide</h1>
-          <p className="text-xl text-muted-foreground">Maximise your property's value and ensure a smooth, stress-free sale.</p>
+          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">Property information to prepare before selling</h1>
+          <p className="text-xl text-muted-foreground">A practical UK home seller guide to the TA6 form, EPC, supporting documents, conveyancing and preparing for buyer questions.</p>
         </PageHero>
 
         {/* TA6 Form Section */}

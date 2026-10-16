@@ -1,0 +1,27 @@
+# UKHomePack
+
+> UKHomePack creates online UK property information reports for buyers, sellers and property professionals. The service brings together available public and official records into an online report and downloadable PDF.
+
+UKHomePack is an independent service for initial property research. A report may include available HM Land Registry sale history and tenure, EPC information, council tax, planning applications, flood-risk findings, crime statistics, schools, healthcare, broadband and mobile coverage. Availability and publication dates vary by address and source. A missing result is not evidence that no issue exists.
+
+Retail reports cost £9.99 for one property. Business membership costs £49 per month and includes unlimited reports. Business Plus costs £79 per month and adds company branding. Current pricing and terms on the website take precedence over this summary.
+
+UKHomePack reports do not replace a building survey, valuation, legal advice, title documents, conveyancing searches or statutory local-authority searches.
+
+## Main pages
+
+- [UK property reports](https://ukhomepack.com/): Service overview and one-off report purchase.
+- [Report contents](https://ukhomepack.com/features): Checks and data sources included in a report.
+- [Pricing](https://ukhomepack.com/pricing): Retail, Business and Business Plus prices.
+- [Sample property report](https://ukhomepack.com/sample): Illustrative report showing the presentation and limitations.
+- [Property checks before buying](https://ukhomepack.com/buyer-guide): UK homebuyer checklist and guidance.
+- [Seller guide](https://ukhomepack.com/seller-guide): Information to prepare before selling a property.
+- [Council tax band checker](https://ukhomepack.com/council-tax): Exact-address VOA band lookup and available charges.
+- [Broadband checker](https://ukhomepack.com/broadband): Available Ofcom broadband information by address.
+- [Mobile coverage checker](https://ukhomepack.com/mobile): Available Ofcom mobile coverage information by address.
+- [Machine-readable site information](https://ukhomepack.com/site-info.json): JSON summary of the organisation, service, prices and important limitations.
+
+## Contact
+
+- [Support](https://ukhomepack.com/contact)
+- Email: support@ukhomepack.com

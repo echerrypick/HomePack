@@ -10,7 +10,7 @@ import Groq from "groq-sdk";
 import * as cheerio from 'cheerio';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { lookupOfcomMobile, lookupOfcomBroadband, ensurePlaywrightChromium } from './src/lib/ofcomScraper';
 import { scrapeCoverage as scrapeSiginfoCoverage } from './src/lib/siginfoScraper';
 import { getHealthcareAccessData } from './src/services/healthcareService';
@@ -20,6 +20,7 @@ import { type PlanningScope } from './server/planning-scope';
 import { saveReport, listReports, readReport, saveJob, readJob, cleanupExpiredJobs } from './server/report-store';
 import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-registry-match';
 import { queryLandRegistry } from './server/land-registry-client';
+import { injectSeoHead, seoForPath } from './src/lib/seo';
 
 const execPromise = promisify(exec);
 
@@ -3289,9 +3290,13 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    const indexTemplate = readFileSync(path.join(distPath, 'index.html'), 'utf8');
+    app.get('/sample-report', (_req, res) => res.redirect(301, '/sample'));
+    app.use(express.static(distPath, { index: false }));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const seo = seoForPath(req.path);
+      if (!seo.index) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      res.type('html').send(injectSeoHead(indexTemplate, seo));
     });
   }
 

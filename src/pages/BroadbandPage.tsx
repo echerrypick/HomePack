@@ -138,7 +138,7 @@ export default function BroadbandPage() {
               transition={{ delay: 0.1 }}
               className="site-page-heading text-3xl font-bold tracking-tight mb-3"
             >
-              Broadband & Mobile Checker
+              Broadband availability checker by address
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0, y: -10 }}
@@ -146,7 +146,7 @@ export default function BroadbandPage() {
               transition={{ delay: 0.2 }}
               className="text-lg text-muted-foreground max-w-xl"
             >
-              Check official Ofcom coverage data for your property. See available speeds and network providers.
+              Check available Ofcom broadband coverage, speed information and network providers for a UK property address.
             </motion.p>
           </PageHero>
 

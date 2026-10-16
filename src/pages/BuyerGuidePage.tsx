@@ -14,8 +14,8 @@ export default function BuyerGuidePage() {
 
       <main className="site-main container mx-auto px-4 py-12 max-w-4xl flex-grow">
         <PageHero eyebrow="Your next home starts with good questions" illustration="property" icon={<FileText />}>
-          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">The Ultimate Buyer's Guide</h1>
-          <p className="text-xl text-muted-foreground">Everything you need to know to navigate the UK property market with confidence.</p>
+          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">Property checks before buying a house</h1>
+          <p className="text-xl text-muted-foreground">A practical UK homebuyer guide to property research, surveys, conveyancing and the information to check before making a commitment.</p>
         </PageHero>
 
         {/* TA6 Form Section */}

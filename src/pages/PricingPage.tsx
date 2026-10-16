@@ -118,7 +118,7 @@ export default function PricingPage() {
             Tailored For Consumers & Businesses
           </Badge>
           <h1 className="site-page-heading text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 font-sans text-primary dark:text-foreground">
-            Clear, Transparent Property Intelligence
+            UK property report pricing for buyers and professionals
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed">
             Choose Retail for a one-off property report, Business for unlimited reports, or Business Plus to add your company branding.

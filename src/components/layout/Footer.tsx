@@ -9,18 +9,18 @@ export function Footer() {
     {
       title: 'Product',
       links: [
-        { name: 'Features', href: '/features' },
-        { name: 'Pricing', href: '/pricing' },
-        { name: 'Sample Report', href: '/sample' },
-        { name: 'New Property Report', href: '/tool' },
+        { name: 'Property Report Features', href: '/features' },
+        { name: 'Property Report Pricing', href: '/pricing' },
+        { name: 'Sample Property Report', href: '/sample' },
+        { name: 'Create a Property Report', href: '/tool' },
       ],
     },
     {
       title: 'Guides',
       links: [
-        { name: 'Buyer Guide', href: '/buyer-guide' },
-        { name: 'Seller Guide', href: '/seller-guide' },
-        { name: 'Property Search', href: '/tool' },
+        { name: 'Checks Before Buying', href: '/buyer-guide' },
+        { name: 'Selling Property Guide', href: '/seller-guide' },
+        { name: 'Council Tax Band Checker', href: '/council-tax' },
       ],
     },
     {
@@ -46,7 +46,7 @@ export function Footer() {
               <span className="text-xl font-bold tracking-tight">UKHomePack.com</span>
             </Link>
             <p className="text-muted-foreground max-w-sm leading-relaxed">
-              Property information from the latest available sources to help buyers and sellers make informed decisions.
+              Online UK property reports using available public and official records to help buyers, sellers and property professionals make informed decisions.
             </p>
           </div>
 

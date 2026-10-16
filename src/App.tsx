@@ -1,6 +1,6 @@
 import { PageHero } from './components/layout/PageHero';
 import React, { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 import LandingPage from './pages/LandingPage';
@@ -26,12 +26,14 @@ import { AuthProvider } from './contexts/AuthContext';
 import { HomePackJobProvider } from './contexts/HomePackJobContext';
 import { HomePackChecklistModal } from './components/homepack/homepack-checklist-modal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { Seo } from './components/Seo';
 
 export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
         <Router>
+          <Seo />
           <HomePackJobProvider>
             <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center" role="status">Loading page…</div>}>
             <Routes>
@@ -44,7 +46,7 @@ export default function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/sample" element={<SampleReportPage />} />
-              <Route path="/sample-report" element={<SampleReportPage />} />
+              <Route path="/sample-report" element={<Navigate to="/sample" replace />} />
               <Route path="/features" element={<FeaturesPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/buyer-guide" element={<BuyerGuidePage />} />

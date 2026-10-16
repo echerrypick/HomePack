@@ -1,0 +1,35 @@
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "UKHomePack",
+  "url": "https://ukhomepack.com/",
+  "description": "UKHomePack creates online UK property information reports from available public and official records.",
+  "inLanguage": "en-GB",
+  "publisher": {
+    "@type": "Organization",
+    "name": "UKHomePack",
+    "url": "https://ukhomepack.com/",
+    "email": "support@ukhomepack.com"
+  },
+  "mainEntity": {
+    "@type": "Service",
+    "name": "UK property report",
+    "serviceType": "Online property information report",
+    "areaServed": "United Kingdom",
+    "url": "https://ukhomepack.com/features",
+    "offers": [
+      { "@type": "Offer", "name": "Retail property report", "price": "9.99", "priceCurrency": "GBP", "url": "https://ukhomepack.com/pricing" },
+      { "@type": "Offer", "name": "Business membership", "price": "49.00", "priceCurrency": "GBP", "url": "https://ukhomepack.com/pricing" },
+      { "@type": "Offer", "name": "Business Plus membership", "price": "79.00", "priceCurrency": "GBP", "url": "https://ukhomepack.com/pricing" }
+    ],
+    "termsOfService": "https://ukhomepack.com/terms"
+  },
+  "significantLink": [
+    "https://ukhomepack.com/features",
+    "https://ukhomepack.com/pricing",
+    "https://ukhomepack.com/sample",
+    "https://ukhomepack.com/buyer-guide",
+    "https://ukhomepack.com/council-tax"
+  ],
+  "usageInfo": "Reports are informational and do not replace a survey, valuation, conveyancing advice, title documents or statutory property searches. Source coverage and publication dates vary."
+}

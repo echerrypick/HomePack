@@ -10,9 +10,9 @@ export default function FeaturesPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       <main className="site-main container mx-auto px-4 py-20 flex-grow">
-        <PageHero eyebrow="Inside your HomePack" illustration="report">
-          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">Property information for buyers, sellers and professionals</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Explore available property records, local services and potential risks in one place. Coverage varies by location and data source.</p>
+        <PageHero eyebrow="Inside a UKHomePack report" illustration="report">
+          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">What’s included in a UK property report</h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Explore available sold-price history, EPC, council tax, planning, flood risk, crime, schools and connectivity records in one place. Coverage varies by location and source.</p>
         </PageHero>
 
         <div className="page-feature-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
