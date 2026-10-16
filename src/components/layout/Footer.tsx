@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Mail, Phone, MapPin, Twitter, Github, Linkedin, Facebook } from 'lucide-react';
+import { Building2, MessageCircle } from 'lucide-react';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -79,8 +79,8 @@ export function Footer() {
           </p>
           <div className="flex items-center gap-8">
              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Mail className="h-3 w-3" />
-                <a href="mailto:support@ukhomepack.com" className="hover:underline">support@ukhomepack.com</a>
+                <MessageCircle className="h-3 w-3" />
+                <Link to="/contact" className="hover:underline">Contact UKHomePack</Link>
              </div>
           </div>
         </div>

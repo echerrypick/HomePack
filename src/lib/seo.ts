@@ -102,7 +102,6 @@ export function structuredDataForPage(page: SeoPage) {
     '@id': `${SITE_URL}/#organization`,
     name: 'UKHomePack',
     url: `${SITE_URL}/`,
-    email: 'support@ukhomepack.com',
   };
   const webPage = {
     '@type': 'WebPage',

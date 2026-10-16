@@ -21,6 +21,7 @@ import { saveReport, listReports, readReport, saveJob, readJob, cleanupExpiredJo
 import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-registry-match';
 import { queryLandRegistry } from './server/land-registry-client';
 import { injectSeoHead, seoForPath } from './src/lib/seo';
+import { registerContactRoute } from './server/contact';
 
 const execPromise = promisify(exec);
 
@@ -228,6 +229,7 @@ async function trackTiming<T>(label: string, logs: string[], operation: () => Pr
 }
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 3000;
 
 // Keep platform health probes inexpensive: no Firestore reads or upstream calls.
@@ -595,6 +597,7 @@ ${JSON.stringify(prunedData, null, 2)}`;
 registerPaymentWebhook(app);
 app.use(express.json({ limit: '50mb' }));
 registerBillingRoutes(app);
+registerContactRoute(app);
 
 // Land Registry Fetching
 async function fetchLandRegistryData(houseNumberOrName: string, street: string, postcode: string, logs: string[]) {

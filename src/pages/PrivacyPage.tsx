@@ -13,7 +13,7 @@ export default function PrivacyPage() {
       <main className="site-main container mx-auto px-4 py-20 max-w-4xl flex-grow">
         <PageHero eyebrow="Your information, explained" illustration="simple" icon={<ShieldCheck />}><h1 className="site-page-heading">Privacy Policy</h1><p>How we handle account, payment and property-report information.</p></PageHero>
         <div className="prose prose-slate dark:prose-invert max-w-none space-y-6 text-muted-foreground">
-          <p className="text-lg">Last updated: 26 September 2026</p>
+          <p className="text-lg">Last updated: 17 October 2026</p>
           
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">1. Introduction</h2>
@@ -68,11 +68,11 @@ export default function PrivacyPage() {
             <p>Google Firebase provides account authentication and profile storage. Stripe processes checkout and subscription payments; UKHomePack.com does not receive your full card number. Property queries are sent to relevant data providers. Report content and uploaded photos may be processed by configured AI providers, including Google Gemini, Groq and OpenRouter. Avoid including people, personal documents or unnecessary personal information in uploaded photos.</p>
           </section>
           <section className="space-y-4"><h2 className="text-2xl font-bold text-foreground">Purpose, storage and retention</h2>
-            <p>Account, payment, promotional-code redemption and report information is used to provide the service you request. We also use operational records for security, support and resolving billing disputes. We retain account details and purchased property access while your account remains open. You can request deletion by emailing support@ukhomepack.com; records needed for legal, accounting or dispute purposes may need to be retained.</p>
+            <p>Account, payment, promotional-code redemption and report information is used to provide the service you request. We also use operational records for security, support and resolving billing disputes. We retain account details and purchased property access while your account remains open. You can request deletion through our <Link to="/contact" className="text-primary hover:underline">Contact Page</Link>; records needed for legal, accounting or dispute purposes may need to be retained.</p>
             <p>Completed reports are stored securely in your Firebase account history and can be reopened on another device after signing in. The latest report replaces the previous version for the same property and planning scope. Report bodies are compressed; temporary generation records support troubleshooting and recovery. Authentication uses browser storage. Older reports previously stored only in your browser remain on that device until its storage is cleared. Download PDFs if you need to retain a particular report version.</p>
           </section>
           <section className="space-y-4"><h2 className="text-2xl font-bold text-foreground">Privacy requests and complaints</h2>
-            <p>Email support@ukhomepack.com to request access, correction, deletion, restriction or portability of your personal data, or to object to processing. We may need to verify your identity. Where processing relies on consent, you can withdraw it. You can also raise a complaint with the <a className="text-primary underline" href="https://ico.org.uk/make-a-complaint/">Information Commissioner's Office</a>.</p>
+            <p>Use our <Link to="/contact" className="text-primary hover:underline">Contact Page</Link> to request access, correction, deletion, restriction or portability of your personal data, or to object to processing. We may need to verify your identity. Where processing relies on consent, you can withdraw it. You can also raise a complaint with the <a className="text-primary underline" href="https://ico.org.uk/make-a-complaint/">Information Commissioner's Office</a>.</p>
           </section>
         </div>
       </main>

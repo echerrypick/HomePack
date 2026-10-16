@@ -8,8 +8,7 @@
   "publisher": {
     "@type": "Organization",
     "name": "UKHomePack",
-    "url": "https://ukhomepack.com/",
-    "email": "support@ukhomepack.com"
+    "url": "https://ukhomepack.com/"
   },
   "mainEntity": {
     "@type": "Service",
