@@ -67,6 +67,12 @@ const PRIVATE_PAGE_TITLES: Record<string, string> = {
   '/payment': 'Secure Checkout | UKHomePack',
 };
 
+export function isKnownSeoPath(pathname: string) {
+  const requestedPath = pathname.split('?')[0].replace(/\/+$/, '') || '/';
+  const path = normalizeSeoPath(requestedPath);
+  return requestedPath === '/sample-report' || Boolean(INDEXABLE_PAGES[path] || PRIVATE_PAGE_TITLES[path]);
+}
+
 export function normalizeSeoPath(pathname: string) {
   const cleanPath = pathname.split('?')[0].replace(/\/+$/, '') || '/';
   return cleanPath === '/sample-report' ? '/sample' : cleanPath;

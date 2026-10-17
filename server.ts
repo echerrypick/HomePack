@@ -20,7 +20,8 @@ import { type PlanningScope } from './server/planning-scope';
 import { saveReport, listReports, readReport, saveJob, readJob, cleanupExpiredJobs } from './server/report-store';
 import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-registry-match';
 import { queryLandRegistry } from './server/land-registry-client';
-import { injectSeoHead, seoForPath } from './src/lib/seo';
+import { injectSeoHead, isKnownSeoPath, seoForPath } from './src/lib/seo';
+import { injectSeoContent } from './src/lib/seo-content';
 import { registerContactRoute } from './server/contact';
 
 const execPromise = promisify(exec);
@@ -3299,7 +3300,9 @@ async function startServer() {
     app.get('*', (req, res) => {
       const seo = seoForPath(req.path);
       if (!seo.index) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-      res.type('html').send(injectSeoHead(indexTemplate, seo));
+      if (!isKnownSeoPath(req.path)) res.status(404);
+      const html = injectSeoContent(injectSeoHead(indexTemplate, seo), seo);
+      res.type('html').send(html);
     });
   }
 
