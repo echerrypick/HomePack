@@ -11,6 +11,7 @@ import { getBillingMode } from './billing-mode';
 import { subscriptionPlan } from './subscription-plan';
 import { stripeTestMode, billingCollections, mergeBillingProfile } from './billing-environment';
 import { discountedReportAmount, generatePromoCode, isDeletablePromoStatus, isRedeemablePromoStatus, isValidPromoCode, normalizePromoCode, normalizePromoProducts, promoAppliesTo, promoCodeId } from './promo-code';
+import { checkoutPurchaseNotification, sendBillingNotification, subscriptionChangeNotifications, type BillingNotification } from './billing-notifications';
 
 export function database() {
   const app = getApps()[0] || initializeApp({
@@ -132,16 +133,22 @@ export async function requireBusiness(_req: Request, res: Response, next: NextFu
 async function syncSubscription(id: string) {
   const subscription = await stripe().subscriptions.retrieve(id);
   const { uid } = subscription.metadata;
-  if (!uid) return;
+  if (!uid) throw new Error('Subscription account metadata is missing.');
   const price = subscription.items.data[0]?.price;
   const plan = price && subscriptionPlan(price, subscription.metadata.plan);
   if (!uid || !plan || subscription.items.data.length !== 1) throw new Error('Unrecognised subscription price.');
   const ref = billingUser(uid);
+  let previousPlan: 'subscription' | 'agency' | undefined;
+  let previousCancellationScheduled = false;
+  let email = '';
+  const timing = subscriptionTiming(subscription);
   await database().runTransaction(async tx => {
     const profile = (await tx.get(ref)).data();
+    previousPlan = profile?.subscriptionPlan === 'subscription' || profile?.subscriptionPlan === 'agency' ? profile.subscriptionPlan : undefined;
+    previousCancellationScheduled = profile?.subscriptionCancelAtPeriodEnd === true;
+    email = String(profile?.email || '');
     if (profile?.stripeSubscriptionId && profile.stripeSubscriptionId !== id && (profile.subscriptionCreatedAt || 0) >= subscription.created) return;
     const active = subscription.status === 'active';
-    const timing = subscriptionTiming(subscription);
     tx.set(ref, {
       ...(profile?.role === 'admin' ? {} : { role: active ? plan : 'free' }),
       accountType: profile?.role === 'admin' || active ? 'business' : 'consumer', stripeSubscriptionId: id,
@@ -153,6 +160,33 @@ async function syncSubscription(id: string) {
       subscriptionExpiresAt: timing.expiresAt,
       updatedAt: new Date().toISOString(),
     }, { merge: true });
+  });
+  return { subscription, uid, email, plan, previousPlan, previousCancellationScheduled, timing };
+}
+
+function billingNotificationCollection() {
+  return stripeTestMode() ? 'stripeTestBillingNotifications' : 'billingNotifications';
+}
+
+async function notifyBillingEvent(key: string, event: Stripe.Event, notification: BillingNotification) {
+  const ref = database().collection(billingNotificationCollection()).doc(createHash('sha256').update(`${key}:${notification.keySuffix}`).digest('hex'));
+  try {
+    await ref.create({ stripeEventId: event.id, eventType: event.type, subject: notification.subject, status: 'sending', createdAt: new Date().toISOString() });
+  } catch (error: any) {
+    if (error?.code === 6 || error?.code === 'already-exists') return;
+    throw error;
+  }
+  try {
+    await sendBillingNotification(notification);
+  } catch (error) {
+    await ref.delete().catch(() => undefined);
+    throw error;
+  }
+  // The email has already left the server at this point. Keep the idempotency
+  // record even if recording the final timestamp is temporarily unavailable,
+  // otherwise a Stripe retry could send the owner a duplicate message.
+  await ref.update({ status: 'sent', sentAt: new Date().toISOString() }).catch(error => {
+    console.error('[BILLING EMAIL] Delivery succeeded but the sent timestamp could not be stored:', error instanceof Error ? error.message : 'Unknown error');
   });
 }
 
@@ -230,10 +264,42 @@ export function registerPaymentWebhook(app: express.Express) {
     } catch { return res.status(400).json({ error: 'Invalid payment signature.' }); }
     if (event.livemode !== !stripeTestMode()) return res.status(400).json({ error: 'Payment environment mismatch.' });
     try {
-      if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) await fulfil((event.data.object as Stripe.Checkout.Session).id);
-      if (['customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type)) await syncSubscription((event.data.object as Stripe.Subscription).id);
+      if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const result = await fulfil(session.id);
+        const notification = checkoutPurchaseNotification(session, result);
+        if (notification) await notifyBillingEvent(session.id, event, notification);
+      }
+      if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+        const current = await syncSubscription((event.data.object as Stripe.Subscription).id);
+        const previous = (event.data as any).previous_attributes || {};
+        const previousPrice = previous.items?.data?.[0]?.price;
+        const previousPlanFromStripe = previousPrice && typeof previousPrice === 'object'
+          ? subscriptionPlan(previousPrice, current.subscription.metadata.plan)
+          : null;
+        const cancellationChanged = Object.hasOwn(previous, 'cancel_at_period_end') || Object.hasOwn(previous, 'cancel_at');
+        const previousCancellationScheduled = cancellationChanged
+          ? Boolean(previous.cancel_at_period_end || previous.cancel_at)
+          : current.previousCancellationScheduled;
+        const notifications = subscriptionChangeNotifications({
+          eventType: event.type,
+          id: current.subscription.id,
+          uid: current.uid,
+          email: current.email,
+          previousPlan: previousPlanFromStripe || current.previousPlan,
+          plan: current.plan,
+          previousCancellationScheduled,
+          cancellationScheduled: current.timing.cancellationScheduled,
+          expiresAt: current.timing.expiresAt,
+          status: current.subscription.status,
+        });
+        for (const notification of notifications) await notifyBillingEvent(event.id, event, notification);
+      }
       res.json({ received: true });
-    } catch { res.status(500).json({ error: 'Payment update could not be saved. Retry required.' }); }
+    } catch (error) {
+      console.error('[BILLING WEBHOOK]', error instanceof Error ? error.message : 'Unknown error');
+      res.status(500).json({ error: 'Payment update could not be saved or notified. Retry required.' });
+    }
   });
 }
 
