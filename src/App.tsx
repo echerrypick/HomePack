@@ -31,6 +31,7 @@ import { HomePackJobProvider } from './contexts/HomePackJobContext';
 import { HomePackChecklistModal } from './components/homepack/homepack-checklist-modal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Seo } from './components/Seo';
+import { AnalyticsConsent } from './components/AnalyticsConsent';
 
 export default function App() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
             </Routes>
             </Suspense>
             <HomePackChecklistModal />
+            <AnalyticsConsent />
             <Toaster position="top-right" offset={80} visibleToasts={3} closeButton />
           </HomePackJobProvider>
         </Router>

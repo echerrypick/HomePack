@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, MessageCircle } from 'lucide-react';
+import { openCookieSettings } from '@/components/AnalyticsConsent';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -85,6 +86,7 @@ export function Footer() {
                 <MessageCircle className="h-3 w-3" />
                 <Link to="/contact" className="hover:underline">Contact UKHomePack</Link>
              </div>
+             <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={openCookieSettings}>Cookie settings</button>
           </div>
         </div>
       </div>

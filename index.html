@@ -1,6 +1,38 @@
 <!doctype html>
 <html lang="en-GB">
   <head>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
+      window.gtag('consent', 'default', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        wait_for_update: 500
+      });
+      window.ukHomePackEnableAnalytics = function(){
+        window.gtag('consent', 'update', { analytics_storage: 'granted' });
+        if (window.__ukHomePackAnalyticsLoaded) return;
+        window.__ukHomePackAnalyticsLoaded = true;
+        var script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-93ZN70T1CX';
+        document.head.appendChild(script);
+        window.gtag('js', new Date());
+        window.gtag('config', 'G-93ZN70T1CX', { send_page_view: false });
+      };
+      window.ukHomePackDisableAnalytics = function(){
+        window.gtag('consent', 'update', { analytics_storage: 'denied' });
+        document.cookie = '_ga=; Max-Age=0; Path=/; SameSite=Lax';
+        document.cookie = '_ga_93ZN70T1CX=; Max-Age=0; Path=/; SameSite=Lax';
+      };
+      try {
+        if (localStorage.getItem('ukhomepack_analytics_consent') === 'accepted') window.ukHomePackEnableAnalytics();
+      } catch (error) {
+        // Analytics remains disabled when browser storage is unavailable.
+      }
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="alternate" type="application/json" href="/site-info.json" title="UKHomePack machine-readable site information" />

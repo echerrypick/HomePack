@@ -51,6 +51,12 @@ export default function PrivacyPage() {
           </section>
 
           <section className="space-y-4">
+            <h2 className="text-2xl font-bold text-foreground">Analytics cookies</h2>
+            <p>With your permission, we use Google Analytics to understand how visitors find and use UKHomePack.com. Google Analytics may set cookies and process information including pages viewed, approximate location, device and browser details, and interactions with the website. We do not use Google Analytics advertising features.</p>
+            <p>Analytics is disabled unless you select “Allow analytics”. You can withdraw or change that choice at any time through “Cookie settings” in the website footer. Necessary account, security and payment functions do not depend on analytics consent.</p>
+          </section>
+
+          <section className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">5. Your Rights</h2>
             <p>You have the right to access, correct, or delete your personal data. You can manage your account information through your profile page or contact us for assistance.</p>
           </section>
