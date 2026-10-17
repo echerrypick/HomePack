@@ -18,6 +18,7 @@ function setMeta(selector: string, attributes: Record<string, string>) {
 
 export default function ArticlePage() {
   const { slug = '' } = useParams();
+  const [hasStaticFallback] = useState(() => Boolean(document.getElementById('seo-static-content')));
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,8 +28,12 @@ export default function ArticlePage() {
     setLoading(true); setError(''); setArticle(null);
     fetch(`/api/articles/${encodeURIComponent(slug)}`, { signal: controller.signal })
       .then(async response => {
-        const data = await response.json();
+        const body = await response.text();
+        let data: { article?: Article; error?: string } = {};
+        try { data = body ? JSON.parse(body) : {}; }
+        catch { throw new Error('The article service returned an unreadable response.'); }
         if (!response.ok) throw new Error(data.error || 'Unable to load this article.');
+        if (!data.article) throw new Error('The article service returned an incomplete response.');
         setArticle(data.article);
       })
       .catch(fetchError => { if (fetchError.name !== 'AbortError') setError(fetchError.message); })
@@ -38,6 +43,7 @@ export default function ArticlePage() {
 
   useEffect(() => {
     if (!article) return;
+    document.getElementById('seo-static-content')?.remove();
     const page = seoForArticle(article);
     const canonical = canonicalUrl(page);
     document.title = page.title;
@@ -57,6 +63,10 @@ export default function ArticlePage() {
   }, [article]);
 
   const date = article?.publishedAt ? new Date(article.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+
+  // On a direct article request, the server has already supplied the complete
+  // article. Leave that version visible until the interactive copy is ready.
+  if (hasStaticFallback && !article) return null;
 
   return <div className="min-h-screen bg-background flex flex-col">
     <Header />

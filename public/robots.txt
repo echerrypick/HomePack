@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /api/articles/
 Disallow: /api/
 
 Sitemap: https://ukhomepack.com/sitemap.xml
