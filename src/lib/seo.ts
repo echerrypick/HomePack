@@ -134,6 +134,7 @@ export function structuredDataForPage(page: SeoPage) {
     '@id': `${SITE_URL}/#organization`,
     name: 'UKHomePack',
     url: `${SITE_URL}/`,
+    logo: `${SITE_URL}/icon-512.png`,
   };
   const webPage = {
     '@type': 'WebPage',
