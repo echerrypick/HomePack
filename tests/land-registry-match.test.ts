@@ -9,6 +9,13 @@ test('Land Registry matching requires the exact house identifier and street', ()
   assert.equal(isExactLandRegistryAddress(record, '22', 'Sunny Close'), false);
 });
 
+test('Land Registry matching recognises common street suffix abbreviations', () => {
+  assert.equal(isExactLandRegistryAddress({ paon: '1', street: 'OAK TREE COURT' }, '1', 'Oak Tree Ct'), true);
+  assert.equal(isExactLandRegistryAddress({ paon: '4', street: 'WATERFORD DRIVE' }, '4', 'Waterford Dr'), true);
+  assert.equal(isExactLandRegistryAddress({ paon: '7', street: 'STATION ROAD' }, '7', 'Station Rd'), true);
+  assert.equal(isExactLandRegistryAddress({ paon: '1', street: 'OAK TREE CLOSE' }, '1', 'Oak Tree Ct'), false);
+});
+
 test('Land Registry matching supports flats and named properties without postcode fallback', () => {
   assert.equal(isExactLandRegistryAddress({ saon: 'FLAT 1', paon: '10', street: 'HIGH STREET' }, 'Flat 1, 10', 'High Street'), true);
   assert.equal(isExactLandRegistryAddress({ paon: 'THE COTTAGE', street: 'CHURCH LANE' }, 'The Cottage', 'Church Lane'), true);

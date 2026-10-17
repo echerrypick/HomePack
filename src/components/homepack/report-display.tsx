@@ -1322,7 +1322,7 @@ export function ReportDisplay({
                 </div>
             ) : (
                 <div className="space-y-2">
-                  <DataItem label="Title Number" value={"N/A"} />
+                  <DataItem label="Title Number" value={"Not included in Price Paid Data"} />
                   <DataItem label="Tenure" value={landRegistryCoverage?.status === 'unavailable' ? 'Not checked' : 'Not recorded'} />
                   <DataItem
                     label="Recorded Sales"

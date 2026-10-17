@@ -13,17 +13,39 @@ function normalizeAddressPart(value: unknown): string {
     .replace(/\s+/g, ' ');
 }
 
+const STREET_SUFFIXES: Record<string, string> = {
+  AVE: 'AVENUE',
+  CL: 'CLOSE',
+  CRES: 'CRESCENT',
+  CT: 'COURT',
+  DR: 'DRIVE',
+  GDNS: 'GARDENS',
+  GR: 'GROVE',
+  LN: 'LANE',
+  PL: 'PLACE',
+  RD: 'ROAD',
+};
+
+export function normalizeLandRegistryStreet(value: unknown): string {
+  const normalized = normalizeAddressPart(value);
+  if (!normalized) return '';
+  const parts = normalized.split(' ');
+  const suffix = parts.at(-1) || '';
+  if (STREET_SUFFIXES[suffix]) parts[parts.length - 1] = STREET_SUFFIXES[suffix];
+  return parts.join(' ');
+}
+
 export function isExactLandRegistryAddress(
   record: LandRegistryAddress,
   houseNumberOrName: string,
   street: string,
 ): boolean {
   const requestedIdentifier = normalizeAddressPart(houseNumberOrName);
-  const requestedStreet = normalizeAddressPart(street);
+  const requestedStreet = normalizeLandRegistryStreet(street);
   const paon = normalizeAddressPart(record.paon);
   const saon = normalizeAddressPart(record.saon);
   const combinedIdentifier = normalizeAddressPart([record.saon, record.paon].filter(Boolean).join(' '));
-  const recordStreet = normalizeAddressPart(record.street);
+  const recordStreet = normalizeLandRegistryStreet(record.street);
 
   if (!requestedIdentifier || !requestedStreet || recordStreet !== requestedStreet) return false;
   return requestedIdentifier === paon

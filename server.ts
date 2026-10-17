@@ -18,7 +18,7 @@ import { getCrimeDataForCoordinates } from './src/services/crimeService';
 import { authenticate, requireProperty, requireBusiness, registerBillingRoutes, registerPaymentWebhook } from './server/billing';
 import { type PlanningScope } from './server/planning-scope';
 import { saveReport, listReports, readReport, saveJob, readJob, cleanupExpiredJobs } from './server/report-store';
-import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-registry-match';
+import { isExactLandRegistryAddress, landRegistryUriLabel, normalizeLandRegistryStreet } from './server/land-registry-match';
 import { queryLandRegistry } from './server/land-registry-client';
 import { injectSeoHead, isKnownSeoPath, seoForArticle, seoForPath } from './src/lib/seo';
 import { registerContactRoute } from './server/contact';
@@ -761,7 +761,7 @@ async function fetchRecentStreetSales(
   logs: string[]
 ) {
   const endpoint = "https://landregistry.data.gov.uk/landregistry/query";
-  const street = escapeSparqlLiteral(streetName.toUpperCase());
+  const street = escapeSparqlLiteral(normalizeLandRegistryStreet(streetName));
   const town = escapeSparqlLiteral(townOrCity.toUpperCase());
   const outwardCode = escapeSparqlLiteral(postcode.replace(/\s+/g, '').slice(0, -3).toUpperCase());
 
