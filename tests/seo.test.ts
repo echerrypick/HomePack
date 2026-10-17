@@ -8,6 +8,8 @@ test('public pages have distinct indexable metadata and canonical URLs', () => {
   const pricing = seoForPath('/pricing');
   assert.equal(home.index, true);
   assert.equal(pricing.index, true);
+  assert.equal(seoForPath('/about').index, true);
+  assert.equal(seoForPath('/data-sources').index, true);
   assert.notEqual(home.title, pricing.title);
   assert.equal(canonicalUrl(pricing), 'https://ukhomepack.com/pricing');
 });
@@ -57,6 +59,14 @@ test('public pages contain meaningful crawlable content in initial HTML', () => 
   assert.match(rendered, /Business — £49 per month/);
   assert.match(rendered, /Business Plus — £79 per month/);
   assert.match(rendered, /<a href="\/features">/);
+});
+
+test('homepage crawlable content includes buyer questions and methodology links', () => {
+  const source = '<body><!-- SEO_CONTENT_START --><!-- SEO_CONTENT_END --><div id="root"></div></body>';
+  const rendered = injectSeoContent(source, seoForPath('/'));
+  assert.match(rendered, /Questions worth asking before you buy/);
+  assert.match(rendered, /What does the EPC suggest/);
+  assert.match(rendered, /href="\/data-sources"/);
 });
 
 test('private pages do not receive public static marketing content', () => {

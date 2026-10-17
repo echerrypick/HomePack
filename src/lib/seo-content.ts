@@ -36,6 +36,12 @@ const PAGE_CONTENT: Record<string, PageContent> = {
         paragraphs: ['UKHomePack is a research aid and does not replace a survey, conveyancing, legal searches or professional advice. Data coverage varies by property and source.'],
         links: [{ href: '/buyer-guide', label: 'Read the homebuyer guide' }, { href: '/seller-guide', label: 'Read the home seller guide' }],
       },
+      {
+        heading: 'Questions worth asking before you buy',
+        items: ['Is nearby planning activity worth a closer look?', 'What does the EPC suggest about the home?', 'What context does recorded local crime provide?'],
+        paragraphs: ['UKHomePack helps turn available records into practical questions for the seller, surveyor or conveyancer.'],
+        links: [{ href: '/data-sources', label: 'Read about data sources and methodology' }],
+      },
     ],
   },
   '/features': {
@@ -77,6 +83,26 @@ const PAGE_CONTENT: Record<string, PageContent> = {
     sections: [
       { heading: 'Latest property articles', paragraphs: ['Published guides and explainers appear here. Each article is reviewed and dated so you can see when it was last updated.'] },
       { heading: 'Research a particular property', links: [{ href: '/features', label: 'See property report checks' }, { href: '/tool', label: 'Create a property report' }] },
+    ],
+  },
+  '/about': {
+    eyebrow: 'About UKHomePack',
+    heading: 'Clearer property research before you commit',
+    intro: 'UKHomePack is an independent UK property-information service created to make early-stage property research easier to understand.',
+    sections: [
+      { heading: 'Why UKHomePack exists', paragraphs: ['Important property information is spread across different public services. UKHomePack brings available records into one readable report so buyers, sellers and professionals can see what deserves closer investigation.'] },
+      { heading: 'What the service does', paragraphs: ['The service checks available records for an exact address and its local area, presents source context and highlights useful questions to raise with an estate agent, surveyor or conveyancer.'] },
+      { heading: 'What it does not do', paragraphs: ['A UKHomePack report is a research aid. It is not a valuation, survey, legal search, conveyancing service or guarantee that every relevant record is available.'], links: [{ href: '/data-sources', label: 'Read our data sources and methodology' }, { href: '/contact', label: 'Contact UKHomePack' }] },
+    ],
+  },
+  '/data-sources': {
+    eyebrow: 'Data sources and methodology',
+    heading: 'How UKHomePack collects and presents property information',
+    intro: 'Understand the principal sources used in a report, how addresses are matched and why coverage can differ between properties.',
+    sections: [
+      { heading: 'Address and location matching', paragraphs: ['Where a source supports address records, UKHomePack looks for the exact house, flat or named property rather than treating a postcode match as proof. Location-based sources use the best confirmed coordinates available for the selected property.'] },
+      { heading: 'Principal property data sources', items: ['HM Land Registry Price Paid Data', 'GOV.UK Energy Performance Certificate data', 'Valuation Office Agency and local authorities', 'Planning Data and local planning records', 'Environment Agency flood data', 'Police.uk crime records', 'Department for Education and Ofsted school information', 'Ofcom broadband and mobile coverage data'] },
+      { heading: 'No result is not a clean bill of health', paragraphs: ['A source may be unavailable, delayed, geographically limited or unable to match an address. “Not available” means that UKHomePack could not confirm the information from that source; it does not prove that no issue or record exists.'], links: [{ href: '/sample', label: 'View a sample report' }, { href: '/features', label: 'See report features' }] },
     ],
   },
   '/buyer-guide': {
@@ -190,6 +216,8 @@ function renderShell(main: string) {
           <a href="/features">Property report features</a>
           <a href="/pricing">Pricing</a>
           <a href="/articles">Property articles</a>
+          <a href="/about">About UKHomePack</a>
+          <a href="/data-sources">Data sources and methodology</a>
           <a href="/council-tax">Council tax checker</a>
           <a href="/broadband">Broadband checker</a>
           <a href="/mobile">Mobile coverage checker</a>
@@ -218,13 +246,31 @@ export function injectSeoContent(html: string, page: SeoPage) {
   return html.replace(/<!-- SEO_CONTENT_START -->[\s\S]*?<!-- SEO_CONTENT_END -->/, buildSeoContent(page));
 }
 
-function plainMarkdownBlocks(content: string) {
-  return content.split(/\n\s*\n/).map(block => block
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/^[-*+]\s+/gm, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/[*_`>#]/g, '')
-    .trim()).filter(Boolean).slice(0, 30);
+function renderInlineMarkdown(value: string) {
+  return escapeHtml(value)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g, '<a href="$2">$1</a>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function renderMarkdown(content: string) {
+  return content.split(/\n\s*\n/).map(rawBlock => {
+    const block = rawBlock.trim();
+    if (!block) return '';
+    const heading = block.match(/^(#{2,3})\s+(.+)$/s);
+    if (heading) return `<h${heading[1].length}>${renderInlineMarkdown(heading[2].trim())}</h${heading[1].length}>`;
+    const lines = block.split('\n').map(line => line.trim()).filter(Boolean);
+    if (lines.every(line => /^[-*+]\s+/.test(line))) {
+      return `<ul>${lines.map(line => `<li>${renderInlineMarkdown(line.replace(/^[-*+]\s+/, ''))}</li>`).join('')}</ul>`;
+    }
+    if (lines.every(line => /^\d+\.\s+/.test(line))) {
+      return `<ol>${lines.map(line => `<li>${renderInlineMarkdown(line.replace(/^\d+\.\s+/, ''))}</li>`).join('')}</ol>`;
+    }
+    if (lines.every(line => /^>\s?/.test(line))) {
+      return `<blockquote><p>${renderInlineMarkdown(lines.map(line => line.replace(/^>\s?/, '')).join(' '))}</p></blockquote>`;
+    }
+    return `<p>${renderInlineMarkdown(lines.join(' '))}</p>`;
+  }).join('');
 }
 
 export function buildArticleIndexSeoContent(articles: Article[]) {
@@ -234,10 +280,12 @@ export function buildArticleIndexSeoContent(articles: Article[]) {
   return renderShell(`<main class="seo-static-main"><p class="seo-static-eyebrow">UK property knowledge</p><h1>Property articles and practical home-moving guides</h1><p class="seo-static-intro">Read guides about researching, buying and selling UK property.</p>${listing}</main>`);
 }
 
-export function buildArticleSeoContent(article: Article) {
+export function buildArticleSeoContent(article: Article, related: Article[] = []) {
   const published = article.publishedAt ? new Date(article.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' }) : '';
-  const paragraphs = plainMarkdownBlocks(article.content).map(block => `<p>${escapeHtml(block)}</p>`).join('');
-  return renderShell(`<main class="seo-static-main"><article><p class="seo-static-eyebrow">${escapeHtml(article.category)}</p><h1>${escapeHtml(article.title)}</h1><p class="seo-static-intro">${escapeHtml(article.excerpt)}</p><p>By ${escapeHtml(article.authorName)} · Published ${escapeHtml(published)} · ${articleReadingMinutes(article.content)} min read</p>${article.imageUrl ? `<img src="${escapeHtml(article.imageUrl)}" alt="${escapeHtml(article.imageAlt)}" width="1200" height="675" />` : ''}<section><h2>Article</h2>${paragraphs}</section><p><a href="/articles">View all property articles</a></p></article></main>`);
+  const updated = article.updatedAt ? new Date(article.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' }) : '';
+  const revised = article.updatedAt.slice(0, 10) !== (article.publishedAt || '').slice(0, 10) ? ` · Updated ${escapeHtml(updated)}` : '';
+  const relatedHtml = related.length ? `<aside><h2>Related property guides</h2><ul>${related.map(item => `<li><a href="/articles/${escapeHtml(item.slug)}">${escapeHtml(item.title)}</a></li>`).join('')}</ul></aside>` : '';
+  return renderShell(`<main class="seo-static-main"><article><p class="seo-static-eyebrow">${escapeHtml(article.category)}</p><h1>${escapeHtml(article.title)}</h1><p class="seo-static-intro">${escapeHtml(article.excerpt)}</p><p>By ${escapeHtml(article.authorName)} · Published ${escapeHtml(published)}${revised} · ${articleReadingMinutes(article.content)} min read</p>${article.imageUrl ? `<img src="${escapeHtml(article.imageUrl)}" alt="${escapeHtml(article.imageAlt)}" width="1200" height="675" />` : ''}<section>${renderMarkdown(article.content)}</section><p>Our guides explain general property research and are not legal, financial or surveying advice. <a href="/data-sources">Read about UKHomePack data sources and methodology</a>.</p>${relatedHtml}<p><a href="/articles">View all property articles</a></p></article></main>`);
 }
 
 export function replaceSeoContent(html: string, content: string) {

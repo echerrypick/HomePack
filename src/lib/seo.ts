@@ -37,6 +37,14 @@ const INDEXABLE_PAGES: Record<string, Omit<SeoPage, 'path' | 'index'>> = {
     title: 'UK Property Articles & Homebuyer Guides | UKHomePack',
     description: 'Read practical UK property articles about buying, selling, council tax, planning, EPCs, connectivity and property research.',
   },
+  '/about': {
+    title: 'About UKHomePack | Independent UK Property Research',
+    description: 'Learn why UKHomePack was created, how its UK property reports support early-stage research and where professional advice is still needed.',
+  },
+  '/data-sources': {
+    title: 'Property Data Sources & Methodology | UKHomePack',
+    description: 'See the official and trusted property data sources used by UKHomePack, how addresses are matched and why coverage can vary between properties.',
+  },
   '/buyer-guide': {
     title: 'Property Checks Before Buying a House | UKHomePack',
     description: 'A practical UK homebuyer guide covering property checks, surveys, conveyancing, TA6 information and research to complete before buying a house.',

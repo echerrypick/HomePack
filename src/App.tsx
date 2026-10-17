@@ -22,6 +22,8 @@ const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PaymentPage = lazy(() => import('./pages/PaymentPage'));
 const ArticlesPage = lazy(() => import('./pages/ArticlesPage'));
 const ArticlePage = lazy(() => import('./pages/ArticlePage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const DataSourcesPage = lazy(() => import('./pages/DataSourcesPage'));
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { AuthProvider } from './contexts/AuthContext';
@@ -58,6 +60,8 @@ export default function App() {
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/data-sources" element={<DataSourcesPage />} />
               <Route path="/payment" element={<PaymentPage />} />
               <Route path="*" element={<div className="min-h-screen flex flex-col"><Header /><main className="site-main container mx-auto px-4 py-24 flex-grow text-center"><PageHero eyebrow="Let’s get you back on track" illustration="simple"><h1 className="site-page-heading">Page not found</h1><p>This page may have moved or the link may be incorrect.</p><Button asChild className="mt-5"><Link to="/">Return to UKHomePack.com</Link></Button></PageHero></main><Footer /></div>} />
             </Routes>

@@ -27,6 +27,8 @@ export function Footer() {
     {
       title: 'Company',
       links: [
+        { name: 'About UKHomePack', href: '/about' },
+        { name: 'Data Sources & Methodology', href: '/data-sources' },
         { name: 'Contact', href: '/contact' },
         { name: 'Terms of Service', href: '/terms' },
         { name: 'Privacy Policy', href: '/privacy' },

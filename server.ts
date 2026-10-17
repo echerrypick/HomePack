@@ -22,7 +22,8 @@ import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-
 import { queryLandRegistry } from './server/land-registry-client';
 import { injectSeoHead, isKnownSeoPath, seoForArticle, seoForPath } from './src/lib/seo';
 import { registerContactRoute } from './server/contact';
-import { getPublishedArticle, listPublishedArticles, registerArticleRoutes } from './server/articles';
+import { listPublishedArticles, registerArticleRoutes } from './server/articles';
+import { relatedArticles } from './src/lib/articles';
 import { buildArticleIndexSeoContent, buildArticleSeoContent, injectSeoContent, replaceSeoContent } from './src/lib/seo-content';
 
 const execPromise = promisify(exec);
@@ -3309,10 +3310,11 @@ async function startServer() {
         } else {
           const match = req.path.match(/^\/articles\/([a-z0-9]+(?:-[a-z0-9]+)*)$/);
           if (match) {
-            const article = await getPublishedArticle(match[1]);
+            const articles = await listPublishedArticles();
+            const article = articles.find(item => item.slug === match[1]) || null;
             if (article) {
               seo = seoForArticle(article);
-              dynamicContent = buildArticleSeoContent(article);
+              dynamicContent = buildArticleSeoContent(article, relatedArticles(article, articles));
             } else {
               articleMissing = true;
               seo = { title: 'Article Not Found | UKHomePack', description: 'The requested UKHomePack article could not be found.', path: req.path, index: false };

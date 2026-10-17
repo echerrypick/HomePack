@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { articleReadingMinutes, articleSlug, validateArticleInput, type Article } from '../src/lib/articles.ts';
+import { articleReadingMinutes, articleSlug, relatedArticles, validateArticleInput, type Article } from '../src/lib/articles.ts';
 import { buildArticleIndexSeoContent, buildArticleSeoContent } from '../src/lib/seo-content.ts';
 import { seoForArticle, structuredDataForPage } from '../src/lib/seo.ts';
 
@@ -44,10 +44,19 @@ test('reading time has a minimum of one minute', () => {
 
 test('published article HTML is crawlable and links from the index', () => {
   const index = buildArticleIndexSeoContent([article]);
-  const detail = buildArticleSeoContent(article);
+  const related = { ...article, id: '456', slug: 'related-property-guide', title: 'A related property guide' };
+  const detail = buildArticleSeoContent(article, [related]);
   assert.match(index, /href="\/articles\/checks-before-buying-a-house"/);
   assert.match(detail, /<h1>Ten checks to make before buying a house<\/h1>/);
-  assert.match(detail, /Start with the address/);
+  assert.match(detail, /<h2>Start with the address<\/h2>/);
+  assert.match(detail, /href="\/articles\/related-property-guide"/);
+  assert.match(detail, /href="\/data-sources"/);
+});
+
+test('related articles prioritise a matching category and tags', () => {
+  const different = { ...article, id: '2', slug: 'different', category: 'Connectivity', tags: ['broadband'] };
+  const close = { ...article, id: '3', slug: 'close', tags: ['property checks'] };
+  assert.equal(relatedArticles(article, [different, close], 1)[0]?.slug, 'close');
 });
 
 test('article SEO contains canonical Article structured data', () => {

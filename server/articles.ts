@@ -1,7 +1,7 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { authenticate, database, requireAdmin } from './billing';
-import { ARTICLE_CATEGORIES, articleReadingMinutes, type Article, validateArticleInput } from '../src/lib/articles';
+import { ARTICLE_CATEGORIES, articleReadingMinutes, relatedArticles, type Article, validateArticleInput } from '../src/lib/articles';
 import { SITE_URL } from '../src/lib/seo';
 
 const COLLECTION = 'articles';
@@ -71,10 +71,11 @@ export function registerArticleRoutes(app: express.Express) {
 
   app.get('/api/articles/:slug', async (req, res) => {
     try {
-      const article = await getPublishedArticle(String(req.params.slug || ''));
+      const articles = await listPublishedArticles();
+      const article = articles.find(item => item.slug === String(req.params.slug || '')) || null;
       if (!article) return res.status(404).json({ error: 'Article not found.' });
       res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-      res.json({ article });
+      res.json({ article, related: relatedArticles(article, articles).map(publicSummary) });
     } catch {
       res.status(503).json({ error: 'This article is temporarily unavailable.' });
     }
@@ -168,7 +169,7 @@ export function registerArticleRoutes(app: express.Express) {
   });
 
   app.get('/sitemap.xml', async (_req, res) => {
-    const staticPaths = ['/', '/features', '/pricing', '/sample', '/articles', '/buyer-guide', '/seller-guide', '/council-tax', '/broadband', '/mobile', '/contact', '/terms', '/privacy'];
+    const staticPaths = ['/', '/features', '/pricing', '/sample', '/articles', '/about', '/data-sources', '/buyer-guide', '/seller-guide', '/council-tax', '/broadband', '/mobile', '/contact', '/terms', '/privacy'];
     let articles: Article[] = [];
     try { articles = await listPublishedArticles(); }
     catch (error) { console.error('Article sitemap entries unavailable:', error); }

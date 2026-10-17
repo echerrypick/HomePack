@@ -50,6 +50,21 @@ export function articleReadingMinutes(content: string) {
   return Math.max(1, Math.ceil(words / 220));
 }
 
+export function relatedArticles(article: Article, candidates: Article[], limit = 3) {
+  const tags = new Set(article.tags.map(tag => tag.toLowerCase()));
+  return candidates
+    .filter(candidate => candidate.id !== article.id && candidate.slug !== article.slug && candidate.status === 'published')
+    .map(candidate => ({
+      article: candidate,
+      score: (candidate.category === article.category ? 10 : 0)
+        + candidate.tags.reduce((total, tag) => total + (tags.has(tag.toLowerCase()) ? 2 : 0), 0),
+    }))
+    .sort((a, b) => b.score - a.score
+      || (b.article.publishedAt || b.article.updatedAt).localeCompare(a.article.publishedAt || a.article.updatedAt))
+    .slice(0, Math.max(0, limit))
+    .map(result => result.article);
+}
+
 function cleanText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
