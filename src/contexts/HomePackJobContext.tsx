@@ -88,7 +88,9 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
   cursorRef.current = nextCursor;
   const historyRequest = useRef(false);
   const historyLoaded = useRef(false);
-  const pollDelay = useRef(2000);
+  // Active jobs live in the web process, so a short poll makes provider
+  // completions visible as they happen without waiting for several checks to batch.
+  const pollDelay = useRef(750);
   const reportCache = useRef(new Map<string, { hash?: string; result: ReportResult }>());
   const reportRequests = useRef(new Map<string, Promise<any>>());
   const fetchReports = useCallback(async (more = false) => {
@@ -150,7 +152,7 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
       }
       const data = unwrapLinkedDataValues(await res.json());
       const updatedJob: HomePackJob = data.job;
-      pollDelay.current = data.pollAfterMs || 2000;
+      pollDelay.current = data.pollAfterMs || 750;
 
       setActiveJob(updatedJob);
 

@@ -3155,7 +3155,7 @@ app.get('/api/homepack/job/:jobId', authenticate, async (req, res) => {
     const memory = jobOwners.get(jobId) === res.locals.uid ? homePackJobs.get(jobId) : null;
     const job = memory || await readJob(res.locals.uid, jobId);
     if (!job) return res.status(404).json({ error: 'Job not found' });
-    res.json({ job, pollAfterMs: memory ? 2000 : 15_000 });
+    res.json({ job, pollAfterMs: memory ? 750 : 15_000 });
   } catch (error) { console.error('Job read failed', error); res.status(503).json({ error: 'Unable to retrieve report progress.' }); }
 });
 
