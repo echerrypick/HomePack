@@ -1,4 +1,4 @@
-import { selectBestEpcCertificate } from './epc-match';
+import { expandEpcStreetSuffix, selectBestEpcCertificate } from './epc-match';
 // EPC Data Helper: Extracts a field from certificate or candidate matching various casing conventions
 export function getEpcField(obj: any, ...keys: string[]): string | null {
   if (!obj || typeof obj !== 'object') return null;
@@ -65,42 +65,46 @@ export async function fetchEpcData(street: string, postcode: string, logs: strin
   };
 
   try {
-    const searchUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&address=${encodeURIComponent(street.trim())}&page_size=50`;
-    logs.push(`[EPC] Searching certificates via GOV.UK Energy Performance API...`);
+    const requestedAddress = expandEpcStreetSuffix(street);
+    const searchUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&address=${encodeURIComponent(requestedAddress)}&page_size=50`;
+    logs.push(`[EPC] Searching the ${registerType} register by address and postcode...`);
 
     let res = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(7500) });
-    logs.push(`[EPC] Search API returned HTTP ${res.status}`);
+    logs.push(`[EPC] Exact-address search returned HTTP ${res.status}`);
 
-    if (!res.ok) {
-      if (res.status === 404 && registerType === 'domestic') {
-        logs.push('[EPC] No domestic certificates returned; checking the non-domestic register.');
-        return fetchEpcData(street, postcode, logs, 'non-domestic');
-      }
-      if (res.status === 401 || res.status === 403) {
+    if (!res.ok && (res.status === 401 || res.status === 403)) {
         logs.push(`[EPC] Error: Authentication failed (HTTP ${res.status}). Check that EPC_BEARER_TOKEN is valid.`);
-      } else {
-        logs.push(`[EPC] Error: Search API returned HTTP ${res.status} ${res.statusText}`);
-      }
       return null;
     }
 
-    let searchJson = await res.json();
-    let items = Array.isArray(searchJson.data) ? searchJson.data : (Array.isArray(searchJson) ? searchJson : (searchJson.rows || []));
+    let items: any[] = [];
+    if (res.ok) {
+      const searchJson = await res.json();
+      items = Array.isArray(searchJson.data) ? searchJson.data : (Array.isArray(searchJson) ? searchJson : (searchJson.rows || []));
+    } else {
+      logs.push(`[EPC] Exact-address search did not return data (${res.status} ${res.statusText || 'request failed'}); retrying this register by postcode.`);
+    }
 
     // If no exact match or candidate not found in first search, search by postcode
     let candidate = selectBestEpcCertificate(items, street);
     if (!candidate || items.length === 0) {
       const fallbackUrl = `${searchEndpoint}?postcode=${encodeURIComponent(postcode.trim())}&page_size=100`;
-      logs.push(`[EPC] Address match check required wider query. Trying postcode fallback (${postcode.trim()})...`);
+      logs.push(`[EPC] Trying postcode-only ${registerType} search and matching the exact premises locally...`);
       try {
         const fallbackRes = await fetch(fallbackUrl, { headers, signal: AbortSignal.timeout(7500) });
         if (fallbackRes.ok) {
           const fallbackJson = await fallbackRes.json();
           const fallbackItems = Array.isArray(fallbackJson.data) ? fallbackJson.data : (Array.isArray(fallbackJson) ? fallbackJson : (fallbackJson.rows || []));
+          logs.push(`[EPC] Postcode-only search returned ${fallbackItems.length} certificate candidate${fallbackItems.length === 1 ? '' : 's'}.`);
           if (fallbackItems.length > 0) {
             items = fallbackItems;
             candidate = selectBestEpcCertificate(items, street);
           }
+        } else if (fallbackRes.status === 401 || fallbackRes.status === 403) {
+          logs.push(`[EPC] Error: Authentication failed during postcode search (HTTP ${fallbackRes.status}). Check that EPC_BEARER_TOKEN is valid.`);
+          return null;
+        } else {
+          logs.push(`[EPC] Postcode-only ${registerType} search returned HTTP ${fallbackRes.status} ${fallbackRes.statusText}.`);
         }
       } catch (fbErr: any) {
         logs.push(`[EPC] Postcode fallback search note: ${fbErr?.message || fbErr}`);
@@ -108,7 +112,10 @@ export async function fetchEpcData(street: string, postcode: string, logs: strin
     }
 
     if (!candidate) {
-      if (registerType === 'domestic') return fetchEpcData(street, postcode, logs, 'non-domestic');
+      if (registerType === 'domestic') {
+        logs.push('[EPC] No exact domestic premises match after the postcode search; checking the non-domestic register.');
+        return fetchEpcData(street, postcode, logs, 'non-domestic');
+      }
       logs.push('[EPC] No exact premises match in the domestic or non-domestic register.');
       return null;
     }

@@ -1,4 +1,24 @@
-const normalize = (text: unknown) => String(text || '').toLowerCase().replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
+const STREET_SUFFIXES: Record<string, string> = {
+  ave: 'Avenue',
+  cl: 'Close',
+  cres: 'Crescent',
+  ct: 'Court',
+  dr: 'Drive',
+  gdns: 'Gardens',
+  ln: 'Lane',
+  pl: 'Place',
+  rd: 'Road',
+  st: 'Street',
+  ter: 'Terrace',
+};
+
+export function expandEpcStreetSuffix(text: unknown): string {
+  const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+  return cleaned.replace(/\b([a-z]+)\.?$/i, (match, suffix: string) => STREET_SUFFIXES[suffix.toLowerCase()] || match);
+}
+
+const normalize = (text: unknown) => expandEpcStreetSuffix(text).toLowerCase().replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
 /** Require the full requested premises line; never borrow a neighbour's EPC. */
 export function selectBestEpcCertificate(items: any[], requested: string): any | null {
   const target = normalize(requested);
