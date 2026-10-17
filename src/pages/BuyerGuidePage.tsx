@@ -14,9 +14,16 @@ export default function BuyerGuidePage() {
 
       <main className="site-main container mx-auto px-4 py-12 max-w-4xl flex-grow">
         <PageHero eyebrow="Your next home starts with good questions" illustration="property" icon={<FileText />}>
-          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">Property checks before buying a house</h1>
+          <h1 className="site-page-heading text-4xl font-extrabold tracking-tight mb-4">What to check before buying a house in the UK</h1>
           <p className="text-xl text-muted-foreground">A practical UK homebuyer guide to property research, surveys, conveyancing and the information to check before making a commitment.</p>
         </PageHero>
+
+        <section className="mb-12" aria-labelledby="buyer-stages"><h2 id="buyer-stages" className="text-2xl font-bold">Property checks at each stage</h2><div className="mt-5 grid gap-4 md:grid-cols-2">
+          <Stage title="Before viewing" text="Set a realistic budget, research the area, shortlist connectivity needs and review available property records." />
+          <Stage title="Before making an offer" text="View more than once, ask about the chain and known works, and identify issues that affect your price or appetite for risk." />
+          <Stage title="After your offer is accepted" text="Instruct a conveyancer, choose the right survey and review the seller’s forms, searches and enquiries carefully." />
+          <Stage title="Before exchange" text="Resolve material enquiries, confirm finance and insurance, check fixtures and agree the final completion arrangements." />
+        </div></section>
 
         {/* TA6 Form Section */}
         <Card className="mb-12 border-primary/20 bg-primary/5">
@@ -152,6 +159,8 @@ export default function BuyerGuidePage() {
     </div>
   );
 }
+
+function Stage({ title, text }: { title: string; text: string }) { return <div className="rounded-xl border bg-card p-5"><h3 className="font-bold">{title}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{text}</p></div>; }
 
 function ResourceLink({ title, url, description }: { title: string, url: string, description: string }) {
   return (

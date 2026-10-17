@@ -4,6 +4,10 @@ import { ReportDisplay } from '@/components/homepack/report-display';
 import { Address, ReportResult } from '@/types';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowRight, CircleHelp, Database, ListChecks } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const SAMPLE_ADDRESS: Address = {
   houseNumber: '41',
@@ -382,14 +386,27 @@ export default function SampleReportPage() {
       <Header />
       <main className="site-main container mx-auto px-4 py-12 flex-grow">
         <PageHero eyebrow="Explore before you buy" illustration="report"><h1 className="site-page-heading">Sample UK property report</h1><p>See how available property and local-area records are presented in this dated sample for 41 Bingley Avenue, Tamworth, B78 3BU. Snapshot checked 27 September 2026.</p><p className="page-hero-footnote">Source records change. Generate a new report for current research and independently verify material findings.</p></PageHero>
+        <section className="mb-10 grid gap-5 md:grid-cols-3" aria-label="How to use this sample report">
+          <SampleGuide icon={Database} title="What this sample shows" text="The layout, source labels, dates, returned records and limitations you can expect. A new address may return more, less or different information." />
+          <SampleGuide icon={ListChecks} title="How to use the findings" text="Turn the results into questions for the seller, estate agent, surveyor or conveyancer. Follow important records back to their original source." />
+          <SampleGuide icon={CircleHelp} title="What to investigate" text="Check the age of each record, planning relevance, current connectivity, EPC recommendations and any environmental point that affects your decision." />
+        </section>
         <ReportDisplay 
           address={SAMPLE_ADDRESS} 
           reportData={SAMPLE_REPORT_DATA} 
           isLoading={false} 
           onReset={() => window.location.href = '/'} 
         />
+        <section className="mt-10 rounded-2xl border bg-primary/5 p-6 md:flex md:items-center md:justify-between md:gap-8">
+          <div><h2 className="text-2xl font-bold">Research the property you are considering</h2><p className="mt-2 max-w-2xl text-muted-foreground">Generate a current report for the exact address. Coverage depends on the property and the records available when you run it.</p></div>
+          <Button asChild className="mt-5 shrink-0 md:mt-0"><Link to="/tool">Create a property report <ArrowRight /></Link></Button>
+        </section>
       </main>
       <Footer />
     </div>
   );
+}
+
+function SampleGuide({ icon: Icon, title, text }: { icon: React.ComponentType<{ className?: string }>; title: string; text: string }) {
+  return <Card><CardHeader><Icon className="h-6 w-6 text-primary" /><CardTitle className="text-lg">{title}</CardTitle></CardHeader><CardContent><p className="text-sm leading-relaxed text-muted-foreground">{text}</p></CardContent></Card>;
 }

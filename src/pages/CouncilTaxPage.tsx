@@ -5,7 +5,7 @@ import { PageHero } from '@/components/layout/PageHero';
  */
 
 import { useState, FormEvent } from 'react';
-import { Search, Home, MapPin, Loader2, Info } from 'lucide-react';
+import { Search, Home, MapPin, Loader2, Info, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -53,7 +53,7 @@ export default function CouncilTaxPage() {
       <Header />
       
       <main className="site-main flex-grow flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
-        <PageHero eyebrow="Understand the running costs" icon={<Home />}><h1 className="site-page-heading">Council tax band checker by address</h1><p>Check the official VOA council tax band for an exact UK property address, with available local authority charges and source details.</p></PageHero>
+        <PageHero eyebrow="Understand the running costs" icon={<Home />}><h1 className="site-page-heading">Council tax band checker by address</h1><p>Check the official VOA council tax band for an exact property address in England or Wales, with available local authority charges and source details.</p></PageHero>
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -205,12 +205,33 @@ export default function CouncilTaxPage() {
           </AnimatePresence>
         </motion.div>
         
-        <p className="mt-8 text-xs text-slate-400 text-center max-w-xs">
-          Data sourced from GOV.UK. This tool is for informational purposes only.
-        </p>
+        <section className="mt-12 w-full max-w-5xl" aria-labelledby="council-tax-explained">
+          <h2 id="council-tax-explained" className="text-3xl font-bold text-center">How council tax bands and charges work</h2>
+          <p className="mx-auto mt-3 max-w-3xl text-center text-muted-foreground">The valuation band and the amount billed are related, but they are not the same record. UKHomePack does not substitute a guessed band when an exact official match is unavailable.</p>
+          <div className="mt-7 grid gap-5 md:grid-cols-3">
+            <Explainer title="1. Confirm the band" text="The Valuation Office Agency maintains council tax bands for domestic properties in England and Wales. Enter the complete address so the exact official property can be matched." />
+            <Explainer title="2. Match the annual charge" text="The billing authority publishes a standard charge for each band and financial year. The figure shown is the published standard amount where it can be matched." />
+            <Explainer title="3. Check your actual bill" text="Discounts, exemptions, support, parish or local precepts and account adjustments can change what a household pays. Confirm the final amount with the council." />
+          </div>
+          <div className="mt-8 rounded-2xl border bg-muted/20 p-6">
+            <h2 className="text-xl font-bold">Council tax questions</h2>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <details className="rounded-xl border bg-background p-4"><summary className="cursor-pointer font-semibold">Why might a charge be unavailable?</summary><p className="mt-2 text-sm text-muted-foreground">The band may be confirmed while the current authority, parish or published charge table cannot be matched reliably. We show “Not available” rather than an estimate.</p></details>
+              <details className="rounded-xl border bg-background p-4"><summary className="cursor-pointer font-semibold">Can a council tax band change?</summary><p className="mt-2 text-sm text-muted-foreground">Yes. Bands can be reviewed in specific circumstances. Use the official service to understand checks and challenges before taking action.</p></details>
+              <details className="rounded-xl border bg-background p-4"><summary className="cursor-pointer font-semibold">Does this checker cover Scotland or Northern Ireland?</summary><p className="mt-2 text-sm text-muted-foreground">No. This checker uses the VOA service for England and Wales. Scotland has its own valuation system, while Northern Ireland uses domestic rates.</p></details>
+              <details className="rounded-xl border bg-background p-4"><summary className="cursor-pointer font-semibold">Is the displayed amount my final bill?</summary><p className="mt-2 text-sm text-muted-foreground">Not necessarily. It is the available standard annual charge before any household-specific discounts, exemptions, relief or account adjustments.</p></details>
+            </div>
+            <a href="https://www.gov.uk/council-tax-bands" target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 font-semibold text-primary">Check official council tax guidance <ExternalLink className="h-4 w-4" /></a>
+          </div>
+        </section>
+        <p className="mt-8 text-xs text-slate-400 text-center max-w-xl">Official band information is sourced from the VOA service. Published charge availability varies. This tool is for informational purposes only.</p>
       </main>
 
       <Footer />
     </div>
   );
+}
+
+function Explainer({ title, text }: { title: string; text: string }) {
+  return <article className="rounded-2xl border bg-card p-5"><CheckCircle2 className="h-6 w-6 text-primary" /><h3 className="mt-3 font-bold">{title}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{text}</p></article>;
 }

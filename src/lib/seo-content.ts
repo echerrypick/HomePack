@@ -41,12 +41,12 @@ const PAGE_CONTENT: Record<string, PageContent> = {
   '/features': {
     eyebrow: 'UK property data in one place',
     heading: 'Property checks included in a UKHomePack report',
-    intro: 'Explore the available property and local-area records that UKHomePack organises into one practical report for a UK residential address.',
+    intro: 'Understand what each UKHomePack property check shows, why it may matter and what still needs independent verification.',
     sections: [
       { heading: 'Property, energy and cost records', items: ['HM Land Registry sold-price history and recent street sales where available', 'EPC rating and energy information', 'Official VOA council tax band and published local authority charges where available'] },
       { heading: 'Planning and environmental checks', items: ['Planning applications at the property and on its street', 'Flood-risk information from relevant official datasets', 'Nearby schools and local crime statistics'] },
       { heading: 'Connectivity checks', items: ['Available Ofcom broadband coverage and speed information', 'Available Ofcom voice, 4G and 5G coverage predictions'], links: [{ href: '/broadband', label: 'Learn about broadband checks' }, { href: '/mobile', label: 'Learn about mobile coverage checks' }] },
-      { heading: 'Understand report coverage', paragraphs: ['Records depend on the address and the source data available. A UKHomePack report is not a structural survey, valuation, conveyancing search or legal opinion.'], links: [{ href: '/sample', label: 'View the sample report' }, { href: '/pricing', label: 'See report pricing' }] },
+      { heading: 'Understand geographical and source coverage', paragraphs: ['HM Land Registry Price Paid Data and the VOA council tax service used by UKHomePack cover England and Wales. Other datasets have their own coverage, publication cycles and limitations. “Not available” does not confirm that an issue or feature does not exist.'], links: [{ href: '/sample', label: 'View the sample report' }, { href: '/pricing', label: 'See report pricing' }] },
     ],
   },
   '/pricing': {
@@ -65,7 +65,8 @@ const PAGE_CONTENT: Record<string, PageContent> = {
     heading: 'View a sample UK property report',
     intro: 'See how UKHomePack presents available property records, local-area information, source details and important data limitations in an easy-to-read report.',
     sections: [
-      { heading: 'See the report structure', paragraphs: ['The sample demonstrates sections for property details, sold prices, EPC, council tax, planning, flood risk, crime, schools and connectivity. Actual results depend on the records available for the chosen address.'] },
+      { heading: 'See the report structure', paragraphs: ['The sample demonstrates sections for property details, sold prices, EPC, council tax, planning, flood risk, crime, schools and connectivity. It also shows source dates and limitations. Actual results depend on the records available for the chosen address.'] },
+      { heading: 'Turn findings into useful questions', paragraphs: ['Check how recent each record is, follow important findings to the original source and raise material points with the seller, surveyor or conveyancer.'] },
       { heading: 'Ready to research an address?', links: [{ href: '/tool', label: 'Create your property report' }, { href: '/pricing', label: 'View pricing and business plans' }] },
     ],
   },
@@ -80,7 +81,7 @@ const PAGE_CONTENT: Record<string, PageContent> = {
   },
   '/buyer-guide': {
     eyebrow: 'Practical guidance for homebuyers',
-    heading: 'Property checks to make before buying a house',
+    heading: 'What to check before buying a house in the UK',
     intro: 'Use this UK homebuyer guide to understand the research, professional checks and questions that can help before you exchange contracts.',
     sections: [
       { heading: 'Research the property and local area', items: ['Review available sold-price, EPC and council tax records', 'Check planning applications, flood information and nearby development', 'Consider schools, crime, broadband and mobile coverage'] },
@@ -90,7 +91,7 @@ const PAGE_CONTENT: Record<string, PageContent> = {
   },
   '/seller-guide': {
     eyebrow: 'Practical guidance for home sellers',
-    heading: 'Prepare property information before selling your home',
+    heading: 'Preparing your house for sale: a practical UK checklist',
     intro: 'Organising accurate documents and property details early can help you answer enquiries and reduce avoidable delays during a UK property sale.',
     sections: [
       { heading: 'Documents and details to prepare', items: ['Current EPC and property information', 'Planning permissions, building regulations documents and guarantees', 'Details needed for the TA6 property information form and your conveyancer'] },
@@ -101,9 +102,9 @@ const PAGE_CONTENT: Record<string, PageContent> = {
   '/council-tax': {
     eyebrow: 'Council tax information by property',
     heading: 'Check a council tax band and published local charge',
-    intro: 'UKHomePack uses the official VOA council tax band for a property address and matches it to published local authority charges where the required source data is available.',
+    intro: 'For properties in England and Wales, UKHomePack uses the official VOA council tax band for an exact address and matches it to published local authority charges where the required source data is available.',
     sections: [
-      { heading: 'No estimated council tax band', paragraphs: ['If an official band or an exact published charge cannot be confirmed, UKHomePack does not replace it with a guessed value. Charges can change by financial year and may include parish or local precepts.'] },
+      { heading: 'No estimated council tax band', paragraphs: ['If an official band or an exact published charge cannot be confirmed, UKHomePack does not replace it with a guessed value. Discounts, exemptions, support, parish or local precepts and account adjustments can change the final bill.'] },
       { heading: 'Council tax in a property report', links: [{ href: '/features', label: 'See all property report checks' }, { href: '/tool', label: 'Check a property address' }] },
     ],
   },

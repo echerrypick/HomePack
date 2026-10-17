@@ -130,10 +130,24 @@ export function ArticleManager() {
           <div className="grid gap-5 md:grid-cols-2"><label className="grid gap-1.5 text-sm font-medium">Image URL <span className="font-normal text-muted-foreground">optional, HTTPS only</span><Input type="url" value={form.imageUrl} onChange={event => update('imageUrl', event.target.value)} placeholder="https://…" /></label><label className="grid gap-1.5 text-sm font-medium">Image description <span className="font-normal text-muted-foreground">required when using an image</span><Input value={form.imageAlt} maxLength={180} onChange={event => update('imageAlt', event.target.value)} placeholder="Describe the image for accessibility" /></label></div>
           <div className="grid gap-5 md:grid-cols-2"><label className="grid gap-1.5 text-sm font-medium">Author name<Input value={form.authorName} maxLength={80} onChange={event => update('authorName', event.target.value)} /></label><label className="grid gap-1.5 text-sm font-medium">Tags <span className="font-normal text-muted-foreground">comma separated</span><Input value={form.tags.join(', ')} onChange={event => update('tags', event.target.value.split(',').map(tag => tag.trim()).filter(Boolean))} placeholder="homebuyer, planning, due diligence" /></label></div>
           <div className="grid gap-5 md:grid-cols-2"><label className="grid gap-1.5 text-sm font-medium">SEO title <span className="font-normal text-muted-foreground">optional</span><Input value={form.seoTitle} maxLength={70} onChange={event => update('seoTitle', event.target.value)} placeholder={form.title || 'Search result title'} /></label><label className="grid gap-1.5 text-sm font-medium">SEO description <span className="font-normal text-muted-foreground">optional</span><Textarea value={form.seoDescription} maxLength={170} rows={2} onChange={event => update('seoDescription', event.target.value)} placeholder={form.excerpt || 'Search result description'} /></label></div>
+          <div className="rounded-xl border bg-muted/20 p-5"><h3 className="font-semibold">Publishing checklist</h3><p className="mt-1 text-sm text-muted-foreground">Use this as an editorial check before making the article live. It is guidance, not an automatic accuracy review.</p><ul className="mt-4 grid gap-2 text-sm md:grid-cols-2">{articleChecks(form).map(item => <li key={item.label} className="flex items-start gap-2"><span className={item.done ? 'text-emerald-600' : 'text-muted-foreground'}>{item.done ? '✓' : '○'}</span><span>{item.label}</span></li>)}</ul></div>
           <label className="flex items-center justify-between gap-4 rounded-xl border p-4"><span><strong className="block">Featured article</strong><span className="text-sm text-muted-foreground">Show this prominently on the articles page.</span></span><input type="checkbox" className="h-5 w-5" checked={form.featured} onChange={event => update('featured', event.target.checked)} /></label>
         </div>}
         <div className="flex flex-wrap justify-end gap-3 border-t pt-4"><Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="button" variant="outline" disabled={saving} onClick={() => save('draft')}>{saving ? 'Saving…' : 'Save draft'}</Button><Button type="button" disabled={saving} onClick={() => save('published')}><Send />{saving ? 'Saving…' : editing?.status === 'published' ? 'Save published article' : 'Publish article'}</Button></div>
       </DialogContent>
     </Dialog>
   </>;
+}
+
+function articleChecks(form: ArticleInput) {
+  return [
+    { label: 'Clear, search-focused title', done: form.title.trim().length >= 20 },
+    { label: 'Useful excerpt for listing and search', done: form.excerpt.trim().length >= 80 },
+    { label: 'At least two descriptive headings', done: (form.content.match(/^##+\s+/gm) || []).length >= 2 },
+    { label: 'Links to supporting or official sources', done: /\[[^\]]+\]\(https:\/\//.test(form.content) },
+    { label: 'Internal link to a relevant UKHomePack page', done: /\[[^\]]+\]\(\//.test(form.content) || /ukhomepack\.com\//i.test(form.content) },
+    { label: 'Practical next step or call to action', done: /(next step|create a report|check a property|contact|sample report)/i.test(form.content) },
+    { label: 'Image has a meaningful description', done: !form.imageUrl || form.imageAlt.trim().length >= 12 },
+    { label: 'SEO title and description reviewed', done: form.seoTitle.trim().length >= 20 && form.seoDescription.trim().length >= 80 },
+  ];
 }

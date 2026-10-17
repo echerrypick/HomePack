@@ -35,18 +35,19 @@ export default function LandingPage() {
   const moreFaqs = useRef<HTMLDetailsElement>(null);
   return <div className="hp-home"><Header /><main>
     <section className="hp-hero"><div className="hp-wrap hp-hero-grid">
-      <div className="hp-hero-copy"><p className="hp-eyebrow">Online UK property reports for buyers & sellers</p><h1>Research a UK property <span>before you commit.</span></h1><p className="hp-intro">Check available sold-price history, EPC, council tax, planning applications, flood risk, local crime, schools and connectivity in one easy-to-read property report.</p>
+      <div className="hp-hero-copy"><p className="hp-eyebrow">Online UK property reports for buyers & sellers</p><h1>Research a UK property <span>before you commit.</span></h1><p className="hp-intro">Buying a home is a major financial decision. Bring available sold-price history, EPC, council tax, planning, flood, crime, schools and connectivity records together before taking the next step.</p>
         <p className="hp-price">One-off UK property report — <strong>{PLANS.report.price}</strong></p>
         <ul className="hp-benefits">{['One-off payment','PDF included','No subscription'].map(t=><li key={t}><Check aria-hidden="true" />{t}</li>)}</ul>
         {hasBusinessAccess(profile)&&<p className="hp-member-note">Reports are included in your active membership.</p>}
-        <div className="hp-actions"><ReportLink /><a href="#whats-included" className="hp-button hp-button-secondary">See what's included</a></div>
+        <div className="hp-actions"><ReportLink /><Link to="/sample" className="hp-button hp-button-secondary">View sample report</Link></div>
+        <p className="hp-member-note"><a href="#whats-included">See exactly what’s included and where coverage can vary</a></p>
         <ul className="hp-assurances"><li><LockKeyhole />Secure payment</li><li><Cloud />Purchase saved to your account</li><li><FileText />Downloadable PDF</li></ul>
         <p className="hp-value"><Coins />A {PLANS.report.price} check before a major property decision.</p>
       </div>
       <div className="hp-report-stage" role="img" aria-label="Illustrative HomePack report pages showing property information, energy ratings and local context"><div className="hp-report-orb" /><ReportPreview variant="history" className="hp-hero-back" /><ReportPreview variant="energy" className="hp-hero-side" /><ReportPreview className="hp-hero-front" /><p className="hp-handwritten">A clear, easy<br />to read report<svg viewBox="0 0 50 65"><path d="M40 5 Q45 35 12 52 M12 52 L16 39 M12 52 L26 53" fill="none" stroke="currentColor" strokeWidth="2" /></svg></p><p className="hp-illustration-label">Illustrative report layout · View the actual sample below</p></div>
     </div></section>
 
-    <section className="hp-sources"><div className="hp-wrap"><div className="hp-section-heading"><h2>Built using trusted UK property data</h2><p>We bring together public and official records to help you make more informed property decisions.</p></div><div className="hp-source-grid">
+    <section className="hp-sources"><div className="hp-wrap"><div className="hp-section-heading"><h2>Built using available public and official property data</h2><p>We bring returned source records together to help you identify useful questions before making a property decision.</p></div><div className="hp-source-grid">
       <div className="hp-source-card"><span className="hp-land-mark" aria-hidden="true">{Array.from({length:19},(_,i)=><i key={i}/>)}</span><div><h3>HM Land Registry</h3><p>Recorded sales & tenure</p></div></div>
       <div className="hp-source-card"><Crown className="hp-crown" aria-hidden="true" /><div><h3>GOV.UK EPC Register</h3><p>Energy performance</p></div></div>
       <div className="hp-source-card"><FileText aria-hidden="true" /><div><h3>Planning data</h3><p>Local planning information</p></div></div>

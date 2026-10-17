@@ -156,6 +156,10 @@ export default function PricingPage() {
           </div>
         </PageHero>
 
+        <section className="mx-auto mb-8 grid max-w-5xl gap-5 md:grid-cols-2" aria-label="Choose the right property report plan">
+          <div className="rounded-2xl border bg-card p-6"><h2 className="text-xl font-bold">Buying or selling one property?</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Choose Retail for one address, one payment and a downloadable report. There is no recurring subscription.</p><button onClick={() => setFilterType('consumer')} className="mt-4 font-semibold text-primary">View the £9.99 Retail report →</button></div>
+          <div className="rounded-2xl border bg-card p-6"><h2 className="text-xl font-bold">Researching property for clients?</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Choose Business for regular reports, or Business Plus when client-facing PDFs need your company branding.</p><button onClick={() => setFilterType('business')} className="mt-4 font-semibold text-primary">Compare £49 and £79 business plans →</button></div>
+        </section>
         <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Reports bring together available public-source records. Coverage varies by property and provider; incomplete checks are identified. Licensed radon, mining and ground-stability searches are not included.</p>
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-10 max-w-7xl mx-auto pt-8 pb-12 items-stretch">
