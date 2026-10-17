@@ -3324,6 +3324,9 @@ async function startServer() {
       }
       if (!seo.index) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       if (!isKnownSeoPath(req.path) || articleMissing) res.status(404);
+      // Each deployment replaces hashed JavaScript chunks. HTML must always be
+      // revalidated so a browser refresh receives the current chunk manifest.
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       let html = injectSeoContent(injectSeoHead(indexTemplate, seo), seo);
       if (dynamicContent) html = replaceSeoContent(html, dynamicContent);
       res.type('html').send(html);

@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCcw } from 'lucide-react';
+import { staleDeploymentFailureKey } from '@/lib/deployment-recovery';
 
 interface Props {
   children: ReactNode;
@@ -24,6 +25,18 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+    const failedBuildAsset = staleDeploymentFailureKey(error);
+    if (!failedBuildAsset) return;
+    try {
+      const storageKey = 'ukhomepack:reloaded-missing-build-asset';
+      if (window.sessionStorage.getItem(storageKey) !== failedBuildAsset) {
+        window.sessionStorage.setItem(storageKey, failedBuildAsset);
+        window.location.reload();
+      }
+    } catch {
+      // Storage can be unavailable in privacy-restricted browsers. The visible
+      // refresh action remains available as the safe fallback.
+    }
   }
 
   private handleReset = () => {
