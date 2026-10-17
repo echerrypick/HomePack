@@ -90,13 +90,15 @@ export function HomePackChecklistModal() {
             <div className="flex items-center justify-between text-xs font-medium text-muted-foreground mb-1.5">
               <span>{isCompleted ? "100% Complete" : `${progress}% Complete`}</span>
               <span>
-                {isCompleted 
-                  ? "Verified Official Records" 
-                  : completedCount < 3 
-                    ? "~8 seconds remaining" 
-                    : completedCount < 6 
-                      ? "~4 seconds remaining" 
-                      : "Finalizing summary..."}
+                {isCompleted
+                  ? "Verified Official Records"
+                  : completedCount < 3
+                    ? "Querying official databases..."
+                    : completedCount < 6
+                      ? "Cross-referencing records..."
+                      : completedCount < totalCount - 1
+                        ? "Completing remaining checks..."
+                        : "Finalizing summary..."}
               </span>
             </div>
             <Progress value={progress} className="h-2 rounded-full" />

@@ -1,6 +1,5 @@
 import { chromium } from "playwright";
 import { type Browser } from "playwright";
-import fs from "fs";
 import { ensurePlaywrightChromium } from "./ofcomScraper";
 
 export interface GenerationSignal {
@@ -24,6 +23,29 @@ export interface CoverageResult {
   source: string;
 }
 
+const SIGINFO_BROWSER_TIMEOUT_MS = 3500;
+const SIGINFO_CLOSE_TIMEOUT_MS = 1000;
+
+const launchOptions = {
+  headless: true,
+  timeout: SIGINFO_BROWSER_TIMEOUT_MS,
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-blink-features=AutomationControlled",
+    "--disable-infobars",
+    "--window-size=1280,900",
+  ],
+};
+
+async function closeBrowserWithin(browser: Browser): Promise<void> {
+  await Promise.race([
+    browser.close().catch(() => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, SIGINFO_CLOSE_TIMEOUT_MS)),
+  ]);
+}
+
 export async function scrapeCoverage(
   postcode: string,
   _houseNumber?: string,
@@ -32,46 +54,33 @@ export async function scrapeCoverage(
   console.log(`[Siginfo] Starting coverage scrape for postcode: ${postcode}`);
 
   let browser: Browser | null = null;
-  const abortHandler = () => void browser?.close().catch(() => undefined);
+  let closePromise: Promise<void> | null = null;
+  const closeBrowser = () => {
+    if (!browser) return Promise.resolve();
+    closePromise ||= closeBrowserWithin(browser);
+    return closePromise;
+  };
+  const abortHandler = () => void closeBrowser();
   signal?.addEventListener('abort', abortHandler, { once: true });
 
   try {
     if (signal?.aborted) throw new Error('Siginfo lookup timed out');
     try {
-      browser = await chromium.launch({
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-blink-features=AutomationControlled",
-          "--disable-infobars",
-          "--window-size=1280,900",
-          "--single-process",
-          "--no-zygote",
-        ],
-      });
+      browser = await chromium.launch(launchOptions);
     } catch (err: any) {
       if (err?.message && (err.message.includes("Executable doesn't exist") || err.message.includes("playwright install"))) {
-        console.warn("[Siginfo] Playwright browser not found. Installing chromium now...");
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error('Siginfo browser is unavailable in the production image');
+        }
+        console.warn("[Siginfo] Playwright browser not found. Installing chromium for local development...");
         await ensurePlaywrightChromium();
-        browser = await chromium.launch({
-          headless: true,
-          args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-blink-features=AutomationControlled",
-            "--disable-infobars",
-            "--window-size=1280,900",
-            "--single-process",
-            "--no-zygote",
-          ],
-        });
+        browser = await chromium.launch(launchOptions);
       } else {
         throw err;
       }
     }
+
+    if (signal?.aborted) throw new Error('Siginfo lookup timed out');
 
     const context = await browser.newContext({
       userAgent:
@@ -241,6 +250,6 @@ export async function scrapeCoverage(
     };
   } finally {
     signal?.removeEventListener('abort', abortHandler);
-    if (browser) await browser.close();
+    await closeBrowser();
   }
 }

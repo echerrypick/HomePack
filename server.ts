@@ -210,11 +210,18 @@ function fastestBroadbandSpeed(results: any[], field: 'downloadSpeed' | 'uploadS
   return speeds.length ? `${Math.max(...speeds)} Mbps` : 'Not available from Ofcom lookup';
 }
 
-// Bounded timeout helper to prevent external network or scraper hangs
-function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+// Bounded timeout helper to prevent external network or scraper hangs.
+// The callback lets callers stop any browser/network work which supports aborting.
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T, onTimeout?: () => void): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeoutPromise = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), ms);
+    timer = setTimeout(() => {
+      try {
+        onTimeout?.();
+      } finally {
+        resolve(fallback);
+      }
+    }, ms);
   });
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
 }
@@ -1631,7 +1638,16 @@ async function fetchGroundedLocalData(
     return null;
   });
 
-  const connectivityPromise = Promise.all([ofcomPromise, siginfoPromise]).then(([ofcom, siginfo]) => {
+  let connectivityTimedOut = false;
+  const connectivityPromise = withTimeout(
+    Promise.all([ofcomPromise, siginfoPromise]),
+    12_000,
+    [null, null] as const,
+    () => {
+      connectivityTimedOut = true;
+      logs.push('[Connectivity] Lookup exceeded the 12-second report deadline; continuing without an address-level result.');
+    }
+  ).then(([ofcom, siginfo]) => {
     const speed = fastestBroadbandSpeed(ofcom?.broadband || [], 'downloadSpeed');
     const networkCount = siginfo?.operators?.length || 0;
     const verifiedSpeed = speed === 'Not available from Ofcom lookup' ? null : speed;
@@ -1639,7 +1655,7 @@ async function fetchGroundedLocalData(
     const detail = [
       verifiedSpeed,
       ofcomMobileCount ? `${ofcomMobileCount} mobile networks` : networkCount ? `${networkCount} mobile networks` : null
-    ].filter(Boolean).join(' • ') || 'No exact coverage record returned';
+    ].filter(Boolean).join(' • ') || (connectivityTimedOut ? 'Coverage lookup timed out' : 'No exact coverage record returned');
     onStepProgress?.('connectivity', 'completed', detail);
     return { ofcom, siginfo };
   });
@@ -1708,7 +1724,8 @@ async function fetchGroundedLocalData(
     };
   }
 
-  // Mobile Coverage assignment: use siginfo if populated, otherwise call fetchMobileCoverageData
+  // Mobile Coverage assignment: use only the bounded lookups above. The separate
+  // browser-led checker can take much longer and must not hold up a paid report.
   if (ofcomData?.mobile && ofcomData.mobile.length > 0) {
     aiData.mobile = ofcomData.mobile;
     aiData.mobileSummary = ofcomData.mobileSummary || 'Ofcom Connected Nations postcode coverage.';
@@ -1716,17 +1733,7 @@ async function fetchGroundedLocalData(
     aiData.mobile = siginfoData.operators;
     aiData.mobileSummary = siginfoData.summary;
   } else {
-    try {
-      logs.push(`[Mobile] Fetching grounded mobile coverage and transmitter telemetry for ${postcode}...`);
-      const mobileData = await fetchMobileCoverageData(postcode, fullAddress);
-      if (mobileData && mobileData.operators && mobileData.operators.length > 0) {
-        aiData.mobile = mobileData.operators;
-        aiData.mobileSummary = mobileData.summary || "";
-        logs.push(`[Mobile] Successfully loaded verified mobile coverage for ${aiData.mobile.length} operators`);
-      }
-    } catch (mErr: any) {
-      console.warn(`[Mobile] Error fetching mobile coverage:`, mErr?.message || mErr);
-    }
+    logs.push('[Mobile] No verified operator-level result returned within the report deadline; no estimate was used.');
   }
 
   // Assign schools
