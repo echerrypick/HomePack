@@ -20,9 +20,10 @@ import { type PlanningScope } from './server/planning-scope';
 import { saveReport, listReports, readReport, saveJob, readJob, cleanupExpiredJobs } from './server/report-store';
 import { isExactLandRegistryAddress, landRegistryUriLabel } from './server/land-registry-match';
 import { queryLandRegistry } from './server/land-registry-client';
-import { injectSeoHead, isKnownSeoPath, seoForPath } from './src/lib/seo';
-import { injectSeoContent } from './src/lib/seo-content';
+import { injectSeoHead, isKnownSeoPath, seoForArticle, seoForPath } from './src/lib/seo';
 import { registerContactRoute } from './server/contact';
+import { getPublishedArticle, listPublishedArticles, registerArticleRoutes } from './server/articles';
+import { buildArticleIndexSeoContent, buildArticleSeoContent, injectSeoContent, replaceSeoContent } from './src/lib/seo-content';
 
 const execPromise = promisify(exec);
 
@@ -599,6 +600,7 @@ registerPaymentWebhook(app);
 app.use(express.json({ limit: '50mb' }));
 registerBillingRoutes(app);
 registerContactRoute(app);
+registerArticleRoutes(app);
 
 // Land Registry Fetching
 async function fetchLandRegistryData(houseNumberOrName: string, street: string, postcode: string, logs: string[]) {
@@ -3297,11 +3299,33 @@ async function startServer() {
     const indexTemplate = readFileSync(path.join(distPath, 'index.html'), 'utf8');
     app.get('/sample-report', (_req, res) => res.redirect(301, '/sample'));
     app.use(express.static(distPath, { index: false }));
-    app.get('*', (req, res) => {
-      const seo = seoForPath(req.path);
+    app.get('*', async (req, res) => {
+      let seo = seoForPath(req.path);
+      let dynamicContent = '';
+      let articleMissing = false;
+      try {
+        if (req.path === '/articles') {
+          dynamicContent = buildArticleIndexSeoContent(await listPublishedArticles());
+        } else {
+          const match = req.path.match(/^\/articles\/([a-z0-9]+(?:-[a-z0-9]+)*)$/);
+          if (match) {
+            const article = await getPublishedArticle(match[1]);
+            if (article) {
+              seo = seoForArticle(article);
+              dynamicContent = buildArticleSeoContent(article);
+            } else {
+              articleMissing = true;
+              seo = { title: 'Article Not Found | UKHomePack', description: 'The requested UKHomePack article could not be found.', path: req.path, index: false };
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Article page rendering failed:', error);
+      }
       if (!seo.index) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-      if (!isKnownSeoPath(req.path)) res.status(404);
-      const html = injectSeoContent(injectSeoHead(indexTemplate, seo), seo);
+      if (!isKnownSeoPath(req.path) || articleMissing) res.status(404);
+      let html = injectSeoContent(injectSeoHead(indexTemplate, seo), seo);
+      if (dynamicContent) html = replaceSeoContent(html, dynamicContent);
       res.type('html').send(html);
     });
   }

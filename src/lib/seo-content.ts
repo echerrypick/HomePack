@@ -1,4 +1,5 @@
 import type { SeoPage } from './seo';
+import { articleReadingMinutes, type Article } from './articles';
 
 type ContentSection = {
   heading: string;
@@ -66,6 +67,15 @@ const PAGE_CONTENT: Record<string, PageContent> = {
     sections: [
       { heading: 'See the report structure', paragraphs: ['The sample demonstrates sections for property details, sold prices, EPC, council tax, planning, flood risk, crime, schools and connectivity. Actual results depend on the records available for the chosen address.'] },
       { heading: 'Ready to research an address?', links: [{ href: '/tool', label: 'Create your property report' }, { href: '/pricing', label: 'View pricing and business plans' }] },
+    ],
+  },
+  '/articles': {
+    eyebrow: 'UK property knowledge',
+    heading: 'Property articles and practical home-moving guides',
+    intro: 'Read UKHomePack articles about researching, buying and selling property, including council tax, planning, EPCs and connectivity.',
+    sections: [
+      { heading: 'Latest property articles', paragraphs: ['Published guides and explainers appear here. Each article is reviewed and dated so you can see when it was last updated.'] },
+      { heading: 'Research a particular property', links: [{ href: '/features', label: 'See property report checks' }, { href: '/tool', label: 'Create a property report' }] },
     ],
   },
   '/buyer-guide': {
@@ -159,11 +169,7 @@ function renderSection(section: ContentSection) {
   return `<section><h2>${escapeHtml(section.heading)}</h2>${paragraphs}${items}${links}</section>`;
 }
 
-export function buildSeoContent(page: SeoPage) {
-  if (!page.index) return '<!-- SEO_CONTENT_START --><!-- SEO_CONTENT_END -->';
-  const content = PAGE_CONTENT[page.path];
-  if (!content) return '<!-- SEO_CONTENT_START --><!-- SEO_CONTENT_END -->';
-
+function renderShell(main: string) {
   return `<!-- SEO_CONTENT_START -->
     <div id="seo-static-content" class="seo-static-shell">
       <header class="seo-static-header">
@@ -172,20 +178,17 @@ export function buildSeoContent(page: SeoPage) {
           <a href="/features">Features</a>
           <a href="/pricing">Pricing</a>
           <a href="/sample">Sample report</a>
+          <a href="/articles">Articles</a>
           <a href="/buyer-guide">Buyer guide</a>
           <a href="/contact">Contact</a>
         </nav>
       </header>
-      <main class="seo-static-main">
-        <p class="seo-static-eyebrow">${escapeHtml(content.eyebrow)}</p>
-        <h1>${escapeHtml(content.heading)}</h1>
-        <p class="seo-static-intro">${escapeHtml(content.intro)}</p>
-        ${content.sections.map(renderSection).join('')}
-      </main>
+      ${main}
       <footer class="seo-static-footer">
         <nav aria-label="Footer navigation">
           <a href="/features">Property report features</a>
           <a href="/pricing">Pricing</a>
+          <a href="/articles">Property articles</a>
           <a href="/council-tax">Council tax checker</a>
           <a href="/broadband">Broadband checker</a>
           <a href="/mobile">Mobile coverage checker</a>
@@ -197,6 +200,45 @@ export function buildSeoContent(page: SeoPage) {
     <!-- SEO_CONTENT_END -->`;
 }
 
+export function buildSeoContent(page: SeoPage) {
+  if (!page.index) return '<!-- SEO_CONTENT_START --><!-- SEO_CONTENT_END -->';
+  const content = PAGE_CONTENT[page.path];
+  if (!content) return '<!-- SEO_CONTENT_START --><!-- SEO_CONTENT_END -->';
+
+  return renderShell(`<main class="seo-static-main">
+        <p class="seo-static-eyebrow">${escapeHtml(content.eyebrow)}</p>
+        <h1>${escapeHtml(content.heading)}</h1>
+        <p class="seo-static-intro">${escapeHtml(content.intro)}</p>
+        ${content.sections.map(renderSection).join('')}
+      </main>`);
+}
+
 export function injectSeoContent(html: string, page: SeoPage) {
   return html.replace(/<!-- SEO_CONTENT_START -->[\s\S]*?<!-- SEO_CONTENT_END -->/, buildSeoContent(page));
+}
+
+function plainMarkdownBlocks(content: string) {
+  return content.split(/\n\s*\n/).map(block => block
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_`>#]/g, '')
+    .trim()).filter(Boolean).slice(0, 30);
+}
+
+export function buildArticleIndexSeoContent(articles: Article[]) {
+  const listing = articles.length
+    ? `<section><h2>Published articles</h2><ul>${articles.map(article => `<li><a href="/articles/${escapeHtml(article.slug)}">${escapeHtml(article.title)}</a> — ${escapeHtml(article.excerpt)}</li>`).join('')}</ul></section>`
+    : '<section><h2>Published articles</h2><p>New UK property articles will be published here.</p></section>';
+  return renderShell(`<main class="seo-static-main"><p class="seo-static-eyebrow">UK property knowledge</p><h1>Property articles and practical home-moving guides</h1><p class="seo-static-intro">Read guides about researching, buying and selling UK property.</p>${listing}</main>`);
+}
+
+export function buildArticleSeoContent(article: Article) {
+  const published = article.publishedAt ? new Date(article.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' }) : '';
+  const paragraphs = plainMarkdownBlocks(article.content).map(block => `<p>${escapeHtml(block)}</p>`).join('');
+  return renderShell(`<main class="seo-static-main"><article><p class="seo-static-eyebrow">${escapeHtml(article.category)}</p><h1>${escapeHtml(article.title)}</h1><p class="seo-static-intro">${escapeHtml(article.excerpt)}</p><p>By ${escapeHtml(article.authorName)} · Published ${escapeHtml(published)} · ${articleReadingMinutes(article.content)} min read</p>${article.imageUrl ? `<img src="${escapeHtml(article.imageUrl)}" alt="${escapeHtml(article.imageAlt)}" width="1200" height="675" />` : ''}<section><h2>Article</h2>${paragraphs}</section><p><a href="/articles">View all property articles</a></p></article></main>`);
+}
+
+export function replaceSeoContent(html: string, content: string) {
+  return html.replace(/<!-- SEO_CONTENT_START -->[\s\S]*?<!-- SEO_CONTENT_END -->/, content);
 }

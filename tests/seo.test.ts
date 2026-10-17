@@ -26,6 +26,8 @@ test('private and unknown routes are marked noindex', () => {
 
 test('known routes can be distinguished from real 404s', () => {
   assert.equal(isKnownSeoPath('/features'), true);
+  assert.equal(isKnownSeoPath('/articles'), true);
+  assert.equal(isKnownSeoPath('/articles/checks-before-buying'), true);
   assert.equal(isKnownSeoPath('/sample-report'), true);
   assert.equal(isKnownSeoPath('/profile'), true);
   assert.equal(isKnownSeoPath('/does-not-exist'), false);

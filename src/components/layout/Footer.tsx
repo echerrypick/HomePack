@@ -18,6 +18,7 @@ export function Footer() {
     {
       title: 'Guides',
       links: [
+        { name: 'Property Articles', href: '/articles' },
         { name: 'Checks Before Buying', href: '/buyer-guide' },
         { name: 'Selling Property Guide', href: '/seller-guide' },
         { name: 'Council Tax Band Checker', href: '/council-tax' },

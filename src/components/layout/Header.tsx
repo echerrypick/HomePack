@@ -187,6 +187,16 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Link
+              to="/articles"
+              className={cn(
+                "px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                location.pathname.startsWith('/articles') ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              Articles
+            </Link>
+
             {/* Sample Report (Direct Link) */}
             <Link 
               to="/sample"
@@ -411,6 +421,18 @@ export function Header() {
             </div>
 
             {/* Sample Report */}
+            <Link
+              to="/articles"
+              className={cn(
+                "flex items-center gap-3 px-3.5 py-2.5 text-base font-semibold rounded-lg transition-colors",
+                location.pathname.startsWith('/articles') ? "bg-primary/10 text-primary" : "hover:bg-muted text-foreground"
+              )}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <BookOpen className="h-5 w-5 text-primary" />
+              <span>Articles</span>
+            </Link>
+
             <Link 
               to="/sample"
               className={cn(

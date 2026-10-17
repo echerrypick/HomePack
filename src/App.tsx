@@ -20,6 +20,8 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PaymentPage = lazy(() => import('./pages/PaymentPage'));
+const ArticlesPage = lazy(() => import('./pages/ArticlesPage'));
+const ArticlePage = lazy(() => import('./pages/ArticlePage'));
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { AuthProvider } from './contexts/AuthContext';
@@ -46,6 +48,8 @@ export default function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/sample" element={<SampleReportPage />} />
+              <Route path="/articles" element={<ArticlesPage />} />
+              <Route path="/articles/:slug" element={<ArticlePage />} />
               <Route path="/sample-report" element={<Navigate to="/sample" replace />} />
               <Route path="/features" element={<FeaturesPage />} />
               <Route path="/pricing" element={<PricingPage />} />

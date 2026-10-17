@@ -6,6 +6,14 @@ export type SeoPage = {
   description: string;
   path: string;
   index: boolean;
+  imageUrl?: string;
+  article?: {
+    headline: string;
+    authorName: string;
+    publishedAt: string;
+    updatedAt: string;
+    tags: string[];
+  };
 };
 
 const INDEXABLE_PAGES: Record<string, Omit<SeoPage, 'path' | 'index'>> = {
@@ -24,6 +32,10 @@ const INDEXABLE_PAGES: Record<string, Omit<SeoPage, 'path' | 'index'>> = {
   '/sample': {
     title: 'Sample UK Property Report | UKHomePack',
     description: 'View an illustrative UKHomePack property report and see how available sales, EPC, council tax, planning, flood, crime and local-area records are presented.',
+  },
+  '/articles': {
+    title: 'UK Property Articles & Homebuyer Guides | UKHomePack',
+    description: 'Read practical UK property articles about buying, selling, council tax, planning, EPCs, connectivity and property research.',
   },
   '/buyer-guide': {
     title: 'Property Checks Before Buying a House | UKHomePack',
@@ -70,7 +82,7 @@ const PRIVATE_PAGE_TITLES: Record<string, string> = {
 export function isKnownSeoPath(pathname: string) {
   const requestedPath = pathname.split('?')[0].replace(/\/+$/, '') || '/';
   const path = normalizeSeoPath(requestedPath);
-  return requestedPath === '/sample-report' || Boolean(INDEXABLE_PAGES[path] || PRIVATE_PAGE_TITLES[path]);
+  return requestedPath === '/sample-report' || /^\/articles\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path) || Boolean(INDEXABLE_PAGES[path] || PRIVATE_PAGE_TITLES[path]);
 }
 
 export function normalizeSeoPath(pathname: string) {
@@ -82,6 +94,12 @@ export function seoForPath(pathname: string): SeoPage {
   const path = normalizeSeoPath(pathname);
   const publicPage = INDEXABLE_PAGES[path];
   if (publicPage) return { ...publicPage, path, index: true };
+  if (/^\/articles\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path)) return {
+    title: 'UK Property Article | UKHomePack',
+    description: 'Practical information for researching, buying and selling UK property.',
+    path,
+    index: true,
+  };
 
   return {
     title: PRIVATE_PAGE_TITLES[path] || 'Page Not Found | UKHomePack',
@@ -139,6 +157,20 @@ export function structuredDataForPage(page: SeoPage) {
     ],
   }];
 
+  if (page.article) graph.push({
+    '@type': 'Article',
+    '@id': `${canonicalUrl(page)}#article`,
+    headline: page.article.headline,
+    description: page.description,
+    datePublished: page.article.publishedAt,
+    dateModified: page.article.updatedAt,
+    author: { '@type': 'Organization', name: page.article.authorName },
+    publisher: { '@id': `${SITE_URL}/#organization` },
+    mainEntityOfPage: { '@id': `${canonicalUrl(page)}#webpage` },
+    ...(page.imageUrl ? { image: page.imageUrl } : {}),
+    ...(page.article.tags.length ? { keywords: page.article.tags.join(', ') } : {}),
+  });
+
   return { '@context': 'https://schema.org', '@graph': graph };
 }
 
@@ -154,6 +186,7 @@ export function buildSeoHead(page: SeoPage) {
   const title = escapeAttribute(page.title);
   const description = escapeAttribute(page.description);
   const canonical = escapeAttribute(canonicalUrl(page));
+  const image = escapeAttribute(page.imageUrl || SHARE_IMAGE_URL);
   const robots = page.index ? 'index, follow, max-image-preview:large' : 'noindex, nofollow';
   const structuredData = page.index ? `\n    <script id="seo-structured-data" type="application/ld+json">${safeJson(structuredDataForPage(page))}</script>` : '';
 
@@ -170,13 +203,41 @@ export function buildSeoHead(page: SeoPage) {
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
     <meta property="og:url" content="${canonical}" />
-    <meta property="og:image" content="${SHARE_IMAGE_URL}" />
+    <meta property="og:image" content="${image}" />
     <meta property="og:image:alt" content="UK residential properties" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${title}" />
     <meta name="twitter:description" content="${description}" />
-    <meta name="twitter:image" content="${SHARE_IMAGE_URL}" />${structuredData}
+    <meta name="twitter:image" content="${image}" />${structuredData}
     <!-- SEO_END -->`;
+}
+
+export function seoForArticle(article: {
+  slug: string;
+  title: string;
+  excerpt: string;
+  seoTitle: string;
+  seoDescription: string;
+  imageUrl: string;
+  authorName: string;
+  publishedAt?: string;
+  updatedAt: string;
+  tags: string[];
+}): SeoPage {
+  return {
+    title: `${article.seoTitle || article.title}${(article.seoTitle || article.title).includes('UKHomePack') ? '' : ' | UKHomePack'}`,
+    description: article.seoDescription || article.excerpt,
+    path: `/articles/${article.slug}`,
+    index: Boolean(article.publishedAt),
+    ...(article.imageUrl ? { imageUrl: article.imageUrl } : {}),
+    article: {
+      headline: article.title,
+      authorName: article.authorName,
+      publishedAt: article.publishedAt || '',
+      updatedAt: article.updatedAt,
+      tags: article.tags,
+    },
+  };
 }
 
 export function injectSeoHead(html: string, page: SeoPage) {

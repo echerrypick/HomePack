@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { Shield, Users, Activity, Settings, FileText, TicketPercent, Copy, Plus, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { billingRequest } from '@/lib/billing-client';
+import { ArticleManager } from '@/components/admin/ArticleManager';
 
 type PromoCodeRecord = {
   id: string;
@@ -190,6 +191,8 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </div>
+
+        <ArticleManager />
 
         <Card className="mb-8">
           <CardHeader>

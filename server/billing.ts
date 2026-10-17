@@ -95,7 +95,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 }
 
-async function requireAdmin(_req: Request, res: Response, next: NextFunction) {
+export async function requireAdmin(_req: Request, res: Response, next: NextFunction) {
   try {
     const profile = (await database().doc(`users/${res.locals.uid}`).get()).data();
     const legacyAdmin = res.locals.emailVerified && res.locals.email === 'echerrypick@btinternet.com';
