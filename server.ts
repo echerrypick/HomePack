@@ -96,7 +96,7 @@ async function fetchCouncilTaxAnnualCharge(
   try {
     const indexResponse = await fetch(`${COUNCIL_TAX_BANDS_BASE_URL}/councils/`, {
       headers: { "User-Agent": "UKHomePack/1.0 (+https://UKHomePack.com)" },
-      signal: AbortSignal.timeout(6000)
+      signal: AbortSignal.timeout(5000)
     });
     if (!indexResponse.ok) throw new Error(`council index returned HTTP ${indexResponse.status}`);
 
@@ -118,11 +118,25 @@ async function fetchCouncilTaxAnnualCharge(
     }
 
     const councilUrl = new URL(uniqueMatches[0].href, COUNCIL_TAX_BANDS_BASE_URL).toString();
-    const councilResponse = await fetch(councilUrl, {
-      headers: { "User-Agent": "UKHomePack/1.0 (+https://UKHomePack.com)" },
-      signal: AbortSignal.timeout(6000)
-    });
-    if (!councilResponse.ok) throw new Error(`council page returned HTTP ${councilResponse.status}`);
+    let councilResponse: Response | null = null;
+    let councilPageError: unknown = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const response = await fetch(councilUrl, {
+          headers: { "User-Agent": "UKHomePack/1.0 (+https://UKHomePack.com)" },
+          signal: AbortSignal.timeout(4500)
+        });
+        if (!response.ok) throw new Error(`council page returned HTTP ${response.status}`);
+        councilResponse = response;
+        break;
+      } catch (error) {
+        councilPageError = error;
+        if (attempt < 2) {
+          logs.push(`[CouncilTax] Published charge table request failed; retrying once.`);
+        }
+      }
+    }
+    if (!councilResponse) throw councilPageError || new Error('council page was unavailable');
 
     const councilPage = cheerio.load(await councilResponse.text());
     const heading = councilPage('h1').first().text().replace(/\s+/g, ' ').trim();
@@ -1594,7 +1608,7 @@ async function fetchGroundedLocalData(
   };
 
   const councilTaxPromise = trackTiming('Council tax lookup', logs, () =>
-    withTimeout(fetchGroundedCouncilTax(houseNumber, street, postcode, logs), 15000, null)
+    withTimeout(fetchGroundedCouncilTax(houseNumber, street, postcode, logs), 20000, null)
   ).then(result => {
     const verifiedBand = /^[A-I]$/i.test(String(result?.band || ''));
     onStepProgress?.('council_tax', 'completed', verifiedBand ? `Band ${result.band}` : 'Official band unavailable');
