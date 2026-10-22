@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { authenticate, database, requireAdmin } from './billing';
 import { ARTICLE_CATEGORIES, articleReadingMinutes, relatedArticles, type Article, validateArticleInput } from '../src/lib/articles';
 import { SITE_URL } from '../src/lib/seo';
+import { notifyIndexNowUrls } from './indexnow';
 
 const COLLECTION = 'articles';
 let publicCache: { expiresAt: number; articles: Article[] } | null = null;
@@ -109,6 +110,9 @@ export function registerArticleRoutes(app: express.Express) {
       };
       await database().collection(COLLECTION).doc(id).create(article);
       clearPublicCache();
+      if (article.status === 'published') {
+        notifyIndexNowUrls([`${SITE_URL}/articles/${article.slug}`, `${SITE_URL}/articles`]);
+      }
       res.status(201).json({ article: toArticle(id, article) });
     } catch {
       res.status(503).json({ error: 'Unable to create the article.' });
@@ -146,6 +150,9 @@ export function registerArticleRoutes(app: express.Express) {
       };
       await ref.set(article);
       clearPublicCache();
+      if (current.status === 'published' || article.status === 'published') {
+        notifyIndexNowUrls([`${SITE_URL}/articles/${article.slug}`, `${SITE_URL}/articles`]);
+      }
       res.json({ article: toArticle(id, article) });
     } catch {
       res.status(503).json({ error: 'Unable to update the article.' });
