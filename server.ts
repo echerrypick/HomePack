@@ -1,3 +1,4 @@
+import { readSelectedCsvRecords, OFSTED_FIELDS } from './server/ofsted-csv';
 import { fetchPlanningHistory } from './server/planning';
 import { fetchEpcData } from './server/epc';
 import { selectBestEpcCertificate } from './server/epc-match';
@@ -1355,29 +1356,14 @@ function filterAndVerifySchools(rawList: any[], propLat?: number, propLng?: numb
 type OfstedSchoolRecord = Record<string, string>;
 let ofstedCache: { loadedAt: number; publicationLabel: string; records: OfstedSchoolRecord[] } | null = null;
 
-function parseCsvRows(csv: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let value = '';
-  let quoted = false;
-  for (let i = 0; i < csv.length; i += 1) {
-    const char = csv[i];
-    if (char === '"') {
-      if (quoted && csv[i + 1] === '"') { value += '"'; i += 1; } else quoted = !quoted;
-    } else if (char === ',' && !quoted) {
-      row.push(value); value = '';
-    } else if ((char === '\n' || char === '\r') && !quoted) {
-      if (char === '\r' && csv[i + 1] === '\n') i += 1;
-      row.push(value); value = '';
-      if (row.some(cell => cell.length > 0)) rows.push(row);
-      row = [];
-    } else value += char;
-  }
-  if (value || row.length) { row.push(value); rows.push(row); }
-  return rows;
+let ofstedLoad: Promise<{ publicationLabel: string; records: OfstedSchoolRecord[] }> | null = null;
+
+function loadLatestOfstedRecords() {
+  if (!ofstedLoad) ofstedLoad = fetchLatestOfstedRecords().finally(() => { ofstedLoad = null; });
+  return ofstedLoad;
 }
 
-async function loadLatestOfstedRecords(): Promise<{ publicationLabel: string; records: OfstedSchoolRecord[] }> {
+async function fetchLatestOfstedRecords(): Promise<{ publicationLabel: string; records: OfstedSchoolRecord[] }> {
   if (ofstedCache && Date.now() - ofstedCache.loadedAt < 24 * 60 * 60 * 1000) return ofstedCache;
   const page = await fetch('https://www.gov.uk/government/statistical-data-sets/monthly-management-information-ofsteds-school-inspections-outcomes', { signal: AbortSignal.timeout(8000) });
   if (!page.ok) throw new Error(`Ofsted catalogue returned HTTP ${page.status}`);
@@ -1387,9 +1373,20 @@ async function loadLatestOfstedRecords(): Promise<{ publicationLabel: string; re
   if (!latest) throw new Error('Latest Ofsted CSV link not found');
   const response = await fetch(latest[2], { signal: AbortSignal.timeout(20000) });
   if (!response.ok) throw new Error(`Ofsted CSV returned HTTP ${response.status}`);
-  const rows = parseCsvRows(await response.text());
-  const headers = rows.shift() || [];
-  const records = rows.map(row => Object.fromEntries(headers.map((header, index) => [header.replace(/^\uFEFF/, ''), row[index] || ''])));
+  if (!response.body) throw new Error('Ofsted CSV response has no body');
+  async function* decodedChunks() {
+    const decoder = new TextDecoder();
+    const reader = response.body!.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        yield decoder.decode(value, { stream: true });
+      }
+      yield decoder.decode();
+    } finally { reader.releaseLock(); }
+  }
+  const records = await readSelectedCsvRecords(decodedChunks(), OFSTED_FIELDS);
   ofstedCache = { loadedAt: Date.now(), publicationLabel: latest[1], records };
   return ofstedCache;
 }
@@ -2945,13 +2942,13 @@ async function generateHomePackDossier(
     return null;
   });
 
-  const healthcarePromise = trackTiming('NHS and CQC healthcare lookup', logs, () => coordsPromise.then((coords) => getHealthcareAccessData(postcode, {
+  const healthcarePromise = trackTiming('NHS and CQC healthcare lookup', logs, () => coordsPromise.then((coords) => withTimeout(getHealthcareAccessData(postcode, {
     nhsApiKey: process.env.NHS_API_KEY,
     nhsApiBaseUrl: process.env.NHS_API_BASE_URL,
     cqcApiKey: process.env.CQC_API_KEY,
     logs,
     coords: coords ? { lat: coords.latitude, lng: coords.longitude } : null
-  }))).then(res => {
+  }), 35_000, null, () => logs.push('[Healthcare] Lookup exceeded the 35-second report deadline; continuing without healthcare results.')))).then(res => {
     onStepProgress?.('healthcare', 'completed', res?.gpSurgeries?.length ? `${res.gpSurgeries.length} surgeries` : 'Registers checked');
     return res;
   }).catch(err => {

@@ -77,6 +77,10 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
     }
   });
 
+  const [pollJobId, setPollJobId] = useState<string | null>(() => {
+    try { return localStorage.getItem(ACTIVE_JOB_KEY); } catch { return null; }
+  });
+
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -141,12 +145,13 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
   // Poll a job by ID
   const pollJob = useCallback(async (jobId: string) => {
     try {
-      const res = await authenticatedFetch(`/api/homepack/job/${jobId}`);
+      const res = await authenticatedFetch(`/api/homepack/job/${jobId}`, { signal: AbortSignal.timeout(20_000) });
       if (!res.ok) {
         if (res.status === 404) {
           // Job expired or not found on server
           localStorage.removeItem(ACTIVE_JOB_KEY);
           setActiveJob(null);
+          setPollJobId(null);
         }
         return;
       }
@@ -193,20 +198,12 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
     }
   }, [navigate, saveRecentReport]);
 
-  // Restore active job from localStorage on initial mount (resilient to refresh)
-  useEffect(() => {
-    const savedJobId = localStorage.getItem(ACTIVE_JOB_KEY);
-    if (savedJobId) {
-      pollJob(savedJobId);
-    }
-  }, [pollJob]);
-
   // Sequential polling avoids overlapping requests; hidden tabs and database fallback poll less often.
   useEffect(() => {
-    if (activeJob && activeJob.status === 'processing') {
+    if (pollJobId && (!activeJob || activeJob.status === 'processing')) {
       if (!pollTimerRef.current) {
         const tick = async () => {
-          await pollJob(activeJob.id);
+          await pollJob(pollJobId);
           if (pollTimerRef.current) pollTimerRef.current = setTimeout(tick, document.hidden ? 30_000 : pollDelay.current);
         };
         pollTimerRef.current = setTimeout(tick, pollDelay.current);
@@ -224,7 +221,7 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
         pollTimerRef.current = null;
       }
     };
-  }, [activeJob?.id, activeJob?.status, pollJob]);
+  }, [pollJobId, activeJob?.status, pollJob]);
 
   const startJob = async (address: Address): Promise<string> => {
     const res = await authenticatedFetch('/api/homepack/start', {
@@ -241,6 +238,7 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
     const data = await res.json();
     const newJob: HomePackJob = data.job;
 
+    setPollJobId(newJob.id);
     setActiveJob(newJob);
     localStorage.setItem(ACTIVE_JOB_KEY, newJob.id);
     setIsModalOpen(true);
@@ -251,6 +249,7 @@ function AccountJobs({ children }: { children: React.ReactNode }) {
   const closeModal = () => setIsModalOpen(false);
   const dismissActiveJob = () => {
     localStorage.removeItem(ACTIVE_JOB_KEY);
+    setPollJobId(null);
     setActiveJob(null);
     setIsModalOpen(false);
   };

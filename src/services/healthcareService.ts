@@ -60,7 +60,7 @@ export async function fetchCqcRatingForOds(odsCode: string, cqcApiKey?: string):
     }
 
     const url = `https://api.cqc.org.uk/public/v1/locations?odsCode=${encodeURIComponent(odsCode)}`;
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const data = await res.json();
       if (data.locations && data.locations.length > 0) {
